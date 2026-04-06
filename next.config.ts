@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  outputFileTracingIncludes: {
+    "/**": ["./src/generated/prisma/**/*"],
+  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "res.cloudinary.com" },
