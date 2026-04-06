@@ -47,6 +47,8 @@ async function getPlayerBySlug(slug: string) {
               tournament: { select: { name: true, gameCategory: true } },
               homeTeam: { select: { name: true } },
               awayTeam: { select: { name: true } },
+              homePlayer: { select: { name: true } },
+              awayPlayer: { select: { name: true } },
             },
           },
         },
@@ -267,38 +269,77 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                       <TableRow className="bg-muted/50">
                         <TableHead>Event</TableHead>
                         <TableHead>Match</TableHead>
+                        <TableHead>Score</TableHead>
+                        <TableHead>Result</TableHead>
                         <TableHead>Tournament</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {player.matchEvents.map((event) => (
-                        <TableRow key={event.id}>
-                          <TableCell>
-                            <span className="font-medium">
-                              {EVENT_TYPE_LABELS[event.type] ?? event.type}
-                            </span>
-                            {event.minute && (
-                              <span className="text-xs text-muted-foreground ml-2">
-                                ({event.minute}&apos;)
+                      {player.matchEvents.map((event) => {
+                        const match = event.match;
+                        // Determine if player was home or away
+                        const isHome = match?.homePlayer?.name === player.name || 
+                                      match?.homeTeam?.name === player.name;
+                        
+                        // Get opponent name (player or team)
+                        const opponentName = isHome 
+                          ? (match?.awayPlayer?.name ?? match?.awayTeam?.name ?? "Unknown")
+                          : (match?.homePlayer?.name ?? match?.homeTeam?.name ?? "Unknown");
+                        
+                        // Get player's team score and opponent score
+                        const playerScore = isHome ? (match?.homeScore ?? 0) : (match?.awayScore ?? 0);
+                        const opponentScore = isHome ? (match?.awayScore ?? 0) : (match?.homeScore ?? 0);
+                        
+                        // Determine result
+                        let result = "—";
+                        let resultClass = "text-muted-foreground";
+                        if (match?.status === "COMPLETED") {
+                          if (playerScore > opponentScore) {
+                            result = "W";
+                            resultClass = "text-green-500 font-bold";
+                          } else if (playerScore < opponentScore) {
+                            result = "L";
+                            resultClass = "text-red-500 font-bold";
+                          } else {
+                            result = "D";
+                            resultClass = "text-yellow-500 font-bold";
+                          }
+                        }
+                        
+                        return (
+                          <TableRow key={event.id}>
+                            <TableCell>
+                              <span className="font-medium">
+                                {EVENT_TYPE_LABELS[event.type] ?? event.type}
                               </span>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {event.match?.homeTeam?.name} vs{" "}
-                            {event.match?.awayTeam?.name}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {event.match?.tournament?.name && (
-                              <>
-                                {event.match.tournament.name}
-                                <span className="text-xs ml-1">
-                                  ({gameLabel(event.match.tournament.gameCategory as never)})
+                              {event.minute && (
+                                <span className="text-xs text-muted-foreground ml-2">
+                                  ({event.minute}&apos;)
                                 </span>
-                              </>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                              )}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              vs {opponentName}
+                            </TableCell>
+                            <TableCell className="text-sm font-mono">
+                              {playerScore} - {opponentScore}
+                            </TableCell>
+                            <TableCell className={`text-sm ${resultClass}`}>
+                              {result}
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {match?.tournament?.name && (
+                                <>
+                                  {match.tournament.name}
+                                  <span className="text-xs ml-1">
+                                    ({gameLabel(match.tournament.gameCategory as never)})
+                                  </span>
+                                </>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </CardContent>
