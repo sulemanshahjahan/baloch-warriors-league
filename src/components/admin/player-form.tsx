@@ -206,32 +206,55 @@ export function PlayerForm({ player }: PlayerFormProps) {
                   <Input
                     ref={fileInputRef}
                     type="file"
-                    accept="image/*"
+                    accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
                     className="hidden"
                     onChange={async (e) => {
                       const file = e.target.files?.[0];
                       if (!file) return;
                       
-                      setIsUploading(true);
-                      const formData = new FormData();
-                      formData.append("file", file);
-                      
-                      const result = await uploadPlayerImage(formData);
-                      if (result.success && result.url) {
-                        setPhotoUrl(result.url);
-                      } else {
-                        setError(result.error || "Upload failed");
+                      // Validate before upload
+                      const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/gif"];
+                      if (!allowedTypes.includes(file.type)) {
+                        setError(`Invalid file type: ${file.type}. Please use JPG, PNG, WebP, or GIF.`);
+                        if (fileInputRef.current) fileInputRef.current.value = "";
+                        return;
                       }
-                      setIsUploading(false);
                       
-                      // Reset file input
-                      if (fileInputRef.current) {
-                        fileInputRef.current.value = "";
+                      if (file.size > 2 * 1024 * 1024) {
+                        setError("File too large. Max 2MB for avatar images.");
+                        if (fileInputRef.current) fileInputRef.current.value = "";
+                        return;
+                      }
+                      
+                      setIsUploading(true);
+                      setError("");
+                      
+                      try {
+                        const formData = new FormData();
+                        formData.append("file", file);
+                        
+                        const result = await uploadPlayerImage(formData);
+                        console.log("Upload result:", result);
+                        
+                        if (result.success && result.url) {
+                          setPhotoUrl(result.url);
+                        } else {
+                          setError(result.error || "Upload failed");
+                        }
+                      } catch (err: any) {
+                        console.error("Upload error:", err);
+                        setError(`Upload error: ${err.message || "Unknown error"}`);
+                      } finally {
+                        setIsUploading(false);
+                        // Reset file input
+                        if (fileInputRef.current) {
+                          fileInputRef.current.value = "";
+                        }
                       }
                     }}
                   />
                   <p className="text-xs text-muted-foreground">
-                    JPG, PNG, WebP, or GIF. Max 5MB.
+                    JPG, PNG, WebP, or GIF. Max 2MB.
                   </p>
                 </div>
               </div>
