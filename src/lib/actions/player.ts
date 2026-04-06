@@ -93,6 +93,60 @@ export async function deletePlayer(id: string) {
   return { success: true, data: undefined };
 }
 
+export async function bulkDeletePlayers(ids: string[]) {
+  const session = await auth();
+  if (!session) return { success: false, error: "Unauthorized" };
+
+  await prisma.player.updateMany({
+    where: { id: { in: ids } },
+    data: { isActive: false },
+  });
+
+  revalidatePath("/admin/players");
+  return { success: true, count: ids.length };
+}
+
+const bulkPlayerSchema = z.array(
+  z.object({
+    name: z.string().min(2, "Name must be at least 2 characters"),
+    nickname: z.string().optional(),
+    position: z.string().optional(),
+    nationality: z.string().optional(),
+  })
+);
+
+export async function bulkCreatePlayers(players: { name: string; nickname?: string; position?: string; nationality?: string }[]) {
+  const session = await auth();
+  if (!session) return { success: false, error: "Unauthorized" };
+
+  const parsed = bulkPlayerSchema.safeParse(players);
+  if (!parsed.success) {
+    return { success: false, error: "Invalid player data" };
+  }
+
+  const created = [];
+  for (const data of players) {
+    const slug = slugify(data.name);
+    const existing = await prisma.player.findUnique({ where: { slug } });
+    const finalSlug = existing ? `${slug}-${Date.now().toString(36)}` : slug;
+
+    const player = await prisma.player.create({
+      data: {
+        name: data.name,
+        slug: finalSlug,
+        nickname: data.nickname || null,
+        position: data.position || null,
+        nationality: data.nationality || null,
+        isActive: true,
+      },
+    });
+    created.push(player);
+  }
+
+  revalidatePath("/admin/players");
+  return { success: true, count: created.length };
+}
+
 export async function getPlayers() {
   return prisma.player.findMany({
     where: { isActive: true },
