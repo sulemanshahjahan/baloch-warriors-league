@@ -185,6 +185,16 @@ export async function getTournamentById(id: string) {
           team: { select: { id: true, name: true, logoUrl: true } },
         },
       },
+      groups: {
+        orderBy: { orderIndex: "asc" },
+        include: {
+          teams: {
+            include: {
+              team: { select: { id: true, name: true, logoUrl: true } },
+            },
+          },
+        },
+      },
     },
   });
 }

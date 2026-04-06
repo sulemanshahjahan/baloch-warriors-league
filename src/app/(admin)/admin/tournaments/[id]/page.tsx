@@ -15,7 +15,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Edit, Plus, Users, User, Swords, BarChart3, Award } from "lucide-react";
+import { Edit, Plus, Users, User, Swords, BarChart3, Award, Calendar } from "lucide-react";
+import { ScheduleGenerator, GenerateKnockoutButton } from "./schedule-generator";
 import {
   formatDate,
   gameLabel,
@@ -232,12 +233,26 @@ export default async function TournamentDetailPage({ params }: TournamentDetailP
                 Matches
                 <Badge variant="secondary">{tournament.matches.length}</Badge>
               </CardTitle>
-              <Button variant="outline" size="sm" asChild>
-                <Link href={`/admin/matches/new?tournamentId=${id}`}>
-                  <Plus className="w-3 h-3" />
-                  Add Match
-                </Link>
-              </Button>
+              <div className="flex items-center gap-2">
+                <ScheduleGenerator
+                  tournamentId={id}
+                  participantCount={tournament.teams.length + tournament.players.length}
+                  hasGroups={tournament.groups.length > 0}
+                  participantType={tournament.participantType}
+                />
+                {tournament.groups.length > 0 && (
+                  <GenerateKnockoutButton
+                    tournamentId={id}
+                    groupCount={tournament.groups.length}
+                  />
+                )}
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={`/admin/matches/new?tournamentId=${id}`}>
+                    <Plus className="w-3 h-3" />
+                    Add Match
+                  </Link>
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
