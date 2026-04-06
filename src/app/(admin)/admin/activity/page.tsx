@@ -2,7 +2,8 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { AdminHeader } from "@/components/admin/header";
-import { getActivityLogs, formatActionLabel, formatEntityLabel } from "@/lib/actions/activity-log";
+import { getActivityLogs } from "@/lib/actions/activity-log";
+import { formatActionLabel, formatEntityLabel } from "@/lib/activity-helpers";
 import { requireRole } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import {
