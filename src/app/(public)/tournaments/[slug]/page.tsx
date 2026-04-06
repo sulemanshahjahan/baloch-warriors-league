@@ -46,7 +46,7 @@ async function getTournamentBySlug(slug: string) {
     include: {
       teams: {
         include: {
-          team: { select: { id: true, name: true, logoUrl: true, shortName: true } },
+          team: { select: { id: true, slug: true, name: true, logoUrl: true, shortName: true } },
         },
       },
       matches: {
