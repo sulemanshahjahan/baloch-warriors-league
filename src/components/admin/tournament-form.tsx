@@ -16,7 +16,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, Save } from "lucide-react";
 import { createTournament, updateTournament } from "@/lib/actions/tournament";
-import type { Tournament } from "@/generated/prisma/client";
+import type { Tournament } from "@prisma/client";
 
 interface TournamentFormProps {
   tournament?: Tournament;

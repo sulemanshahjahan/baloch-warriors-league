@@ -6,7 +6,7 @@ import {
   TournamentStatus,
   MatchStatus,
   TournamentFormat,
-} from "@/generated/prisma/enums";
+} from "@prisma/client";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
