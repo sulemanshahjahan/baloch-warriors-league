@@ -33,7 +33,7 @@ export function RescheduleForm({
   const router = useRouter();
   const [status, setStatus] = useState(currentStatus);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | undefined>(undefined);
   const [success, setSuccess] = useState(false);
 
   const scheduledAtValue = currentScheduledAt
@@ -43,7 +43,7 @@ export function RescheduleForm({
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
-    setError(null);
+    setError(undefined);
     setSuccess(false);
 
     const fd = new FormData(e.currentTarget);
