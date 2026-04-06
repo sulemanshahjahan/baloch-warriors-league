@@ -149,12 +149,12 @@ export function MatchResultForm({
       {players.length > 0 && (
         <div className="space-y-2">
           <Label>Man of the Match</Label>
-          <Select value={motm} onValueChange={setMotm}>
+          <Select value={motm || "none"} onValueChange={(v) => setMotm(v === "none" ? "" : v)}>
             <SelectTrigger>
               <SelectValue placeholder="Select player..." />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">None</SelectItem>
+              <SelectItem value="none">None</SelectItem>
               {players.map((p) => (
                 <SelectItem key={p.id} value={p.id}>
                   {p.name}

@@ -152,12 +152,12 @@ export function MatchEventManager({
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs">Team</Label>
-            <Select value={teamId} onValueChange={setTeamId}>
+            <Select value={teamId || "none"} onValueChange={(v) => setTeamId(v === "none" ? "" : v)}>
               <SelectTrigger className="h-8 text-xs">
                 <SelectValue placeholder="Select team..." />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">—</SelectItem>
+                <SelectItem value="none">—</SelectItem>
                 {teams.map((t) => (
                   <SelectItem key={t.id} value={t.id}>
                     {t.name}
@@ -171,12 +171,12 @@ export function MatchEventManager({
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label className="text-xs">Player</Label>
-            <Select value={playerId} onValueChange={setPlayerId}>
+            <Select value={playerId || "none"} onValueChange={(v) => setPlayerId(v === "none" ? "" : v)}>
               <SelectTrigger className="h-8 text-xs">
                 <SelectValue placeholder="Select player..." />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">—</SelectItem>
+                <SelectItem value="none">—</SelectItem>
                 {players.map((p) => (
                   <SelectItem key={p.id} value={p.id}>
                     {p.name}
