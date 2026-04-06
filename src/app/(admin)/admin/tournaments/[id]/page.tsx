@@ -261,7 +261,8 @@ export default async function TournamentDetailPage({ params }: TournamentDetailP
                         {match.round ?? "—"}
                       </TableCell>
                       <TableCell className="font-medium text-sm">
-                        {match.homeTeam?.name ?? "TBD"}
+                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                        {(match as any).homePlayer?.name ?? match.homeTeam?.name ?? "TBD"}
                       </TableCell>
                       <TableCell className="text-center font-bold text-sm">
                         {match.status === "COMPLETED"
@@ -269,7 +270,8 @@ export default async function TournamentDetailPage({ params }: TournamentDetailP
                           : "vs"}
                       </TableCell>
                       <TableCell className="font-medium text-sm">
-                        {match.awayTeam?.name ?? "TBD"}
+                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                        {(match as any).awayPlayer?.name ?? match.awayTeam?.name ?? "TBD"}
                       </TableCell>
                       <TableCell>
                         <span

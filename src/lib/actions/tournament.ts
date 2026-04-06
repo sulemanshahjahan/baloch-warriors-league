@@ -168,6 +168,8 @@ export async function getTournamentById(id: string) {
         include: {
           homeTeam: { select: { id: true, name: true, shortName: true } },
           awayTeam: { select: { id: true, name: true, shortName: true } },
+          homePlayer: { select: { id: true, name: true } },
+          awayPlayer: { select: { id: true, name: true } },
         },
       },
       standings: {
