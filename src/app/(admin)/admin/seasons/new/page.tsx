@@ -13,14 +13,14 @@ import { createSeason } from "@/lib/actions/season";
 
 export default function NewSeasonPage() {
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(false);
   const [isActive, setIsActive] = useState(false);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
-    setError(null);
+    setError(undefined);
     const fd = new FormData(e.currentTarget);
     fd.set("isActive", isActive ? "true" : "false");
     const result = await createSeason(fd);

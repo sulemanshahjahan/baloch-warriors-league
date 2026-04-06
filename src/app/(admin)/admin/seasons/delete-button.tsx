@@ -24,12 +24,12 @@ export function DeleteSeasonButton({
 }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | undefined>(undefined);
   const router = useRouter();
 
   async function handleDelete() {
     setLoading(true);
-    setError(null);
+    setError(undefined);
     const result = await deleteSeason(id);
     setLoading(false);
     if (!result.success) {

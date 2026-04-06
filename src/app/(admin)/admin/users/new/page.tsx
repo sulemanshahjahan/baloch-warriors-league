@@ -21,13 +21,13 @@ import { createAdminUser } from "@/lib/actions/admin-user";
 export default function NewAdminUserPage() {
   const router = useRouter();
   const [role, setRole] = useState("EDITOR");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
-    setError(null);
+    setError(undefined);
     const fd = new FormData(e.currentTarget);
     fd.set("role", role);
     const result = await createAdminUser(fd);

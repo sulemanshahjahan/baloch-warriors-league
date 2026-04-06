@@ -24,12 +24,12 @@ export function RemovePlayerButton({
 }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | undefined>(undefined);
   const router = useRouter();
 
   async function handleRemove() {
     setLoading(true);
-    setError(null);
+    setError(undefined);
     const result = await removePlayerFromTeam(teamPlayerId, teamId);
     setLoading(false);
     if (!result.success) {

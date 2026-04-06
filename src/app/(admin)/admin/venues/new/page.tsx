@@ -13,13 +13,13 @@ import { createVenue } from "@/lib/actions/venue";
 
 export default function NewVenuePage() {
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true);
-    setError(null);
+    setError(undefined);
     const result = await createVenue(new FormData(e.currentTarget));
     setLoading(false);
     if (!result.success) {
