@@ -141,6 +141,13 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                 {tournament.endDate && ` → ${formatDate(tournament.endDate)}`}
               </p>
             </div>
+            <Link
+              href={`/tournaments/${slug}/stats`}
+              className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+            >
+              <BarChart3 className="w-4 h-4" />
+              View Stats
+            </Link>
           </div>
 
           {tournament.description && (

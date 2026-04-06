@@ -1,109 +1,17 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { prisma } from "@/lib/db";
+import { getOverallStats } from "@/lib/actions/stats";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  BarChart3,
-  Trophy,
-  Target,
-  Users,
-  Swords,
-  TrendingUp,
-} from "lucide-react";
-import { getInitials, gameLabel } from "@/lib/utils";
+import { BarChart3, Trophy, Target, TrendingUp, Swords, Users } from "lucide-react";
+import { getInitials } from "@/lib/utils";
 
-async function getStats() {
-  // Top scorers
-  const topScorers = await prisma.matchEvent.groupBy({
-    by: ["playerId"],
-    where: { type: "GOAL", playerId: { not: null } },
-    _count: { type: true },
-    orderBy: { _count: { type: "desc" } },
-    take: 10,
-  });
-
-  const topScorerIds = topScorers.map((s) => s.playerId!).filter(Boolean);
-  const topScorerPlayers = await prisma.player.findMany({
-    where: { id: { in: topScorerIds } },
-    select: { id: true, name: true, slug: true, photoUrl: true },
-  });
-
-  // Top assists
-  const topAssists = await prisma.matchEvent.groupBy({
-    by: ["playerId"],
-    where: { type: "ASSIST", playerId: { not: null } },
-    _count: { type: true },
-    orderBy: { _count: { type: "desc" } },
-    take: 10,
-  });
-
-  const topAssistIds = topAssists.map((s) => s.playerId!).filter(Boolean);
-  const topAssistPlayers = await prisma.player.findMany({
-    where: { id: { in: topAssistIds } },
-    select: { id: true, name: true, slug: true, photoUrl: true },
-  });
-
-  // Most MOTM
-  const topMOTM = await prisma.matchEvent.groupBy({
-    by: ["playerId"],
-    where: { type: "MOTM", playerId: { not: null } },
-    _count: { type: true },
-    orderBy: { _count: { type: "desc" } },
-    take: 10,
-  });
-
-  const topMOTMIds = topMOTM.map((s) => s.playerId!).filter(Boolean);
-  const topMOTMPlayers = await prisma.player.findMany({
-    where: { id: { in: topMOTMIds } },
-    select: { id: true, name: true, slug: true, photoUrl: true },
-  });
-
-  // Overall stats
-  const [
-    totalTournaments,
-    totalTeams,
-    totalPlayers,
-    totalMatches,
-    completedMatches,
-    totalGoals,
-  ] = await Promise.all([
-    prisma.tournament.count(),
-    prisma.team.count({ where: { isActive: true } }),
-    prisma.player.count({ where: { isActive: true } }),
-    prisma.match.count(),
-    prisma.match.count({ where: { status: "COMPLETED" } }),
-    prisma.matchEvent.count({ where: { type: "GOAL" } }),
-  ]);
-
-  return {
-    topScorers: topScorers.map((s) => ({
-      count: s._count.type,
-      player: topScorerPlayers.find((p) => p.id === s.playerId),
-    })),
-    topAssists: topAssists.map((s) => ({
-      count: s._count.type,
-      player: topAssistPlayers.find((p) => p.id === s.playerId),
-    })),
-    topMOTM: topMOTM.map((s) => ({
-      count: s._count.type,
-      player: topMOTMPlayers.find((p) => p.id === s.playerId),
-    })),
-    overall: {
-      totalTournaments,
-      totalTeams,
-      totalPlayers,
-      totalMatches,
-      completedMatches,
-      totalGoals,
-    },
-  };
-}
+export const metadata = { title: "Statistics | BWL" };
 
 export default async function StatsPage() {
-  const stats = await getStats();
+  const stats = await getOverallStats();
 
   return (
     <div className="min-h-screen">
@@ -119,11 +27,10 @@ export default async function StatsPage() {
             </span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-black tracking-tight">
-            League Statistics
+            League Leaderboards
           </h1>
           <p className="text-muted-foreground mt-2 max-w-2xl">
-            Top performers, goal scorers, and league-wide stats across all BWL
-            competitions.
+            Top performers across all BWL tournaments. Track goals, assists, awards, and more.
           </p>
         </div>
       </section>
@@ -133,12 +40,12 @@ export default async function StatsPage() {
         {/* Overall Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
           {[
-            { label: "Tournaments", value: stats.overall.totalTournaments, icon: Trophy },
-            { label: "Teams", value: stats.overall.totalTeams, icon: Users },
-            { label: "Players", value: stats.overall.totalPlayers, icon: TrendingUp },
-            { label: "Matches", value: stats.overall.totalMatches, icon: Swords },
-            { label: "Completed", value: stats.overall.completedMatches, icon: Target },
-            { label: "Goals Scored", value: stats.overall.totalGoals, icon: Target },
+            { label: "Matches", value: stats.totals.matches, icon: Swords },
+            { label: "Goals", value: stats.totals.goals, icon: Target },
+            { label: "Assists", value: stats.totals.assists, icon: TrendingUp },
+            { label: "Yellow Cards", value: stats.totals.yellowCards, icon: Users },
+            { label: "Red Cards", value: stats.totals.redCards, icon: Users },
+            { label: "MOTM", value: stats.totals.motm, icon: Trophy },
           ].map((stat) => (
             <Card key={stat.label}>
               <CardContent className="p-4 text-center">
@@ -167,138 +74,30 @@ export default async function StatsPage() {
           </TabsList>
 
           <TabsContent value="scorers" className="mt-0">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Top Goal Scorers</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {stats.topScorers.length === 0 ? (
-                  <EmptyState />
-                ) : (
-                  <div className="space-y-3">
-                    {stats.topScorers.map((s, i) =>
-                      s.player ? (
-                        <Link
-                          key={s.player.id}
-                          href={`/players/${s.player.slug}`}
-                          className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
-                        >
-                          <div className="flex items-center gap-3">
-                            <span className="text-lg font-bold text-muted-foreground w-6">
-                              {i + 1}
-                            </span>
-                            <Avatar className="h-10 w-10">
-                              <AvatarImage src={s.player.photoUrl ?? undefined} />
-                              <AvatarFallback className="text-sm">
-                                {getInitials(s.player.name)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <span className="font-medium">{s.player.name}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Target className="w-4 h-4 text-green-400" />
-                            <span className="text-xl font-bold">{s.count}</span>
-                            <span className="text-sm text-muted-foreground">
-                              goals
-                            </span>
-                          </div>
-                        </Link>
-                      ) : null
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <LeaderboardCard 
+              title="Top Goal Scorers" 
+              data={stats.topScorers} 
+              icon={Target}
+              color="text-green-400"
+            />
           </TabsContent>
 
           <TabsContent value="assists" className="mt-0">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Top Assists</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {stats.topAssists.length === 0 ? (
-                  <EmptyState />
-                ) : (
-                  <div className="space-y-3">
-                    {stats.topAssists.map((s, i) =>
-                      s.player ? (
-                        <Link
-                          key={s.player.id}
-                          href={`/players/${s.player.slug}`}
-                          className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
-                        >
-                          <div className="flex items-center gap-3">
-                            <span className="text-lg font-bold text-muted-foreground w-6">
-                              {i + 1}
-                            </span>
-                            <Avatar className="h-10 w-10">
-                              <AvatarImage src={s.player.photoUrl ?? undefined} />
-                              <AvatarFallback className="text-sm">
-                                {getInitials(s.player.name)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <span className="font-medium">{s.player.name}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <TrendingUp className="w-4 h-4 text-blue-400" />
-                            <span className="text-xl font-bold">{s.count}</span>
-                            <span className="text-sm text-muted-foreground">
-                              assists
-                            </span>
-                          </div>
-                        </Link>
-                      ) : null
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <LeaderboardCard 
+              title="Top Assists" 
+              data={stats.topAssists} 
+              icon={TrendingUp}
+              color="text-blue-400"
+            />
           </TabsContent>
 
           <TabsContent value="motm" className="mt-0">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Most Man of the Match</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {stats.topMOTM.length === 0 ? (
-                  <EmptyState />
-                ) : (
-                  <div className="space-y-3">
-                    {stats.topMOTM.map((s, i) =>
-                      s.player ? (
-                        <Link
-                          key={s.player.id}
-                          href={`/players/${s.player.slug}`}
-                          className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
-                        >
-                          <div className="flex items-center gap-3">
-                            <span className="text-lg font-bold text-muted-foreground w-6">
-                              {i + 1}
-                            </span>
-                            <Avatar className="h-10 w-10">
-                              <AvatarImage src={s.player.photoUrl ?? undefined} />
-                              <AvatarFallback className="text-sm">
-                                {getInitials(s.player.name)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <span className="font-medium">{s.player.name}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Trophy className="w-4 h-4 text-yellow-400" />
-                            <span className="text-xl font-bold">{s.count}</span>
-                            <span className="text-sm text-muted-foreground">
-                              MOTM
-                            </span>
-                          </div>
-                        </Link>
-                      ) : null
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <LeaderboardCard 
+              title="Most Man of the Match" 
+              data={stats.mostMOTM} 
+              icon={Trophy}
+              color="text-yellow-400"
+            />
           </TabsContent>
         </Tabs>
       </div>
@@ -306,11 +105,59 @@ export default async function StatsPage() {
   );
 }
 
-function EmptyState() {
+function LeaderboardCard({ 
+  title, 
+  data, 
+  icon: Icon,
+  color,
+}: { 
+  title: string; 
+  data: Array<{ player: { id: string; name: string; slug: string; photoUrl: string | null } | undefined; count: number }>;
+  icon: React.ComponentType<{ className?: string }>;
+  color: string;
+}) {
   return (
-    <div className="text-center py-12">
-      <BarChart3 className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-      <p className="text-muted-foreground">No statistics available yet.</p>
-    </div>
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <Icon className={`w-4 h-4 ${color}`} />
+          {title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {data.length === 0 ? (
+          <p className="text-muted-foreground text-center py-8">No data available yet.</p>
+        ) : (
+          <div className="space-y-3">
+            {data.map((item, i) =>
+              item.player ? (
+                <Link
+                  key={item.player.id}
+                  href={`/players/${item.player.slug}`}
+                  className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className={`text-lg font-bold w-6 ${i < 3 ? color : 'text-muted-foreground'}`}>
+                      {i + 1}
+                    </span>
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={item.player.photoUrl ?? undefined} />
+                      <AvatarFallback className="text-sm">
+                        {getInitials(item.player.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="font-medium">{item.player.name}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Icon className={`w-4 h-4 ${color}`} />
+                    <span className="text-xl font-bold">{item.count}</span>
+                  </div>
+                </Link>
+              ) : null
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
