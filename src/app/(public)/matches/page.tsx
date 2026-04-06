@@ -121,6 +121,8 @@ function MatchCard({
     round: string | null;
     homeTeam: { id: string; name: string; shortName: string | null; logoUrl: string | null } | null;
     awayTeam: { id: string; name: string; shortName: string | null; logoUrl: string | null } | null;
+    homePlayer?: { id: string; name: string; photoUrl: string | null } | null;
+    awayPlayer?: { id: string; name: string; photoUrl: string | null } | null;
     homeScore: number | null;
     awayScore: number | null;
     status: string;
@@ -131,6 +133,12 @@ function MatchCard({
 }) {
   const isCompleted = match.status === "COMPLETED";
   const isLive = match.status === "LIVE";
+  
+  // Support both team and individual player matches
+  const homeName = match.homePlayer?.name ?? match.homeTeam?.name ?? "TBD";
+  const awayName = match.awayPlayer?.name ?? match.awayTeam?.name ?? "TBD";
+  const homeLogo = match.homeTeam?.logoUrl ?? undefined;
+  const awayLogo = match.awayTeam?.logoUrl ?? undefined;
 
   return (
     <Card className="hover:border-primary/30 transition-colors">
@@ -167,19 +175,17 @@ function MatchCard({
 
         {/* Teams & Score */}
         <div className="flex items-center justify-between gap-4">
-          {/* Home Team */}
+          {/* Home Team/Player */}
           <div className="flex items-center gap-3 flex-1">
             <Avatar className="h-10 w-10">
-              <AvatarImage src={match.homeTeam?.logoUrl ?? undefined} />
+              <AvatarImage src={homeLogo} />
               <AvatarFallback className="text-sm">
-                {getInitials(match.homeTeam?.name ?? "")}
+                {getInitials(homeName)}
               </AvatarFallback>
             </Avatar>
             <div className="min-w-0">
-              <p className="font-medium truncate">
-                {match.homeTeam?.name ?? "TBD"}
-              </p>
-              {match.homeTeam?.shortName && (
+              <p className="font-medium truncate">{homeName}</p>
+              {match.homeTeam?.shortName && !match.homePlayer && (
                 <p className="text-xs text-muted-foreground">
                   {match.homeTeam.shortName}
                 </p>
@@ -198,22 +204,20 @@ function MatchCard({
             )}
           </div>
 
-          {/* Away Team */}
+          {/* Away Team/Player */}
           <div className="flex items-center gap-3 flex-1 justify-end">
             <div className="min-w-0 text-right">
-              <p className="font-medium truncate">
-                {match.awayTeam?.name ?? "TBD"}
-              </p>
-              {match.awayTeam?.shortName && (
+              <p className="font-medium truncate">{awayName}</p>
+              {match.awayTeam?.shortName && !match.awayPlayer && (
                 <p className="text-xs text-muted-foreground">
                   {match.awayTeam.shortName}
                 </p>
               )}
             </div>
             <Avatar className="h-10 w-10">
-              <AvatarImage src={match.awayTeam?.logoUrl ?? undefined} />
+              <AvatarImage src={awayLogo} />
               <AvatarFallback className="text-sm">
-                {getInitials(match.awayTeam?.name ?? "")}
+                {getInitials(awayName)}
               </AvatarFallback>
             </Avatar>
           </div>

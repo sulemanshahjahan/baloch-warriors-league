@@ -150,13 +150,27 @@ export async function getPlayerStats(playerId: string) {
     statsMap[e.type] = e._count.type;
   }
 
-  // Count appearances (matches this player participated in)
-  const appearances = await prisma.matchEvent.findMany({
+  // Count appearances from match events
+  const eventAppearances = await prisma.matchEvent.findMany({
     where: { playerId, match: { status: "COMPLETED" } },
     select: { matchId: true },
     distinct: ["matchId"],
   });
 
+  // Count appearances from individual player matches (eFootball 1v1)
+  const individualMatches = await prisma.match.count({
+    where: {
+      status: "COMPLETED",
+      OR: [
+        { homePlayerId: playerId },
+        { awayPlayerId: playerId },
+      ],
+    },
+  });
+
+  // Combine and deduplicate match IDs
+  const appearanceMatchIds = new Set(eventAppearances.map((e) => e.matchId));
+  
   return {
     goals: statsMap["GOAL"] ?? 0,
     assists: statsMap["ASSIST"] ?? 0,
@@ -165,6 +179,6 @@ export async function getPlayerStats(playerId: string) {
     ownGoals: statsMap["OWN_GOAL"] ?? 0,
     motm: statsMap["MOTM"] ?? 0,
     kills: statsMap["KILL"] ?? 0,
-    appearances: appearances.length,
+    appearances: appearanceMatchIds.size + individualMatches,
   };
 }

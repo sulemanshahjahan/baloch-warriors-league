@@ -71,11 +71,13 @@ export default async function MatchesPage() {
                     <TableCell>
                       <div className="text-sm">
                         <span className="font-medium">
-                          {match.homeTeam?.shortName ?? match.homeTeam?.name ?? "TBD"}
+                          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                          {(match as any).homePlayer?.name ?? match.homeTeam?.shortName ?? match.homeTeam?.name ?? "TBD"}
                         </span>
                         <span className="text-muted-foreground mx-2">vs</span>
                         <span className="font-medium">
-                          {match.awayTeam?.shortName ?? match.awayTeam?.name ?? "TBD"}
+                          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                          {(match as any).awayPlayer?.name ?? match.awayTeam?.shortName ?? match.awayTeam?.name ?? "TBD"}
                         </span>
                       </div>
                     </TableCell>
