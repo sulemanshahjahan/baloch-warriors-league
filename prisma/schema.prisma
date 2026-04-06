@@ -237,6 +237,8 @@ model Player {
   captainOf       Team[]             @relation("TeamCaptain")
   awards          Award[]
   manOfTheMatches Match[]            @relation("MatchMOTM")
+  homeMatches     Match[]            @relation("HomePlayer")
+  awayMatches     Match[]            @relation("AwayPlayer")
 
   @@map("players")
 }
@@ -336,6 +338,11 @@ model Match {
   // Team vs team
   homeTeamId    String?
   awayTeamId    String?
+
+  // Player vs player (e.g. eFootball 1v1)
+  homePlayerId  String?
+  awayPlayerId  String?
+
   homeScore     Int?
   awayScore     Int?
   homeScorePens Int?
@@ -362,6 +369,8 @@ model Match {
   venue           Venue?            @relation(fields: [venueId], references: [id])
   homeTeam        Team?             @relation("HomeTeam", fields: [homeTeamId], references: [id])
   awayTeam        Team?             @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  homePlayer      Player?           @relation("HomePlayer", fields: [homePlayerId], references: [id])
+  awayPlayer      Player?           @relation("AwayPlayer", fields: [awayPlayerId], references: [id])
   motmPlayer      Player?           @relation("MatchMOTM", fields: [motmPlayerId], references: [id])
   events          MatchEvent[]
   participants    MatchParticipant[]

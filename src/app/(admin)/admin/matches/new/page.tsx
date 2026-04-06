@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Save } from "lucide-react";
+import { Loader2, Save, Users, User } from "lucide-react";
 import { createMatch } from "@/lib/actions/match";
 
 interface Tournament {
@@ -23,7 +23,10 @@ interface Tournament {
   name: string;
   gameCategory: string;
   teams: { team: { id: string; name: string } }[];
+  players: { player: { id: string; name: string } }[];
 }
+
+type MatchType = "TEAM" | "PLAYER";
 
 export default function NewMatchPage() {
   const router = useRouter();
@@ -34,12 +37,16 @@ export default function NewMatchPage() {
   const [error, setError] = useState("");
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [tournamentId, setTournamentId] = useState(defaultTournamentId);
+  const [matchType, setMatchType] = useState<MatchType>("TEAM");
   const [homeTeamId, setHomeTeamId] = useState("");
   const [awayTeamId, setAwayTeamId] = useState("");
+  const [homePlayerId, setHomePlayerId] = useState("");
+  const [awayPlayerId, setAwayPlayerId] = useState("");
   const [status, setStatus] = useState("SCHEDULED");
 
   const selectedTournament = tournaments.find((t) => t.id === tournamentId);
   const teams = selectedTournament?.teams.map((tt) => tt.team) ?? [];
+  const players = selectedTournament?.players.map((tp) => tp.player) ?? [];
 
   useEffect(() => {
     fetch("/api/admin/tournaments")
@@ -48,14 +55,36 @@ export default function NewMatchPage() {
       .catch(() => {});
   }, []);
 
+  function handleTournamentChange(id: string) {
+    setTournamentId(id);
+    setHomeTeamId("");
+    setAwayTeamId("");
+    setHomePlayerId("");
+    setAwayPlayerId("");
+  }
+
+  function handleMatchTypeChange(type: MatchType) {
+    setMatchType(type);
+    setHomeTeamId("");
+    setAwayTeamId("");
+    setHomePlayerId("");
+    setAwayPlayerId("");
+  }
+
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
     const formData = new FormData(e.currentTarget);
     formData.set("tournamentId", tournamentId);
-    formData.set("homeTeamId", homeTeamId);
-    formData.set("awayTeamId", awayTeamId);
     formData.set("status", status);
+
+    if (matchType === "TEAM") {
+      formData.set("homeTeamId", homeTeamId);
+      formData.set("awayTeamId", awayTeamId);
+    } else {
+      formData.set("homePlayerId", homePlayerId);
+      formData.set("awayPlayerId", awayPlayerId);
+    }
 
     startTransition(async () => {
       const result = await createMatch(formData);
@@ -67,7 +96,7 @@ export default function NewMatchPage() {
         );
         router.refresh();
       } else {
-        setError((result as any).error ?? '');
+        setError((result as { error?: string }).error ?? "");
       }
     });
   }
@@ -90,11 +119,7 @@ export default function NewMatchPage() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label>Tournament *</Label>
-                <Select value={tournamentId} onValueChange={(v) => {
-                  setTournamentId(v);
-                  setHomeTeamId("");
-                  setAwayTeamId("");
-                }}>
+                <Select value={tournamentId} onValueChange={handleTournamentChange}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select tournament..." />
                   </SelectTrigger>
@@ -108,38 +133,127 @@ export default function NewMatchPage() {
                 </Select>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Home Team</Label>
-                  <Select value={homeTeamId} onValueChange={setHomeTeamId} disabled={!tournamentId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select team..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {teams.filter((t) => t.id !== awayTeamId).map((t) => (
-                        <SelectItem key={t.id} value={t.id}>
-                          {t.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Away Team</Label>
-                  <Select value={awayTeamId} onValueChange={setAwayTeamId} disabled={!tournamentId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select team..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {teams.filter((t) => t.id !== homeTeamId).map((t) => (
-                        <SelectItem key={t.id} value={t.id}>
-                          {t.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              {/* Match type toggle */}
+              <div className="space-y-2">
+                <Label>Match Type</Label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant={matchType === "TEAM" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handleMatchTypeChange("TEAM")}
+                  >
+                    <Users className="w-4 h-4 mr-1" />
+                    Team vs Team
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={matchType === "PLAYER" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handleMatchTypeChange("PLAYER")}
+                  >
+                    <User className="w-4 h-4 mr-1" />
+                    Player vs Player
+                  </Button>
                 </div>
               </div>
+
+              {matchType === "TEAM" ? (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Home Team</Label>
+                    <Select
+                      value={homeTeamId}
+                      onValueChange={setHomeTeamId}
+                      disabled={!tournamentId}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select team..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {teams
+                          .filter((t) => t.id !== awayTeamId)
+                          .map((t) => (
+                            <SelectItem key={t.id} value={t.id}>
+                              {t.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Away Team</Label>
+                    <Select
+                      value={awayTeamId}
+                      onValueChange={setAwayTeamId}
+                      disabled={!tournamentId}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select team..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {teams
+                          .filter((t) => t.id !== homeTeamId)
+                          .map((t) => (
+                            <SelectItem key={t.id} value={t.id}>
+                              {t.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Home Player</Label>
+                    <Select
+                      value={homePlayerId}
+                      onValueChange={setHomePlayerId}
+                      disabled={!tournamentId}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select player..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {players
+                          .filter((p) => p.id !== awayPlayerId)
+                          .map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                    {tournamentId && players.length === 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        No individual players enrolled in this tournament yet.
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Away Player</Label>
+                    <Select
+                      value={awayPlayerId}
+                      onValueChange={setAwayPlayerId}
+                      disabled={!tournamentId}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select player..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {players
+                          .filter((p) => p.id !== homePlayerId)
+                          .map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
@@ -191,7 +305,12 @@ export default function NewMatchPage() {
               <Save className="w-4 h-4" />
               Schedule Match
             </Button>
-            <Button type="button" variant="outline" onClick={() => router.back()} disabled={isPending}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.back()}
+              disabled={isPending}
+            >
               Cancel
             </Button>
           </div>

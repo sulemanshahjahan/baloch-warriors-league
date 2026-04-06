@@ -54,6 +54,8 @@ async function getTournamentBySlug(slug: string) {
         include: {
           homeTeam: { select: { id: true, name: true, shortName: true, logoUrl: true } },
           awayTeam: { select: { id: true, name: true, shortName: true, logoUrl: true } },
+          homePlayer: { select: { id: true, name: true, slug: true, photoUrl: true } },
+          awayPlayer: { select: { id: true, name: true, slug: true, photoUrl: true } },
         },
       },
       standings: {
@@ -399,6 +401,8 @@ function MatchCard({
     round: string | null;
     homeTeam: { id: string; name: string; shortName: string | null; logoUrl: string | null } | null;
     awayTeam: { id: string; name: string; shortName: string | null; logoUrl: string | null } | null;
+    homePlayer: { id: string; name: string; slug: string; photoUrl: string | null } | null;
+    awayPlayer: { id: string; name: string; slug: string; photoUrl: string | null } | null;
     homeScore: number | null;
     awayScore: number | null;
     status: string;
@@ -406,6 +410,20 @@ function MatchCard({
   };
 }) {
   const isCompleted = match.status === "COMPLETED";
+  const isPlayerMatch = !!match.homePlayer || !!match.awayPlayer;
+
+  const homeName = isPlayerMatch
+    ? (match.homePlayer?.name ?? "TBD")
+    : (match.homeTeam?.name ?? "TBD");
+  const awayName = isPlayerMatch
+    ? (match.awayPlayer?.name ?? "TBD")
+    : (match.awayTeam?.name ?? "TBD");
+  const homeImg = isPlayerMatch
+    ? (match.homePlayer?.photoUrl ?? undefined)
+    : (match.homeTeam?.logoUrl ?? undefined);
+  const awayImg = isPlayerMatch
+    ? (match.awayPlayer?.photoUrl ?? undefined)
+    : (match.awayTeam?.logoUrl ?? undefined);
 
   return (
     <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
@@ -423,12 +441,12 @@ function MatchCard({
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 flex-1">
             <Avatar className="h-6 w-6">
-              <AvatarImage src={match.homeTeam?.logoUrl ?? undefined} />
+              <AvatarImage src={homeImg} />
               <AvatarFallback className="text-[10px]">
-                {getInitials(match.homeTeam?.name ?? "")}
+                {getInitials(homeName)}
               </AvatarFallback>
             </Avatar>
-            <span className="font-medium">{match.homeTeam?.name ?? "TBD"}</span>
+            <span className="font-medium">{homeName}</span>
           </div>
           <div className="text-center min-w-[60px]">
             {isCompleted ? (
@@ -440,11 +458,11 @@ function MatchCard({
             )}
           </div>
           <div className="flex items-center gap-2 flex-1 justify-end">
-            <span className="font-medium">{match.awayTeam?.name ?? "TBD"}</span>
+            <span className="font-medium">{awayName}</span>
             <Avatar className="h-6 w-6">
-              <AvatarImage src={match.awayTeam?.logoUrl ?? undefined} />
+              <AvatarImage src={awayImg} />
               <AvatarFallback className="text-[10px]">
-                {getInitials(match.awayTeam?.name ?? "")}
+                {getInitials(awayName)}
               </AvatarFallback>
             </Avatar>
           </div>

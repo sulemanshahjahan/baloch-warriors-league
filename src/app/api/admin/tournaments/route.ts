@@ -21,6 +21,13 @@ export async function GET() {
           },
         },
       },
+      players: {
+        select: {
+          player: {
+            select: { id: true, name: true },
+          },
+        },
+      },
     },
   });
 
