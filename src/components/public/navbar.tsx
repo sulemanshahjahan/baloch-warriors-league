@@ -45,6 +45,7 @@ export function PublicNavbar() {
               <Link
                 key={link.href}
                 href={link.href}
+                prefetch={true}
                 className="px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
               >
                 {link.label}
@@ -69,6 +70,7 @@ export function PublicNavbar() {
             <Link
               key={link.href}
               href={link.href}
+              prefetch={true}
               onClick={() => setMobileOpen(false)}
               className="block px-3 py-2.5 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
             >
