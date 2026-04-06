@@ -29,6 +29,7 @@ import { TeamEnrollment } from "./team-enrollment";
 import { PlayerEnrollment } from "./player-enrollment";
 import { AwardsManager } from "./awards-manager";
 import { GroupsManager } from "./groups-manager";
+import { QuickMatchEditor } from "./quick-match-editor";
 
 interface TournamentDetailPageProps {
   params: Promise<{ id: string }>;
@@ -313,14 +314,13 @@ export default async function TournamentDetailPage({ params }: TournamentDetailP
                     <TableHead>Home</TableHead>
                     <TableHead className="text-center">Score</TableHead>
                     <TableHead>Away</TableHead>
-                    <TableHead>Status</TableHead>
                     <TableHead>Date</TableHead>
-                    <TableHead></TableHead>
+                    <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {tournament.matches.map((match) => (
-                    <TableRow key={match.id}>
+                    <TableRow key={match.id} className="group">
                       <TableCell className="text-sm text-muted-foreground">
                         {match.round ?? "—"}
                       </TableCell>
@@ -328,21 +328,16 @@ export default async function TournamentDetailPage({ params }: TournamentDetailP
                         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                         {(match as any).homePlayer?.name ?? match.homeTeam?.name ?? "TBD"}
                       </TableCell>
-                      <TableCell className="text-center font-bold text-sm">
-                        {match.status === "COMPLETED"
-                          ? `${match.homeScore ?? 0} – ${match.awayScore ?? 0}`
-                          : "vs"}
+                      <TableCell className="text-center">
+                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                        <QuickMatchEditor 
+                          match={match as any} 
+                          participantType={tournament.participantType} 
+                        />
                       </TableCell>
                       <TableCell className="font-medium text-sm">
                         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                         {(match as any).awayPlayer?.name ?? match.awayTeam?.name ?? "TBD"}
-                      </TableCell>
-                      <TableCell>
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs ${statusColor(match.status)}`}
-                        >
-                          {statusLabel(match.status)}
-                        </span>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {match.scheduledAt ? formatDate(match.scheduledAt) : "—"}
