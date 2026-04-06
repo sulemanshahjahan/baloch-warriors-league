@@ -28,6 +28,7 @@ import {
 import { TeamEnrollment } from "./team-enrollment";
 import { PlayerEnrollment } from "./player-enrollment";
 import { AwardsManager } from "./awards-manager";
+import { GroupsManager } from "./groups-manager";
 
 interface TournamentDetailPageProps {
   params: Promise<{ id: string }>;
@@ -140,6 +141,32 @@ export default async function TournamentDetailPage({ params }: TournamentDetailP
             </CardContent>
           </Card>
         </div>
+
+        {/* Groups */}
+        {tournament.format === "GROUP_KNOCKOUT" && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Users className="w-4 h-4 text-blue-400" />
+                Groups
+                <Badge variant="secondary" className="ml-1">
+                  {tournament.groups.length}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <GroupsManager
+                tournamentId={id}
+                groups={tournament.groups}
+                unassignedTeams={tournament.teams.filter((t) =>
+                  !tournament.groups.some((g) =>
+                    g.teams.some((gt) => gt.teamId === t.teamId)
+                  )
+                )}
+              />
+            </CardContent>
+          </Card>
+        )}
 
         {/* Awards */}
         <Card>
