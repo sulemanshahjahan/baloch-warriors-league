@@ -26,7 +26,7 @@ async function getTournaments() {
     orderBy: [{ isFeatured: "desc" }, { startDate: "desc" }],
     include: {
       _count: {
-        select: { teams: true, matches: true },
+        select: { teams: true, players: true, matches: true },
       },
     },
   });
@@ -49,12 +49,19 @@ function TournamentCard({
     gameCategory: string;
     format: string;
     status: string;
+    participantType: string;
     startDate: Date | null;
     endDate: Date | null;
     isFeatured: boolean;
-    _count: { teams: number; matches: number };
+    _count: { teams: number; players: number; matches: number };
   };
 }) {
+  const isIndividual = tournament.participantType === "INDIVIDUAL";
+  const participantCount = isIndividual 
+    ? tournament._count.players 
+    : tournament._count.teams;
+  const participantLabel = isIndividual ? "players" : "teams";
+
   return (
     <Link href={`/tournaments/${tournament.slug}`}>
       <Card className="hover:border-primary/50 transition-all hover:-translate-y-0.5 cursor-pointer h-full group">
@@ -105,7 +112,7 @@ function TournamentCard({
           <div className="flex items-center gap-4 mt-4 pt-4 border-t border-border/50">
             <div className="flex items-center gap-1 text-sm">
               <Users className="w-4 h-4 text-blue-400" />
-              <span>{tournament._count.teams} teams</span>
+              <span>{participantCount} {participantLabel}</span>
             </div>
             <div className="flex items-center gap-1 text-sm">
               <Swords className="w-4 h-4 text-orange-400" />
