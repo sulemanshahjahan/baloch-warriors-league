@@ -323,9 +323,7 @@ async function recomputeIndividualStandings(tournamentId: string) {
     select: { playerId: true },
   });
 
-  const playerIds = enrolled.map((e: { playerId: string }) => e.playerId);
-
-  // Build stats map
+  // Build stats map - include enrolled players plus any players from matches
   const stats: Record<
     string,
     {
@@ -335,11 +333,30 @@ async function recomputeIndividualStandings(tournamentId: string) {
     }
   > = {};
 
-  for (const playerId of playerIds) {
+  // Initialize enrolled players with 0 stats
+  for (const { playerId } of enrolled) {
     stats[playerId] = {
       played: 0, won: 0, drawn: 0, lost: 0,
       points: 0, goalsFor: 0, goalsAgainst: 0, goalDiff: 0, cleanSheets: 0,
     };
+  }
+
+  // Ensure all match players are in stats (even if not formally enrolled)
+  for (const match of matches) {
+    const homeId = match.homePlayerId!;
+    const awayId = match.awayPlayerId!;
+    if (!stats[homeId]) {
+      stats[homeId] = {
+        played: 0, won: 0, drawn: 0, lost: 0,
+        points: 0, goalsFor: 0, goalsAgainst: 0, goalDiff: 0, cleanSheets: 0,
+      };
+    }
+    if (!stats[awayId]) {
+      stats[awayId] = {
+        played: 0, won: 0, drawn: 0, lost: 0,
+        points: 0, goalsFor: 0, goalsAgainst: 0, goalDiff: 0, cleanSheets: 0,
+      };
+    }
   }
 
   for (const match of matches) {
@@ -348,6 +365,7 @@ async function recomputeIndividualStandings(tournamentId: string) {
     const hg = match.homeScore ?? 0;
     const ag = match.awayScore ?? 0;
 
+    // Skip if players aren't in stats (shouldn't happen now)
     if (!stats[homeId] || !stats[awayId]) continue;
 
     stats[homeId].played++;
