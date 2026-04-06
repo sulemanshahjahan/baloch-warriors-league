@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { AdminHeader } from "@/components/admin/header";
-import { getTournamentById, getAvailableTeams } from "@/lib/actions/tournament";
+import { getTournamentById, getAvailableTeams, getAvailablePlayers } from "@/lib/actions/tournament";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Edit, Plus, Trophy, Users, Swords, BarChart3, Award } from "lucide-react";
+import { Edit, Plus, Users, User, Swords, BarChart3, Award } from "lucide-react";
 import {
   formatDate,
   gameLabel,
@@ -25,6 +25,7 @@ import {
   formatLabel,
 } from "@/lib/utils";
 import { TeamEnrollment } from "./team-enrollment";
+import { PlayerEnrollment } from "./player-enrollment";
 import { AwardsManager } from "./awards-manager";
 
 interface TournamentDetailPageProps {
@@ -33,9 +34,10 @@ interface TournamentDetailPageProps {
 
 export default async function TournamentDetailPage({ params }: TournamentDetailPageProps) {
   const { id } = await params;
-  const [tournament, availableTeams] = await Promise.all([
+  const [tournament, availableTeams, availablePlayers] = await Promise.all([
     getTournamentById(id),
     getAvailableTeams(id),
+    getAvailablePlayers(id),
   ]);
 
   if (!tournament) notFound();
@@ -102,11 +104,9 @@ export default async function TournamentDetailPage({ params }: TournamentDetailP
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <Users className="w-4 h-4 text-blue-400" />
-                {tournament.participantType === "TEAM" ? "Teams" : "Players"}
+                Teams
                 <Badge variant="secondary" className="ml-1">
-                  {tournament.participantType === "TEAM"
-                    ? tournament.teams.length
-                    : tournament.players.length}
+                  {tournament.teams.length}
                 </Badge>
               </CardTitle>
             </CardHeader>
@@ -119,8 +119,29 @@ export default async function TournamentDetailPage({ params }: TournamentDetailP
             </CardContent>
           </Card>
 
-          {/* Awards */}
+          {/* Individual Players */}
           <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <User className="w-4 h-4 text-purple-400" />
+                Individual Players
+                <Badge variant="secondary" className="ml-1">
+                  {tournament.players.length}
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <PlayerEnrollment
+                tournamentId={id}
+                enrolledPlayers={tournament.players}
+                availablePlayers={availablePlayers}
+              />
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Awards */}
+        <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <Award className="w-4 h-4 text-accent" />
@@ -139,7 +160,6 @@ export default async function TournamentDetailPage({ params }: TournamentDetailP
               />
             </CardContent>
           </Card>
-        </div>
 
         {/* Standings */}
         <Card>

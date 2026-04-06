@@ -223,6 +223,53 @@ export async function removeTeamFromTournament(
   return { success: true, data: undefined };
 }
 
+// ─── PLAYER ENROLLMENT ──────────────────────────────────────
+
+export async function enrollPlayerInTournament(
+  tournamentId: string,
+  playerId: string
+): Promise<ActionResult> {
+  await requireAdmin();
+
+  try {
+    await prisma.tournamentPlayer.create({
+      data: { tournamentId, playerId },
+    });
+    revalidatePath(`/admin/tournaments/${tournamentId}`);
+    return { success: true, data: undefined };
+  } catch {
+    return { success: false, error: "Player is already enrolled in this tournament" };
+  }
+}
+
+export async function removePlayerFromTournament(
+  tournamentId: string,
+  tournamentPlayerId: string
+): Promise<ActionResult> {
+  await requireAdmin();
+
+  await prisma.tournamentPlayer.delete({ where: { id: tournamentPlayerId } });
+  revalidatePath(`/admin/tournaments/${tournamentId}`);
+  return { success: true, data: undefined };
+}
+
+export async function getAvailablePlayers(tournamentId: string) {
+  const enrolled = await prisma.tournamentPlayer.findMany({
+    where: { tournamentId },
+    select: { playerId: true },
+  });
+  const enrolledIds = enrolled.map((e) => e.playerId);
+
+  return prisma.player.findMany({
+    where: {
+      isActive: true,
+      ...(enrolledIds.length > 0 && { id: { notIn: enrolledIds } }),
+    },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true, photoUrl: true },
+  });
+}
+
 export async function getAvailableTeams(tournamentId: string) {
   const enrolledTeamIds = await prisma.tournamentTeam.findMany({
     where: { tournamentId },
