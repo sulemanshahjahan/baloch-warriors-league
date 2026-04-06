@@ -283,6 +283,7 @@ export default async function TournamentDetailPage({ params }: TournamentDetailP
                   hasGroups={tournament.groups.length > 0}
                   participantType={tournament.participantType}
                   groupCount={tournament.groups.length}
+                  scheduledMatchesCount={tournament.matches.filter((m) => m.status === "SCHEDULED").length}
                 />
                 {tournament.groups.length > 0 && (
                   <GenerateKnockoutButton

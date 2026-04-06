@@ -370,6 +370,25 @@ export async function generateKnockoutFromGroups(
   return { success: true, count: createdMatches, advancing: advancing.length };
 }
 
+// ─── DELETE SCHEDULE ───────────────────────────────────────
+
+export async function deleteTournamentSchedule(tournamentId: string) {
+  const session = await auth();
+  if (!session) return { success: false, error: "Unauthorized" };
+
+  const result = await prisma.match.deleteMany({
+    where: {
+      tournamentId,
+      status: "SCHEDULED" as MatchStatus,
+    },
+  });
+
+  revalidatePath(`/admin/tournaments/${tournamentId}`);
+  revalidatePath("/admin/matches");
+
+  return { success: true, count: result.count };
+}
+
 // ─── GROUP MANAGEMENT ────────────────────────────────────────
 
 export async function createGroup(tournamentId: string, name: string) {

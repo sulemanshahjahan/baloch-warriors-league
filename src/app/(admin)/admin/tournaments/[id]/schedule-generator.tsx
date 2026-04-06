@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { generateSchedule, generateKnockoutFromGroups } from "@/lib/actions/schedule";
+import { generateSchedule, generateKnockoutFromGroups, deleteTournamentSchedule } from "@/lib/actions/schedule";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Calendar, Shuffle, Trophy, Users, AlertTriangle } from "lucide-react";
+import { Calendar, Shuffle, Trophy, Users, AlertTriangle, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 interface ScheduleGeneratorProps {
@@ -31,6 +31,7 @@ interface ScheduleGeneratorProps {
   hasGroups: boolean;
   participantType: "TEAM" | "INDIVIDUAL";
   groupCount?: number;
+  scheduledMatchesCount?: number;
 }
 
 export function ScheduleGenerator({
@@ -39,12 +40,15 @@ export function ScheduleGenerator({
   hasGroups,
   participantType,
   groupCount: existingGroupCount = 0,
+  scheduledMatchesCount = 0,
 }: ScheduleGeneratorProps) {
   const [open, setOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [format, setFormat] = useState<"ROUND_ROBIN" | "KNOCKOUT" | "GROUP_KNOCKOUT">("ROUND_ROBIN");
   const [seeding, setSeeding] = useState<"RANDOM" | "MANUAL" | "BY_SKILL">("RANDOM");
   const [advanceCount, setAdvanceCount] = useState(2);
   const [isLoading, setIsLoading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [result, setResult] = useState<{ success: boolean; count?: number; message?: string } | null>(null);
   const router = useRouter();
 
@@ -87,6 +91,16 @@ export function ScheduleGenerator({
     }
   };
 
+  const handleDeleteSchedule = async () => {
+    setIsDeleting(true);
+    const res = await deleteTournamentSchedule(tournamentId);
+    setIsDeleting(false);
+    if (res.success) {
+      setDeleteDialogOpen(false);
+      router.refresh();
+    }
+  };
+
   const estimatedMatches = () => {
     if (format === "ROUND_ROBIN") {
       return (participantCount * (participantCount - 1)) / 2;
@@ -104,14 +118,15 @@ export function ScheduleGenerator({
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <Calendar className="w-4 h-4 mr-1" />
-          Generate Schedule
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-md">
+    <>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm">
+            <Calendar className="w-4 h-4 mr-1" />
+            Generate Schedule
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Generate Tournament Schedule</DialogTitle>
           <DialogDescription>
@@ -217,19 +232,64 @@ export function ScheduleGenerator({
           </div>
         </div>
 
+        <DialogFooter className="flex items-center justify-between">
+          {scheduledMatchesCount > 0 && (
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setOpen(false);
+                setDeleteDialogOpen(true);
+              }}
+              disabled={isLoading}
+            >
+              <Trash2 className="w-4 h-4 mr-1" />
+              Delete Schedule ({scheduledMatchesCount})
+            </Button>
+          )}
+          <div className="flex items-center gap-2 ml-auto">
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleGenerate} 
+              disabled={isLoading || participantCount < 2 || (format === "GROUP_KNOCKOUT" && !hasGroups)}
+            >
+              {isLoading ? "Generating..." : "Generate Schedule"}
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-destructive">
+            <AlertTriangle className="w-5 h-5" />
+            Delete Schedule?
+          </DialogTitle>
+          <DialogDescription>
+            This will permanently delete all {scheduledMatchesCount} scheduled matches for this tournament.
+            <span className="block mt-2 text-destructive font-medium">
+              Completed matches will NOT be deleted.
+            </span>
+          </DialogDescription>
+        </DialogHeader>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
+          <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
             Cancel
           </Button>
-          <Button 
-            onClick={handleGenerate} 
-            disabled={isLoading || participantCount < 2 || (format === "GROUP_KNOCKOUT" && !hasGroups)}
+          <Button
+            variant="destructive"
+            onClick={handleDeleteSchedule}
+            disabled={isDeleting}
           >
-            {isLoading ? "Generating..." : "Generate Schedule"}
+            {isDeleting ? "Deleting..." : "Delete Schedule"}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    </>
   );
 }
 
