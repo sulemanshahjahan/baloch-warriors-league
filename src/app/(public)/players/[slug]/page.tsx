@@ -21,6 +21,7 @@ import {
   MapPin,
   Activity,
   Award,
+  Swords,
 } from "lucide-react";
 import {
   getInitials,
@@ -113,6 +114,27 @@ async function getPlayerStats(playerId: string) {
   };
 }
 
+async function getPlayerRecentMatches(playerId: string) {
+  return prisma.match.findMany({
+    where: {
+      status: "COMPLETED",
+      OR: [
+        { homePlayerId: playerId },
+        { awayPlayerId: playerId },
+      ],
+    },
+    orderBy: { completedAt: "desc" },
+    take: 5,
+    include: {
+      tournament: { select: { name: true, slug: true, gameCategory: true } },
+      homePlayer: { select: { name: true, slug: true, photoUrl: true } },
+      awayPlayer: { select: { name: true, slug: true, photoUrl: true } },
+      homeTeam: { select: { name: true, slug: true, logoUrl: true } },
+      awayTeam: { select: { name: true, slug: true, logoUrl: true } },
+    },
+  });
+}
+
 const AWARD_TYPE_LABELS: Record<string, string> = {
   GOLDEN_BOOT: "Golden Boot",
   TOP_ASSISTS: "Top Assists",
@@ -146,7 +168,10 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
 
   if (!player) notFound();
 
-  const stats = await getPlayerStats(player.id);
+  const [stats, recentMatches] = await Promise.all([
+    getPlayerStats(player.id),
+    getPlayerRecentMatches(player.id),
+  ]);
   const currentTeam = player.teams.find((t) => !t.leftAt)?.team;
 
   return (
@@ -256,6 +281,73 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Recent Matches */}
+            {recentMatches.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Swords className="w-4 h-4 text-orange-400" />
+                    Recent Matches
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {recentMatches.map((match) => {
+                      const isHome = match.homePlayer?.name === player.name || match.homeTeam?.name === player.name;
+                      const opponent = isHome 
+                        ? (match.awayPlayer ?? match.awayTeam)
+                        : (match.homePlayer ?? match.homeTeam);
+                      const playerScore = isHome ? match.homeScore : match.awayScore;
+                      const opponentScore = isHome ? match.awayScore : match.homeScore;
+                      
+                      let result = "D";
+                      let resultColor = "bg-yellow-500/20 text-yellow-500";
+                      if (playerScore! > opponentScore!) {
+                        result = "W";
+                        resultColor = "bg-green-500/20 text-green-500";
+                      } else if (playerScore! < opponentScore!) {
+                        result = "L";
+                        resultColor = "bg-red-500/20 text-red-500";
+                      }
+
+                      return (
+                        <Link
+                          key={match.id}
+                          href={`/tournaments/${match.tournament.slug}`}
+                          className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={(opponent as any)?.photoUrl ?? (opponent as any)?.logoUrl ?? undefined} />
+                              <AvatarFallback className="text-xs">
+                                {getInitials((opponent as any)?.name ?? "?")}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-medium text-sm">
+                                vs {(opponent as any)?.name ?? "Unknown"}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {match.tournament.name}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-sm font-mono font-medium">
+                              {playerScore} - {opponentScore}
+                            </span>
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded ${resultColor}`}>
+                              {result}
+                            </span>
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Recent Activity */}
             {player.matchEvents.length > 0 && (
