@@ -49,6 +49,11 @@ async function getTournamentBySlug(slug: string) {
           team: { select: { id: true, slug: true, name: true, logoUrl: true, shortName: true } },
         },
       },
+      players: {
+        include: {
+          player: { select: { id: true, slug: true, name: true, photoUrl: true } },
+        },
+      },
       matches: {
         orderBy: [{ roundNumber: "asc" }, { scheduledAt: "asc" }],
         include: {
@@ -62,6 +67,7 @@ async function getTournamentBySlug(slug: string) {
         orderBy: [{ points: "desc" }, { goalDiff: "desc" }],
         include: {
           team: { select: { id: true, slug: true, name: true, logoUrl: true } },
+          player: { select: { id: true, slug: true, name: true, photoUrl: true } },
         },
       },
       awards: {
@@ -159,8 +165,14 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
           {/* Stats */}
           <div className="grid grid-cols-3 gap-4 mt-6 max-w-md">
             <div className="text-center p-3 rounded-lg bg-muted/50">
-              <div className="text-2xl font-bold">{tournament.teams.length}</div>
-              <div className="text-xs text-muted-foreground">Teams</div>
+              <div className="text-2xl font-bold">
+                {tournament.participantType === "INDIVIDUAL" 
+                  ? tournament.players.length 
+                  : tournament.teams.length}
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {tournament.participantType === "INDIVIDUAL" ? "Players" : "Teams"}
+              </div>
             </div>
             <div className="text-center p-3 rounded-lg bg-muted/50">
               <div className="text-2xl font-bold">{tournament.matches.length}</div>
@@ -186,9 +198,9 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
               <Swords className="w-4 h-4 mr-2" />
               Matches
             </TabsTrigger>
-            <TabsTrigger value="teams">
+            <TabsTrigger value="participants">
               <Users className="w-4 h-4 mr-2" />
-              Teams
+              {tournament.participantType === "INDIVIDUAL" ? "Players" : "Teams"}
             </TabsTrigger>
             <TabsTrigger value="awards">
               <Award className="w-4 h-4 mr-2" />
@@ -215,7 +227,9 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                     <TableHeader>
                       <TableRow className="bg-muted/50">
                         <TableHead className="w-12">#</TableHead>
-                        <TableHead>Team</TableHead>
+                        <TableHead>
+                          {tournament.participantType === "INDIVIDUAL" ? "Player" : "Team"}
+                        </TableHead>
                         <TableHead className="text-center">P</TableHead>
                         <TableHead className="text-center">W</TableHead>
                         <TableHead className="text-center">D</TableHead>
@@ -231,18 +245,33 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                         <TableRow key={s.id}>
                           <TableCell className="font-medium">{i + 1}</TableCell>
                           <TableCell>
-                            <Link
-                              href={`/teams/${s.team?.slug}`}
-                              className="flex items-center gap-2 hover:text-primary"
-                            >
-                              <Avatar className="h-6 w-6">
-                                <AvatarImage src={s.team?.logoUrl ?? undefined} />
-                                <AvatarFallback className="text-[10px]">
-                                  {getInitials(s.team?.name ?? "")}
-                                </AvatarFallback>
-                              </Avatar>
-                              {s.team?.name}
-                            </Link>
+                            {tournament.participantType === "INDIVIDUAL" ? (
+                              <Link
+                                href={`/players/${s.player?.slug}`}
+                                className="flex items-center gap-2 hover:text-primary"
+                              >
+                                <Avatar className="h-6 w-6">
+                                  <AvatarImage src={s.player?.photoUrl ?? undefined} />
+                                  <AvatarFallback className="text-[10px]">
+                                    {getInitials(s.player?.name ?? "")}
+                                  </AvatarFallback>
+                                </Avatar>
+                                {s.player?.name}
+                              </Link>
+                            ) : (
+                              <Link
+                                href={`/teams/${s.team?.slug}`}
+                                className="flex items-center gap-2 hover:text-primary"
+                              >
+                                <Avatar className="h-6 w-6">
+                                  <AvatarImage src={s.team?.logoUrl ?? undefined} />
+                                  <AvatarFallback className="text-[10px]">
+                                    {getInitials(s.team?.name ?? "")}
+                                  </AvatarFallback>
+                                </Avatar>
+                                {s.team?.name}
+                              </Link>
+                            )}
                           </TableCell>
                           <TableCell className="text-center">{s.played}</TableCell>
                           <TableCell className="text-center">{s.won}</TableCell>
@@ -300,34 +329,58 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
             </div>
           </TabsContent>
 
-          {/* Teams */}
-          <TabsContent value="teams" className="mt-0">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {tournament.teams.map(({ team }) => (
-                <Link key={team.id} href={`/teams/${team.slug}`}>
-                  <Card className="hover:border-primary/50 transition-all cursor-pointer">
-                    <CardContent className="p-4">
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-10 w-10">
-                          <AvatarImage src={team.logoUrl ?? undefined} />
-                          <AvatarFallback className="text-sm">
-                            {getInitials(team.name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium">{team.name}</p>
-                          {team.shortName && (
-                            <p className="text-xs text-muted-foreground">
-                              {team.shortName}
-                            </p>
-                          )}
+          {/* Participants (Teams or Individual Players) */}
+          <TabsContent value="participants" className="mt-0">
+            {tournament.participantType === "INDIVIDUAL" ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {tournament.players.map(({ player }) => (
+                  <Link key={player.id} href={`/players/${player.slug}`}>
+                    <Card className="hover:border-primary/50 transition-all cursor-pointer">
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-10 w-10">
+                            <AvatarImage src={player.photoUrl ?? undefined} />
+                            <AvatarFallback className="text-sm">
+                              {getInitials(player.name)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium">{player.name}</p>
+                          </div>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))}
-            </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {tournament.teams.map(({ team }) => (
+                  <Link key={team.id} href={`/teams/${team.slug}`}>
+                    <Card className="hover:border-primary/50 transition-all cursor-pointer">
+                      <CardContent className="p-4">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-10 w-10">
+                            <AvatarImage src={team.logoUrl ?? undefined} />
+                            <AvatarFallback className="text-sm">
+                              {getInitials(team.name)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium">{team.name}</p>
+                            {team.shortName && (
+                              <p className="text-xs text-muted-foreground">
+                                {team.shortName}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                ))}
+              </div>
+            )}
           </TabsContent>
 
           {/* Awards */}

@@ -239,6 +239,7 @@ model Player {
   manOfTheMatches Match[]            @relation("MatchMOTM")
   homeMatches     Match[]            @relation("HomePlayer")
   awayMatches     Match[]            @relation("AwayPlayer")
+  standings       Standing[]
 
   @@map("players")
 }
@@ -460,6 +461,7 @@ model Standing {
   tournament Tournament        @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   group      TournamentGroup?  @relation(fields: [groupId], references: [id])
   team       Team?             @relation(fields: [teamId], references: [id])
+  player     Player?           @relation(fields: [playerId], references: [id])
 
   @@index([tournamentId])
   @@map("standings")

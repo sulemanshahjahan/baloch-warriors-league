@@ -176,6 +176,7 @@ export async function getTournamentById(id: string) {
         orderBy: [{ points: "desc" }, { goalDiff: "desc" }],
         include: {
           team: { select: { id: true, name: true, logoUrl: true } },
+          player: { select: { id: true, name: true, photoUrl: true } },
         },
       },
       awards: {

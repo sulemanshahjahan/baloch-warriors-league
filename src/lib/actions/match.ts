@@ -210,6 +210,22 @@ export async function deleteMatchEvent(eventId: string, matchId: string) {
 // ─── STANDINGS ENGINE ───────────────────────────────────────
 
 async function recomputeStandings(tournamentId: string) {
+  // Get tournament type
+  const tournament = await prisma.tournament.findUnique({
+    where: { id: tournamentId },
+    select: { participantType: true },
+  });
+
+  if (!tournament) return;
+
+  if (tournament.participantType === "INDIVIDUAL") {
+    await recomputeIndividualStandings(tournamentId);
+  } else {
+    await recomputeTeamStandings(tournamentId);
+  }
+}
+
+async function recomputeTeamStandings(tournamentId: string) {
   // Get all completed matches for this tournament
   const matches = await prisma.match.findMany({
     where: {
@@ -286,6 +302,87 @@ async function recomputeStandings(tournamentId: string) {
     s.goalDiff = s.goalsFor - s.goalsAgainst;
     await prisma.standing.create({
       data: { tournamentId, teamId, ...s },
+    });
+  }
+}
+
+async function recomputeIndividualStandings(tournamentId: string) {
+  // Get all completed matches for individual players
+  const matches = await prisma.match.findMany({
+    where: {
+      tournamentId,
+      status: "COMPLETED",
+      homePlayerId: { not: null },
+      awayPlayerId: { not: null },
+    },
+  });
+
+  // Get all enrolled individual players
+  const enrolled = await prisma.tournamentPlayer.findMany({
+    where: { tournamentId },
+    select: { playerId: true },
+  });
+
+  const playerIds = enrolled.map((e: { playerId: string }) => e.playerId);
+
+  // Build stats map
+  const stats: Record<
+    string,
+    {
+      played: number; won: number; drawn: number; lost: number;
+      points: number; goalsFor: number; goalsAgainst: number;
+      goalDiff: number; cleanSheets: number;
+    }
+  > = {};
+
+  for (const playerId of playerIds) {
+    stats[playerId] = {
+      played: 0, won: 0, drawn: 0, lost: 0,
+      points: 0, goalsFor: 0, goalsAgainst: 0, goalDiff: 0, cleanSheets: 0,
+    };
+  }
+
+  for (const match of matches) {
+    const homeId = match.homePlayerId!;
+    const awayId = match.awayPlayerId!;
+    const hg = match.homeScore ?? 0;
+    const ag = match.awayScore ?? 0;
+
+    if (!stats[homeId] || !stats[awayId]) continue;
+
+    stats[homeId].played++;
+    stats[awayId].played++;
+    stats[homeId].goalsFor += hg;
+    stats[homeId].goalsAgainst += ag;
+    stats[awayId].goalsFor += ag;
+    stats[awayId].goalsAgainst += hg;
+
+    if (ag === 0) stats[homeId].cleanSheets++;
+    if (hg === 0) stats[awayId].cleanSheets++;
+
+    if (hg > ag) {
+      stats[homeId].won++;
+      stats[awayId].lost++;
+      stats[homeId].points += 3;
+    } else if (hg < ag) {
+      stats[awayId].won++;
+      stats[homeId].lost++;
+      stats[awayId].points += 3;
+    } else {
+      stats[homeId].drawn++;
+      stats[awayId].drawn++;
+      stats[homeId].points++;
+      stats[awayId].points++;
+    }
+  }
+
+  // Delete existing standings for this tournament, then recreate
+  await prisma.standing.deleteMany({ where: { tournamentId } });
+
+  for (const [playerId, s] of Object.entries(stats)) {
+    s.goalDiff = s.goalsFor - s.goalsAgainst;
+    await prisma.standing.create({
+      data: { tournamentId, playerId, ...s },
     });
   }
 }

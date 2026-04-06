@@ -181,7 +181,9 @@ export default async function TournamentDetailPage({ params }: TournamentDetailP
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-8">#</TableHead>
-                    <TableHead>Team</TableHead>
+                    <TableHead>
+                      {tournament.participantType === "INDIVIDUAL" ? "Player" : "Team"}
+                    </TableHead>
                     <TableHead className="text-center">P</TableHead>
                     <TableHead className="text-center">W</TableHead>
                     <TableHead className="text-center">D</TableHead>
@@ -199,7 +201,9 @@ export default async function TournamentDetailPage({ params }: TournamentDetailP
                         {i + 1}
                       </TableCell>
                       <TableCell className="font-medium text-sm">
-                        {s.team?.name}
+                        {tournament.participantType === "INDIVIDUAL" 
+                          ? s.player?.name 
+                          : s.team?.name}
                       </TableCell>
                       <TableCell className="text-center text-sm">{s.played}</TableCell>
                       <TableCell className="text-center text-sm">{s.won}</TableCell>
