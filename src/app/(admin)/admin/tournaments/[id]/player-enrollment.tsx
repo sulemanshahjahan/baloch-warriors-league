@@ -1,5 +1,6 @@
 "use client";
 
+// Individual player enrollment for 1v1 tournaments
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
