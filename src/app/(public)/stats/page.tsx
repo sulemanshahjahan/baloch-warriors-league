@@ -112,7 +112,7 @@ function LeaderboardCard({
   color,
 }: { 
   title: string; 
-  data: Array<{ player: { id: string; name: string; slug: string; photoUrl: string | null } | undefined; count: number }>;
+  data: Array<{ player: { id: string; name: string; slug: string; photoUrl: string | null } | undefined; count: number; matches: number }>;
   icon: React.ComponentType<{ className?: string }>;
   color: string;
 }) {
@@ -146,7 +146,10 @@ function LeaderboardCard({
                         {getInitials(item.player.name)}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="font-medium">{item.player.name}</span>
+                    <div className="flex flex-col">
+                      <span className="font-medium">{item.player.name}</span>
+                      <span className="text-xs text-muted-foreground">{item.matches} matches</span>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Icon className={`w-4 h-4 ${color}`} />

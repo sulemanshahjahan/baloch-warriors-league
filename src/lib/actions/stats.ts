@@ -8,8 +8,8 @@ export async function getOverallStats() {
     topScorers,
     topAssists,
     mostMOTM,
-    mostMatches,
     totalStats,
+    allMatches,
   ] = await Promise.all([
     // Top scorers overall
     prisma.matchEvent.groupBy({
@@ -35,14 +35,6 @@ export async function getOverallStats() {
       orderBy: { _count: { type: "desc" } },
       take: 20,
     }),
-    // Most matches played (from individual matches + events)
-    prisma.match.groupBy({
-      by: ["homePlayerId"],
-      where: { status: "COMPLETED", homePlayerId: { not: null } },
-      _count: { homePlayerId: true },
-      orderBy: { _count: { homePlayerId: "desc" } },
-      take: 10,
-    }),
     // Total counts
     Promise.all([
       prisma.match.count({ where: { status: "COMPLETED" } }),
@@ -52,14 +44,33 @@ export async function getOverallStats() {
       prisma.matchEvent.count({ where: { type: "RED_CARD" } }),
       prisma.matchEvent.count({ where: { type: "MOTM" } }),
     ]),
+    // All completed individual matches for calculating matches played
+    prisma.match.findMany({
+      where: { status: "COMPLETED", homePlayerId: { not: null } },
+      select: {
+        homePlayerId: true,
+        awayPlayerId: true,
+      },
+    }),
   ]);
+
+  // Calculate matches played per player
+  const matchCounts = new Map<string, number>();
+  for (const match of allMatches) {
+    if (match.homePlayerId) {
+      matchCounts.set(match.homePlayerId, (matchCounts.get(match.homePlayerId) || 0) + 1);
+    }
+    if (match.awayPlayerId) {
+      matchCounts.set(match.awayPlayerId, (matchCounts.get(match.awayPlayerId) || 0) + 1);
+    }
+  }
 
   // Get player details for top scorers
   const playerIds = [...new Set([
     ...topScorers.map(s => s.playerId!),
     ...topAssists.map(s => s.playerId!),
     ...mostMOTM.map(s => s.playerId!),
-    ...mostMatches.map(s => s.homePlayerId!),
+    ...matchCounts.keys(),
   ])];
 
   const players = await prisma.player.findMany({
@@ -73,14 +84,17 @@ export async function getOverallStats() {
     topScorers: topScorers.map(s => ({
       player: playerMap.get(s.playerId!),
       count: s._count.type,
+      matches: matchCounts.get(s.playerId!) || 0,
     })).filter(s => s.player),
     topAssists: topAssists.map(s => ({
       player: playerMap.get(s.playerId!),
       count: s._count.type,
+      matches: matchCounts.get(s.playerId!) || 0,
     })).filter(s => s.player),
     mostMOTM: mostMOTM.map(s => ({
       player: playerMap.get(s.playerId!),
       count: s._count.type,
+      matches: matchCounts.get(s.playerId!) || 0,
     })).filter(s => s.player),
     totals: {
       matches: totalStats[0],
