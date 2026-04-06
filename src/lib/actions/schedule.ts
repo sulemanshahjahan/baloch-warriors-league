@@ -404,5 +404,158 @@ export async function assignTeamToGroup(tournamentTeamId: string, groupId: strin
     data: { groupId },
   });
 
+  revalidatePath(`/admin/tournaments/${(await prisma.tournamentTeam.findUnique({ where: { id: tournamentTeamId }, select: { tournamentId: true } }))?.tournamentId}`);
   return { success: true };
+}
+
+export async function assignPlayerToGroup(tournamentPlayerId: string, groupId: string | null) {
+  const session = await auth();
+  if (!session) return { success: false, error: "Unauthorized" };
+
+  const tournamentPlayer = await prisma.tournamentPlayer.findUnique({
+    where: { id: tournamentPlayerId },
+    select: { tournamentId: true },
+  });
+
+  await prisma.tournamentPlayer.update({
+    where: { id: tournamentPlayerId },
+    data: { groupId },
+  });
+
+  if (tournamentPlayer) {
+    revalidatePath(`/admin/tournaments/${tournamentPlayer.tournamentId}`);
+  }
+  return { success: true };
+}
+
+// ─── RANDOM DRAW FOR GROUPS ──────────────────────────────────
+
+interface RandomDrawOptions {
+  tournamentId: string;
+  method: "RANDOM" | "SNAKE" | "BY_SKILL";
+}
+
+export async function randomDrawToGroups(options: RandomDrawOptions) {
+  const session = await auth();
+  if (!session) return { success: false, error: "Unauthorized" };
+
+  const { tournamentId, method } = options;
+
+  const tournament = await prisma.tournament.findUnique({
+    where: { id: tournamentId },
+    include: {
+      groups: { orderBy: { orderIndex: "asc" } },
+      teams: { include: { team: true } },
+      players: { include: { player: true } },
+    },
+  });
+
+  if (!tournament) return { success: false, error: "Tournament not found" };
+  if (tournament.groups.length === 0) return { success: false, error: "No groups created" };
+
+  const isIndividual = tournament.participantType === "INDIVIDUAL";
+  const groups = tournament.groups;
+  
+  // Get unassigned participants
+  let participants: Array<{ id: string; name: string; tournamentId: string; skillLevel?: number | null }>;
+  
+  if (isIndividual) {
+    participants = tournament.players
+      .filter((tp) => !tp.groupId)
+      .map((tp) => ({
+        id: tp.id,
+        name: tp.player.name,
+        tournamentId: tp.id,
+        skillLevel: tp.player.skillLevel,
+      }));
+  } else {
+    participants = tournament.teams
+      .filter((tt) => !tt.groupId)
+      .map((tt) => ({
+        id: tt.id,
+        name: tt.team.name,
+        tournamentId: tt.id,
+      }));
+  }
+
+  if (participants.length === 0) {
+    return { success: false, error: "All participants are already assigned to groups" };
+  }
+
+  // Apply seeding method
+  if (method === "RANDOM") {
+    participants = shuffle(participants);
+  } else if (method === "BY_SKILL" && isIndividual) {
+    participants.sort((a, b) => (b.skillLevel || 50) - (a.skillLevel || 50));
+  }
+  // SNAKE keeps current order for snake draft
+
+  // Distribute participants to groups
+  const assignments: { groupId: string; participantId: string; name: string }[] = [];
+  
+  if (method === "SNAKE") {
+    // Snake draft: 1,2,3,4 then 4,3,2,1 then 1,2,3,4 etc.
+    let reverse = false;
+    let groupIndex = 0;
+    
+    for (let i = 0; i < participants.length; i++) {
+      const participant = participants[i];
+      const group = groups[reverse ? groups.length - 1 - groupIndex : groupIndex];
+      
+      assignments.push({
+        groupId: group.id,
+        participantId: participant.tournamentId,
+        name: participant.name,
+      });
+
+      if (reverse) {
+        groupIndex++;
+        if (groupIndex >= groups.length) {
+          groupIndex = 0;
+          reverse = false;
+        }
+      } else {
+        groupIndex++;
+        if (groupIndex >= groups.length) {
+          groupIndex = 0;
+          reverse = true;
+        }
+      }
+    }
+  } else {
+    // Round-robin distribution
+    for (let i = 0; i < participants.length; i++) {
+      const participant = participants[i];
+      const group = groups[i % groups.length];
+      
+      assignments.push({
+        groupId: group.id,
+        participantId: participant.tournamentId,
+        name: participant.name,
+      });
+    }
+  }
+
+  // Apply assignments
+  for (const assignment of assignments) {
+    if (isIndividual) {
+      await prisma.tournamentPlayer.update({
+        where: { id: assignment.participantId },
+        data: { groupId: assignment.groupId },
+      });
+    } else {
+      await prisma.tournamentTeam.update({
+        where: { id: assignment.participantId },
+        data: { groupId: assignment.groupId },
+      });
+    }
+  }
+
+  revalidatePath(`/admin/tournaments/${tournamentId}`);
+  
+  return { 
+    success: true, 
+    count: assignments.length,
+    assignments: assignments.map((a) => a.name),
+  };
 }

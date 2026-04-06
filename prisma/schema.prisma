@@ -176,6 +176,7 @@ model TournamentGroup {
 
   tournament Tournament        @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   teams      TournamentTeam[]
+  players    TournamentPlayer[]
   matches    Match[]
   standings  Standing[]
 
@@ -297,13 +298,16 @@ model TournamentPlayer {
   tournamentId String
   playerId     String
   teamId       String?
+  groupId      String?
   registeredAt DateTime @default(now())
 
-  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-  player     Player     @relation(fields: [playerId], references: [id])
+  tournament Tournament        @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  player     Player            @relation(fields: [playerId], references: [id])
+  group      TournamentGroup?  @relation(fields: [groupId], references: [id])
 
   @@unique([tournamentId, playerId])
   @@index([tournamentId])
+  @@index([groupId])
   @@map("tournament_players")
 }
 

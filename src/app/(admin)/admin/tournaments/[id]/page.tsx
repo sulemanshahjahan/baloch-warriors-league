@@ -158,11 +158,27 @@ export default async function TournamentDetailPage({ params }: TournamentDetailP
               <GroupsManager
                 tournamentId={id}
                 groups={tournament.groups}
-                unassignedTeams={tournament.teams.filter((t) =>
-                  !tournament.groups.some((g) =>
-                    g.teams.some((gt) => gt.teamId === t.teamId)
-                  )
-                )}
+                participantType={tournament.participantType}
+                unassignedParticipants={
+                  tournament.participantType === "INDIVIDUAL"
+                    ? tournament.players
+                        .filter((p) => !p.groupId)
+                        .map((p) => ({
+                          id: p.id,
+                          tournamentId: p.id,
+                          name: p.player.name,
+                          photoUrl: p.player.photoUrl,
+                          skillLevel: p.player.skillLevel,
+                        }))
+                    : tournament.teams
+                        .filter((t) => !t.groupId)
+                        .map((t) => ({
+                          id: t.id,
+                          tournamentId: t.id,
+                          name: t.team.name,
+                          photoUrl: t.team.logoUrl,
+                        }))
+                }
               />
             </CardContent>
           </Card>

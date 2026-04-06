@@ -160,7 +160,7 @@ export async function getTournamentById(id: string) {
       },
       players: {
         include: {
-          player: { select: { id: true, name: true, photoUrl: true } },
+          player: { select: { id: true, name: true, photoUrl: true, skillLevel: true } },
         },
       },
       matches: {
@@ -191,6 +191,11 @@ export async function getTournamentById(id: string) {
           teams: {
             include: {
               team: { select: { id: true, name: true, logoUrl: true } },
+            },
+          },
+          players: {
+            include: {
+              player: { select: { id: true, name: true, photoUrl: true, skillLevel: true } },
             },
           },
         },
