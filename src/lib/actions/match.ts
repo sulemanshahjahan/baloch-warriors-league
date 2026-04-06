@@ -94,6 +94,16 @@ export async function updateMatchResult(
 
   const data = parsed.data;
 
+  // Get current match data to check tournament type
+  const currentMatch = await prisma.match.findUnique({
+    where: { id: matchId },
+    include: { tournament: true },
+  });
+
+  if (!currentMatch) {
+    return { success: false, error: "Match not found" };
+  }
+
   const match = await prisma.match.update({
     where: { id: matchId },
     data: {
@@ -107,6 +117,46 @@ export async function updateMatchResult(
     },
     include: { tournament: true },
   });
+
+  // For individual player tournaments (eFootball 1v1), auto-create goal events
+  if (currentMatch.tournament.participantType === "INDIVIDUAL" && data.status === "COMPLETED") {
+    // Delete existing auto-generated goal events for this match to avoid duplicates
+    await prisma.matchEvent.deleteMany({
+      where: {
+        matchId,
+        type: "GOAL",
+        description: { equals: "Auto-generated from match result" },
+      },
+    });
+
+    // Create goal events for home player
+    if (currentMatch.homePlayerId && data.homeScore > 0) {
+      for (let i = 0; i < data.homeScore; i++) {
+        await prisma.matchEvent.create({
+          data: {
+            matchId,
+            playerId: currentMatch.homePlayerId,
+            type: "GOAL",
+            description: "Auto-generated from match result",
+          },
+        });
+      }
+    }
+
+    // Create goal events for away player
+    if (currentMatch.awayPlayerId && data.awayScore > 0) {
+      for (let i = 0; i < data.awayScore; i++) {
+        await prisma.matchEvent.create({
+          data: {
+            matchId,
+            playerId: currentMatch.awayPlayerId,
+            type: "GOAL",
+            description: "Auto-generated from match result",
+          },
+        });
+      }
+    }
+  }
 
   // Recompute standings if match is completed
   if (data.status === "COMPLETED") {
