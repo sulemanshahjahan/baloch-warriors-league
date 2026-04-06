@@ -1,0 +1,119 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db";
+import { z } from "zod";
+import type { ActionResult } from "@/lib/utils";
+
+const awardSchema = z.object({
+  tournamentId: z.string().min(1, "Tournament is required"),
+  type: z.enum([
+    "GOLDEN_BOOT",
+    "TOP_ASSISTS",
+    "BEST_PLAYER",
+    "BEST_GOALKEEPER",
+    "FAIR_PLAY",
+    "TOURNAMENT_MVP",
+    "TOURNAMENT_WINNER",
+    "CUSTOM",
+  ]),
+  customName: z.string().optional(),
+  playerId: z.string().optional(),
+  teamId: z.string().optional(),
+  description: z.string().optional(),
+});
+
+async function requireAdmin() {
+  const session = await auth();
+  if (!session) throw new Error("Unauthorized");
+  return { session };
+}
+
+export async function createAward(formData: FormData): Promise<ActionResult> {
+  await requireAdmin();
+
+  const raw = Object.fromEntries(formData.entries());
+  const parsed = awardSchema.safeParse({
+    ...raw,
+    playerId: raw.playerId || undefined,
+    teamId: raw.teamId || undefined,
+    customName: raw.customName || undefined,
+    description: raw.description || undefined,
+  });
+
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: parsed.error.issues[0]?.message ?? "Invalid data",
+    };
+  }
+
+  const data = parsed.data;
+
+  await prisma.award.create({
+    data: {
+      tournamentId: data.tournamentId,
+      type: data.type,
+      customName: data.customName || null,
+      playerId: data.playerId || null,
+      teamId: data.teamId || null,
+      description: data.description || null,
+    },
+  });
+
+  revalidatePath(`/admin/tournaments/${data.tournamentId}`);
+  revalidatePath("/admin/awards");
+
+  return { success: true, data: undefined };
+}
+
+export async function deleteAward(id: string, tournamentId: string): Promise<ActionResult> {
+  await requireAdmin();
+
+  await prisma.award.delete({ where: { id } });
+
+  revalidatePath(`/admin/tournaments/${tournamentId}`);
+  revalidatePath("/admin/awards");
+
+  return { success: true, data: undefined };
+}
+
+export async function getAwards(params?: { tournamentId?: string }) {
+  return prisma.award.findMany({
+    where: {
+      ...(params?.tournamentId && { tournamentId: params.tournamentId }),
+    },
+    orderBy: { createdAt: "desc" },
+    include: {
+      tournament: { select: { id: true, name: true } },
+      player: { select: { id: true, name: true, photoUrl: true } },
+      team: { select: { id: true, name: true, logoUrl: true } },
+    },
+  });
+}
+
+export async function getAwardStats() {
+  const [totalAwards, awardsByType, recentAwards] = await Promise.all([
+    prisma.award.count(),
+    prisma.award.groupBy({
+      by: ["type"],
+      _count: { type: true },
+    }),
+    prisma.award.findMany({
+      take: 5,
+      orderBy: { createdAt: "desc" },
+      include: {
+        tournament: { select: { name: true } },
+        player: { select: { name: true } },
+        team: { select: { name: true } },
+      },
+    }),
+  ]);
+
+  return {
+    totalAwards,
+    awardsByType,
+    recentAwards,
+  };
+}
