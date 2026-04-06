@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Save, Trash2 } from "lucide-react";
+import { Loader2, Save, Trash2, Upload, X } from "lucide-react";
 import { updatePlayer, deletePlayer } from "@/lib/actions/player";
+import { uploadPlayerImage } from "@/lib/actions/upload";
 import {
   Dialog,
   DialogContent,
@@ -17,6 +18,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { getInitials } from "@/lib/utils";
 
 interface PlayerFormProps {
   player: {
@@ -39,6 +42,9 @@ export function PlayerForm({ player }: PlayerFormProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [photoUrl, setPhotoUrl] = useState(player.photoUrl ?? "");
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -154,15 +160,81 @@ export function PlayerForm({ player }: PlayerFormProps) {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="photoUrl">Photo URL (optional)</Label>
-              <Input
-                id="photoUrl"
-                name="photoUrl"
-                type="url"
-                defaultValue={player.photoUrl ?? ""}
-                placeholder="https://..."
-              />
+            {/* Avatar Upload */}
+            <div className="space-y-3">
+              <Label>Player Avatar</Label>
+              <div className="flex items-center gap-4">
+                <Avatar className="h-20 w-20">
+                  <AvatarImage src={photoUrl || undefined} />
+                  <AvatarFallback className="text-xl">
+                    {getInitials(player.name)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 space-y-2">
+                  <input
+                    type="hidden"
+                    name="photoUrl"
+                    value={photoUrl}
+                  />
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploading}
+                    >
+                      {isUploading ? (
+                        <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                      ) : (
+                        <Upload className="w-4 h-4 mr-1" />
+                      )}
+                      Upload Image
+                    </Button>
+                    {photoUrl && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setPhotoUrl("")}
+                      >
+                        <X className="w-4 h-4 mr-1" />
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                  <Input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      
+                      setIsUploading(true);
+                      const formData = new FormData();
+                      formData.append("file", file);
+                      
+                      const result = await uploadPlayerImage(formData);
+                      if (result.success && result.url) {
+                        setPhotoUrl(result.url);
+                      } else {
+                        setError(result.error || "Upload failed");
+                      }
+                      setIsUploading(false);
+                      
+                      // Reset file input
+                      if (fileInputRef.current) {
+                        fileInputRef.current.value = "";
+                      }
+                    }}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    JPG, PNG, WebP, or GIF. Max 5MB.
+                  </p>
+                </div>
+              </div>
             </div>
 
             <div className="space-y-2">

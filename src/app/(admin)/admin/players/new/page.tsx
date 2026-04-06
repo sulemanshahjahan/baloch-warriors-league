@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { AdminHeader } from "@/components/admin/header";
 import { Button } from "@/components/ui/button";
@@ -15,8 +15,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Save } from "lucide-react";
+import { Loader2, Save, Upload, X } from "lucide-react";
 import { createPlayer } from "@/lib/actions/player";
+import { uploadPlayerImage } from "@/lib/actions/upload";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { getInitials } from "@/lib/utils";
 
 const POSITIONS = [
   { value: "GK", label: "Goalkeeper" },
@@ -34,6 +37,10 @@ export default function NewPlayerPage() {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState("");
   const [position, setPosition] = useState("");
+  const [photoUrl, setPhotoUrl] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
+  const [playerName, setPlayerName] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -71,11 +78,95 @@ export default function NewPlayerPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">Full Name *</Label>
-                  <Input id="name" name="name" placeholder="e.g. Ali Hassan" required />
+                  <Input 
+                    id="name" 
+                    name="name" 
+                    placeholder="e.g. Ali Hassan" 
+                    required 
+                    value={playerName}
+                    onChange={(e) => setPlayerName(e.target.value)}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="nickname">Nickname / Gaming Tag</Label>
                   <Input id="nickname" name="nickname" placeholder='e.g. "Bullet"' />
+                </div>
+              </div>
+
+              {/* Avatar Upload */}
+              <div className="space-y-3">
+                <Label>Player Avatar</Label>
+                <div className="flex items-center gap-4">
+                  <Avatar className="h-20 w-20">
+                    <AvatarImage src={photoUrl || undefined} />
+                    <AvatarFallback className="text-xl">
+                      {getInitials(playerName || "Player")}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 space-y-2">
+                    <input
+                      type="hidden"
+                      name="photoUrl"
+                      value={photoUrl}
+                    />
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploading}
+                      >
+                        {isUploading ? (
+                          <Loader2 className="w-4 h-4 animate-spin mr-1" />
+                        ) : (
+                          <Upload className="w-4 h-4 mr-1" />
+                        )}
+                        Upload Image
+                      </Button>
+                      {photoUrl && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setPhotoUrl("")}
+                        >
+                          <X className="w-4 h-4 mr-1" />
+                          Remove
+                        </Button>
+                      )}
+                    </div>
+                    <Input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        
+                        setIsUploading(true);
+                        const formData = new FormData();
+                        formData.append("file", file);
+                        
+                        const result = await uploadPlayerImage(formData);
+                        if (result.success && result.url) {
+                          setPhotoUrl(result.url);
+                        } else {
+                          setError(result.error || "Upload failed");
+                        }
+                        setIsUploading(false);
+                        
+                        // Reset file input
+                        if (fileInputRef.current) {
+                          fileInputRef.current.value = "";
+                        }
+                      }}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      JPG, PNG, WebP, or GIF. Max 5MB.
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -105,10 +196,6 @@ export default function NewPlayerPage() {
                 <div className="space-y-2">
                   <Label htmlFor="dateOfBirth">Date of Birth</Label>
                   <Input id="dateOfBirth" name="dateOfBirth" type="date" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="photoUrl">Photo URL</Label>
-                  <Input id="photoUrl" name="photoUrl" type="url" placeholder="https://..." />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="skillLevel">Skill Level (0-99)</Label>
