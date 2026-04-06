@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState } from "react";
-import { Shield, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navLinks = [
@@ -23,9 +24,13 @@ export function PublicNavbar() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary/10 border border-primary/20">
-              <Shield className="w-4 h-4 text-primary" />
-            </div>
+            <Image
+              src="/logo.png"
+              alt="BWL Logo"
+              width={36}
+              height={36}
+              className="rounded-lg object-contain"
+            />
             <span className="font-bold tracking-tight">
               <span className="text-primary">BWL</span>
               <span className="hidden sm:inline text-foreground ml-1 font-medium text-sm opacity-80">

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Shield } from "lucide-react";
+import Image from "next/image";
 
 export function PublicFooter() {
   return (
@@ -7,9 +7,13 @@ export function PublicFooter() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
           <Link href="/" className="flex items-center gap-2">
-            <div className="flex items-center justify-center w-7 h-7 rounded-md bg-primary/10 border border-primary/20">
-              <Shield className="w-3.5 h-3.5 text-primary" />
-            </div>
+            <Image
+              src="/logo.png"
+              alt="BWL Logo"
+              width={28}
+              height={28}
+              className="rounded-md object-contain"
+            />
             <span className="font-bold text-sm">
               <span className="text-primary">BWL</span>
               <span className="ml-1 text-muted-foreground font-normal">

@@ -1,8 +1,9 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
+import Image from "next/image";
 import { prisma } from "@/lib/db";
-import { Shield, Trophy, Swords, Users, ChevronRight, Star } from "lucide-react";
+import { Trophy, Swords, Users, ChevronRight, Star } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   formatDate,
@@ -74,45 +75,57 @@ export default async function HomePage() {
           <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-accent/5 rounded-full blur-3xl" />
         </div>
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 sm:py-32">
-          <div className="max-w-3xl">
-            <div className="flex items-center gap-2 mb-6">
-              <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10 border border-primary/20">
-                <Shield className="w-5 h-5 text-primary" />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-28">
+          <div className="flex flex-col lg:flex-row items-center gap-12">
+            {/* Left: Text Content */}
+            <div className="flex-1 text-center lg:text-left">
+              <div className="flex items-center justify-center lg:justify-start gap-2 mb-6">
+                <span className="text-sm font-semibold text-primary tracking-widest uppercase">
+                  Baloch Warriors League
+                </span>
               </div>
-              <span className="text-sm font-semibold text-primary tracking-widest uppercase">
-                Baloch Warriors League
-              </span>
+
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight mb-6 leading-none">
+                Where{" "}
+                <span className="text-primary">Warriors</span>
+                <br />
+                Compete
+              </h1>
+
+              <p className="text-lg text-muted-foreground max-w-xl mx-auto lg:mx-0 mb-8">
+                The official platform of BWL — tracking every tournament, match,
+                goal, and record across Football, eFootball, PUBG, Snooker, and
+                Checkers.
+              </p>
+
+              <div className="flex flex-wrap justify-center lg:justify-start gap-3">
+                <Link
+                  href="/tournaments"
+                  className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-lg font-semibold hover:bg-primary/90 transition-colors"
+                >
+                  <Trophy className="w-4 h-4" />
+                  View Tournaments
+                </Link>
+                <Link
+                  href="/matches"
+                  className="inline-flex items-center gap-2 bg-secondary text-secondary-foreground px-5 py-2.5 rounded-lg font-semibold hover:bg-secondary/80 transition-colors border border-border"
+                >
+                  <Swords className="w-4 h-4" />
+                  Recent Results
+                </Link>
+              </div>
             </div>
 
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black tracking-tight mb-6 leading-none">
-              Where{" "}
-              <span className="text-primary">Warriors</span>
-              <br />
-              Compete
-            </h1>
-
-            <p className="text-lg text-muted-foreground max-w-xl mb-8">
-              The official platform of BWL — tracking every tournament, match,
-              goal, and record across Football, eFootball, PUBG, Snooker, and
-              Checkers.
-            </p>
-
-            <div className="flex flex-wrap gap-3">
-              <Link
-                href="/tournaments"
-                className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-lg font-semibold hover:bg-primary/90 transition-colors"
-              >
-                <Trophy className="w-4 h-4" />
-                View Tournaments
-              </Link>
-              <Link
-                href="/matches"
-                className="inline-flex items-center gap-2 bg-secondary text-secondary-foreground px-5 py-2.5 rounded-lg font-semibold hover:bg-secondary/80 transition-colors border border-border"
-              >
-                <Swords className="w-4 h-4" />
-                Recent Results
-              </Link>
+            {/* Right: Logo */}
+            <div className="flex-shrink-0">
+              <Image
+                src="/logo.png"
+                alt="BWL Baloch Warriors League"
+                width={280}
+                height={280}
+                className="rounded-2xl object-contain drop-shadow-2xl"
+                priority
+              />
             </div>
           </div>
         </div>
