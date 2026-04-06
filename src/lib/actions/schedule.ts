@@ -174,52 +174,64 @@ export async function generateSchedule(options: GenerateScheduleOptions) {
       createdMatches++;
     }
   } else if (format === "GROUP_KNOCKOUT") {
-    // Create groups first
-    const groups: typeof participants[] = Array.from({ length: groupCount }, () => []);
-    
-    // Distribute participants into groups (snake seeding)
-    for (let i = 0; i < participants.length; i++) {
-      const groupIndex = i % groupCount;
-      groups[groupIndex].push(participants[i]);
+    // For GROUP_KNOCKOUT, use existing groups and their assigned players
+    const existingGroups = await prisma.tournamentGroup.findMany({
+      where: { tournamentId },
+      orderBy: { orderIndex: "asc" },
+    });
+
+    // Fetch group assignments separately based on type
+    const groupAssignments = isIndividual
+      ? await prisma.tournamentPlayer.findMany({
+          where: { tournamentId, groupId: { not: null } },
+          include: { player: true },
+        })
+      : await prisma.tournamentTeam.findMany({
+          where: { tournamentId, groupId: { not: null } },
+          include: { team: true },
+        });
+
+    if (existingGroups.length === 0) {
+      return { success: false, error: "No groups found. Please create groups and assign players first." };
     }
 
-    // Create TournamentGroup records
-    for (let i = 0; i < groups.length; i++) {
-      const group = groups[i];
-      if (group.length === 0) continue;
-
-      // Create or get group
-      let tournamentGroup = await prisma.tournamentGroup.findFirst({
-        where: { tournamentId, name: `Group ${String.fromCharCode(65 + i)}` },
-      });
-
-      if (!tournamentGroup) {
-        tournamentGroup = await prisma.tournamentGroup.create({
-          data: {
-            tournamentId,
-            name: `Group ${String.fromCharCode(65 + i)}`,
-            orderIndex: i,
-          },
-        });
+    // Generate matches for each existing group
+    for (const tournamentGroup of existingGroups) {
+      // Get participants in this group
+      let groupParticipants: { id: string; name: string }[] = [];
+      
+      if (isIndividual) {
+        const playerAssignments = groupAssignments as Array<{
+          playerId: string;
+          groupId: string | null;
+          player: { name: string };
+        }>;
+        groupParticipants = playerAssignments
+          .filter((p) => p.groupId === tournamentGroup.id)
+          .map((p) => ({
+            id: p.playerId,
+            name: p.player.name,
+          }));
+      } else {
+        const teamAssignments = groupAssignments as Array<{
+          teamId: string;
+          groupId: string | null;
+          team: { name: string };
+        }>;
+        groupParticipants = teamAssignments
+          .filter((t) => t.groupId === tournamentGroup.id)
+          .map((t) => ({
+            id: t.teamId,
+            name: t.team.name,
+          }));
       }
 
-      // Assign teams/players to group
-      for (const participant of group) {
-        if (isIndividual) {
-          await prisma.tournamentPlayer.updateMany({
-            where: { tournamentId, playerId: participant.id },
-            data: { teamId: undefined }, // Not applicable for individual
-          });
-        } else {
-          await prisma.tournamentTeam.updateMany({
-            where: { tournamentId, teamId: participant.id },
-            data: { groupId: tournamentGroup.id },
-          });
-        }
+      if (groupParticipants.length < 2) {
+        continue; // Skip groups with less than 2 participants
       }
 
       // Generate round-robin matches within group
-      const pairs = generateRoundRobinPairs(group);
+      const pairs = generateRoundRobinPairs(groupParticipants);
       for (let j = 0; j < pairs.length; j++) {
         const [home, away] = pairs[j];
         if (isIndividual) {
@@ -227,8 +239,8 @@ export async function generateSchedule(options: GenerateScheduleOptions) {
             data: {
               tournamentId,
               groupId: tournamentGroup.id,
-              round: `${tournamentGroup.name} - Round ${Math.floor(j / (group.length / 2)) + 1}`,
-              roundNumber: Math.floor(j / (group.length / 2)) + 1,
+              round: `${tournamentGroup.name} - Round ${Math.floor(j / (groupParticipants.length / 2)) + 1}`,
+              roundNumber: Math.floor(j / (groupParticipants.length / 2)) + 1,
               matchNumber: j + 1,
               homePlayerId: home.id,
               awayPlayerId: away.id,
@@ -240,8 +252,8 @@ export async function generateSchedule(options: GenerateScheduleOptions) {
             data: {
               tournamentId,
               groupId: tournamentGroup.id,
-              round: `${tournamentGroup.name} - Round ${Math.floor(j / (group.length / 2)) + 1}`,
-              roundNumber: Math.floor(j / (group.length / 2)) + 1,
+              round: `${tournamentGroup.name} - Round ${Math.floor(j / (groupParticipants.length / 2)) + 1}`,
+              roundNumber: Math.floor(j / (groupParticipants.length / 2)) + 1,
               matchNumber: j + 1,
               homeTeamId: home.id,
               awayTeamId: away.id,

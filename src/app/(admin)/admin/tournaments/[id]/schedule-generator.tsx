@@ -30,6 +30,7 @@ interface ScheduleGeneratorProps {
   participantCount: number;
   hasGroups: boolean;
   participantType: "TEAM" | "INDIVIDUAL";
+  groupCount?: number;
 }
 
 export function ScheduleGenerator({
@@ -37,11 +38,11 @@ export function ScheduleGenerator({
   participantCount,
   hasGroups,
   participantType,
+  groupCount: existingGroupCount = 0,
 }: ScheduleGeneratorProps) {
   const [open, setOpen] = useState(false);
   const [format, setFormat] = useState<"ROUND_ROBIN" | "KNOCKOUT" | "GROUP_KNOCKOUT">("ROUND_ROBIN");
   const [seeding, setSeeding] = useState<"RANDOM" | "MANUAL" | "BY_SKILL">("RANDOM");
-  const [groupCount, setGroupCount] = useState(4);
   const [advanceCount, setAdvanceCount] = useState(2);
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<{ success: boolean; count?: number; message?: string } | null>(null);
@@ -55,7 +56,7 @@ export function ScheduleGenerator({
       tournamentId,
       format,
       seedingMethod: seeding,
-      groupCount,
+      groupCount: existingGroupCount,
       advanceCount,
     });
     
@@ -92,11 +93,12 @@ export function ScheduleGenerator({
     } else if (format === "KNOCKOUT") {
       return Math.ceil(participantCount / 2);
     } else if (format === "GROUP_KNOCKOUT") {
-      const perGroup = Math.ceil(participantCount / groupCount);
-      const groupMatches = (perGroup * (perGroup - 1)) / 2 * groupCount;
-      const knockoutParticipants = groupCount * advanceCount;
-      const knockoutMatches = knockoutParticipants - 1;
-      return groupMatches + knockoutMatches;
+      // For existing groups, estimate based on group sizes
+      const avgPerGroup = existingGroupCount > 0 ? Math.ceil(participantCount / existingGroupCount) : 0;
+      const groupMatches = existingGroupCount > 0 
+        ? (avgPerGroup * (avgPerGroup - 1)) / 2 * existingGroupCount 
+        : 0;
+      return groupMatches;
     }
     return 0;
   };
@@ -173,26 +175,19 @@ export function ScheduleGenerator({
           {/* Group Settings */}
           {format === "GROUP_KNOCKOUT" && (
             <>
-              <div className="space-y-2">
-                <Label>Number of Groups</Label>
-                <Input
-                  type="number"
-                  min={2}
-                  max={16}
-                  value={groupCount}
-                  onChange={(e) => setGroupCount(Number(e.target.value))}
-                />
+              <div className="bg-blue-500/10 text-blue-400 p-3 rounded text-sm">
+                <p className="font-medium">Using existing groups</p>
+                <p className="text-xs opacity-80">
+                  {existingGroupCount} group{existingGroupCount !== 1 ? "s" : ""} found. 
+                  Matches will be created within each group.
+                </p>
               </div>
-              <div className="space-y-2">
-                <Label>Advance per Group</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={8}
-                  value={advanceCount}
-                  onChange={(e) => setAdvanceCount(Number(e.target.value))}
-                />
-              </div>
+              {!hasGroups && (
+                <div className="bg-destructive/10 text-destructive p-3 rounded text-sm">
+                  <p className="font-medium">No groups found</p>
+                  <p className="text-xs">Please create groups and assign players first.</p>
+                </div>
+              )}
             </>
           )}
 
@@ -226,7 +221,10 @@ export function ScheduleGenerator({
           <Button variant="outline" onClick={() => setOpen(false)}>
             Cancel
           </Button>
-          <Button onClick={handleGenerate} disabled={isLoading || participantCount < 2}>
+          <Button 
+            onClick={handleGenerate} 
+            disabled={isLoading || participantCount < 2 || (format === "GROUP_KNOCKOUT" && !hasGroups)}
+          >
             {isLoading ? "Generating..." : "Generate Schedule"}
           </Button>
         </DialogFooter>
