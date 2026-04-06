@@ -266,6 +266,38 @@ export async function removePlayerFromTournament(
   return { success: true, data: undefined };
 }
 
+export async function bulkEnrollPlayersInTournament(
+  tournamentId: string,
+  playerIds: string[]
+): Promise<ActionResult<{ count: number }>> {
+  await requireAdmin();
+
+  const result = await prisma.tournamentPlayer.createMany({
+    data: playerIds.map((playerId) => ({ tournamentId, playerId })),
+    skipDuplicates: true,
+  });
+
+  revalidatePath(`/admin/tournaments/${tournamentId}`);
+  return { success: true, data: { count: result.count } };
+}
+
+export async function bulkRemovePlayersFromTournament(
+  tournamentId: string,
+  tournamentPlayerIds: string[]
+): Promise<ActionResult<{ count: number }>> {
+  await requireAdmin();
+
+  await prisma.tournamentPlayer.deleteMany({
+    where: {
+      id: { in: tournamentPlayerIds },
+      tournamentId,
+    },
+  });
+
+  revalidatePath(`/admin/tournaments/${tournamentId}`);
+  return { success: true, data: { count: tournamentPlayerIds.length } };
+}
+
 export async function getAvailablePlayers(tournamentId: string) {
   const enrolled = await prisma.tournamentPlayer.findMany({
     where: { tournamentId },
