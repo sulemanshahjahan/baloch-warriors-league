@@ -22,6 +22,7 @@ import {
   Activity,
   Award,
   Swords,
+  BarChart3,
 } from "lucide-react";
 import {
   getInitials,
@@ -209,6 +210,13 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                   <span className="text-sm bg-muted px-2 py-1 rounded">
                     {player.position}
                   </span>
+                )}
+                {player.skillLevel !== null && player.skillLevel !== undefined && (
+                  <div className="flex items-center gap-1 text-sm">
+                    <BarChart3 className="w-4 h-4 text-primary" />
+                    <span className="font-medium">{player.skillLevel}</span>
+                    <span className="text-muted-foreground">level</span>
+                  </div>
                 )}
                 {player.nationality && (
                   <div className="flex items-center gap-1 text-sm text-muted-foreground">
