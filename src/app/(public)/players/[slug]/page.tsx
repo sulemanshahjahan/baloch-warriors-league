@@ -4,14 +4,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   User,
@@ -27,7 +20,6 @@ import {
 import {
   getInitials,
   formatDate,
-  gameLabel,
 } from "@/lib/utils";
 
 interface PlayerPageProps {
@@ -144,22 +136,6 @@ const AWARD_TYPE_LABELS: Record<string, string> = {
   FAIR_PLAY: "Fair Play",
   TOURNAMENT_MVP: "Tournament MVP",
   TOURNAMENT_WINNER: "Tournament Winner",
-  CUSTOM: "Custom",
-};
-
-const EVENT_TYPE_LABELS: Record<string, string> = {
-  GOAL: "Goal",
-  ASSIST: "Assist",
-  YELLOW_CARD: "Yellow Card",
-  RED_CARD: "Red Card",
-  OWN_GOAL: "Own Goal",
-  PENALTY_GOAL: "Penalty Goal",
-  PENALTY_MISS: "Penalty Miss",
-  CLEAN_SHEET: "Clean Sheet",
-  MOTM: "Man of the Match",
-  KILL: "Kill",
-  FRAME_WIN: "Frame Win",
-  MVP: "MVP",
   CUSTOM: "Custom",
 };
 
@@ -353,95 +329,6 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                       );
                     })}
                   </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Recent Activity */}
-            {player.matchEvents.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Recent Activity</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-muted/50">
-                        <TableHead>Event</TableHead>
-                        <TableHead>Match</TableHead>
-                        <TableHead>Score</TableHead>
-                        <TableHead>Result</TableHead>
-                        <TableHead>Tournament</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {player.matchEvents.map((event) => {
-                        const match = event.match;
-                        // Determine if player was home or away
-                        const isHome = match?.homePlayer?.name === player.name || 
-                                      match?.homeTeam?.name === player.name;
-                        
-                        // Get opponent name (player or team)
-                        const opponentName = isHome 
-                          ? (match?.awayPlayer?.name ?? match?.awayTeam?.name ?? "Unknown")
-                          : (match?.homePlayer?.name ?? match?.homeTeam?.name ?? "Unknown");
-                        
-                        // Get player's team score and opponent score
-                        const playerScore = isHome ? (match?.homeScore ?? 0) : (match?.awayScore ?? 0);
-                        const opponentScore = isHome ? (match?.awayScore ?? 0) : (match?.homeScore ?? 0);
-                        
-                        // Determine result
-                        let result = "—";
-                        let resultClass = "text-muted-foreground";
-                        if (match?.status === "COMPLETED") {
-                          if (playerScore > opponentScore) {
-                            result = "W";
-                            resultClass = "text-green-500 font-bold";
-                          } else if (playerScore < opponentScore) {
-                            result = "L";
-                            resultClass = "text-red-500 font-bold";
-                          } else {
-                            result = "D";
-                            resultClass = "text-yellow-500 font-bold";
-                          }
-                        }
-                        
-                        return (
-                          <TableRow key={event.id}>
-                            <TableCell>
-                              <span className="font-medium">
-                                {EVENT_TYPE_LABELS[event.type] ?? event.type}
-                              </span>
-                              {event.minute && (
-                                <span className="text-xs text-muted-foreground ml-2">
-                                  ({event.minute}&apos;)
-                                </span>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-sm">
-                              vs {opponentName}
-                            </TableCell>
-                            <TableCell className="text-sm font-mono">
-                              {playerScore} - {opponentScore}
-                            </TableCell>
-                            <TableCell className={`text-sm ${resultClass}`}>
-                              {result}
-                            </TableCell>
-                            <TableCell className="text-sm text-muted-foreground">
-                              {match?.tournament?.name && (
-                                <>
-                                  {match.tournament.name}
-                                  <span className="text-xs ml-1">
-                                    ({gameLabel(match.tournament.gameCategory as never)})
-                                  </span>
-                                </>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
                 </CardContent>
               </Card>
             )}
