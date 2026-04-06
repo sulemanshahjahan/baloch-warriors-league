@@ -15,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Edit, Plus, Users, User, Swords, BarChart3, Award, Calendar } from "lucide-react";
+import { Edit, Plus, Users, User, Swords, BarChart3, Award, Calendar, RefreshCw } from "lucide-react";
 import { ScheduleGenerator, GenerateKnockoutButton } from "./schedule-generator";
 import {
   formatDate,
@@ -31,6 +31,7 @@ import { AwardsManager } from "./awards-manager";
 import { GroupsManager } from "./groups-manager";
 import { QuickMatchEditor } from "./quick-match-editor";
 import { requireRole } from "@/lib/auth";
+import { RecomputeStandingsButton } from "./recompute-standings-button";
 
 interface TournamentDetailPageProps {
   params: Promise<{ id: string }>;
@@ -216,6 +217,7 @@ export default async function TournamentDetailPage({ params }: TournamentDetailP
                 <BarChart3 className="w-4 h-4 text-yellow-400" />
                 Standings
               </CardTitle>
+              <RecomputeStandingsButton tournamentId={id} />
             </div>
           </CardHeader>
           <CardContent>
