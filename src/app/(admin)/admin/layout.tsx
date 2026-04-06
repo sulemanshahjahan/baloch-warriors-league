@@ -18,7 +18,7 @@ export default async function AdminLayout({
     <SessionProvider session={session}>
       <div className="flex min-h-screen bg-background">
         <AdminSidebar />
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden lg:pt-0 pt-[65px]">
           {children}
         </div>
       </div>
