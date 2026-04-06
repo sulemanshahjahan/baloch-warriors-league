@@ -21,7 +21,7 @@ async function getHomeData() {
         orderBy: [{ isFeatured: "desc" }, { startDate: "asc" }],
         take: 4,
         include: {
-          _count: { select: { teams: true, matches: true } },
+          _count: { select: { teams: true, players: true, matches: true } },
         },
       }),
       prisma.match.findMany({
@@ -32,6 +32,8 @@ async function getHomeData() {
           tournament: { select: { name: true, gameCategory: true } },
           homeTeam: { select: { name: true, shortName: true, logoUrl: true } },
           awayTeam: { select: { name: true, shortName: true, logoUrl: true } },
+          homePlayer: { select: { name: true } },
+          awayPlayer: { select: { name: true } },
           motmPlayer: { select: { name: true } },
         },
       }),
@@ -43,6 +45,8 @@ async function getHomeData() {
           tournament: { select: { name: true, gameCategory: true } },
           homeTeam: { select: { name: true } },
           awayTeam: { select: { name: true } },
+          homePlayer: { select: { name: true } },
+          awayPlayer: { select: { name: true } },
         },
       }),
       Promise.all([
@@ -197,7 +201,11 @@ export default async function HomePage() {
                         {t.name}
                       </h3>
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>{(t as any)._count.teams} teams</span>
+                        <span>
+                          {(t as any).participantType === "INDIVIDUAL" 
+                            ? `${(t as any)._count.players} players`
+                            : `${(t as any)._count.teams} teams`}
+                        </span>
                         <span>{t._count.matches} matches</span>
                       </div>
                     </CardContent>
@@ -239,7 +247,7 @@ export default async function HomePage() {
                       <div className="flex items-center justify-between">
                         <div className="flex-1 text-right">
                           <p className="font-semibold text-sm">
-                            {match.homeTeam?.shortName ?? match.homeTeam?.name}
+                            {(match as any).homePlayer?.name ?? match.homeTeam?.shortName ?? match.homeTeam?.name ?? "TBD"}
                           </p>
                         </div>
                         <div className="text-center px-4 shrink-0">
@@ -253,7 +261,7 @@ export default async function HomePage() {
                         </div>
                         <div className="flex-1 text-left">
                           <p className="font-semibold text-sm">
-                            {match.awayTeam?.shortName ?? match.awayTeam?.name}
+                            {(match as any).awayPlayer?.name ?? match.awayTeam?.shortName ?? match.awayTeam?.name ?? "TBD"}
                           </p>
                         </div>
                       </div>
@@ -299,13 +307,13 @@ export default async function HomePage() {
                       </div>
                       <div className="flex items-center justify-between">
                         <p className="font-semibold text-sm flex-1 text-right">
-                          {match.homeTeam?.name ?? "TBD"}
+                          {(match as any).homePlayer?.name ?? match.homeTeam?.name ?? "TBD"}
                         </p>
                         <span className="text-xs text-muted-foreground px-3 shrink-0">
                           vs
                         </span>
                         <p className="font-semibold text-sm flex-1">
-                          {match.awayTeam?.name ?? "TBD"}
+                          {(match as any).awayPlayer?.name ?? match.awayTeam?.name ?? "TBD"}
                         </p>
                       </div>
                       {match.scheduledAt && (
