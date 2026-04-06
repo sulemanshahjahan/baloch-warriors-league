@@ -195,6 +195,18 @@ export async function getTournamentStats(tournamentId: string) {
 
   const playerMap = new Map(players.map(p => [p.id, p]));
 
+  // Get tournament points from standings (overall standings, not group-specific)
+  const standings = await prisma.standing.findMany({
+    where: { 
+      tournamentId,
+      playerId: { in: playerIds },
+      groupId: null, // Overall standings only
+    },
+    select: { playerId: true, points: true },
+  });
+
+  const standingPoints = new Map(standings.map(s => [s.playerId!, s.points]));
+
   // Build comprehensive player stats
   const playerStats = new Map();
   
@@ -205,6 +217,7 @@ export async function getTournamentStats(tournamentId: string) {
       goals: 0,
       assists: 0,
       motm: 0,
+      points: standingPoints.get(player.id) || 0,
     });
   }
 

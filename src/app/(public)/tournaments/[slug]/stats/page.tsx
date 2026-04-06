@@ -130,7 +130,7 @@ export default async function TournamentStatsPage({ params }: TournamentStatsPag
                             {stat.motm > 0 && <span className="text-yellow-400">{stat.motm}</span>}
                           </TableCell>
                           <TableCell className="text-center font-bold">
-                            {stat.goals + stat.assists}
+                            {stat.points}
                           </TableCell>
                         </TableRow>
                       ))}
