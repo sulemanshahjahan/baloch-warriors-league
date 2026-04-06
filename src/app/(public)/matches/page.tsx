@@ -28,6 +28,12 @@ async function getMatches() {
       awayTeam: {
         select: { id: true, name: true, shortName: true, logoUrl: true },
       },
+      homePlayer: {
+        select: { id: true, name: true, photoUrl: true },
+      },
+      awayPlayer: {
+        select: { id: true, name: true, photoUrl: true },
+      },
     },
   });
 
@@ -121,8 +127,8 @@ function MatchCard({
     round: string | null;
     homeTeam: { id: string; name: string; shortName: string | null; logoUrl: string | null } | null;
     awayTeam: { id: string; name: string; shortName: string | null; logoUrl: string | null } | null;
-    homePlayer?: { id: string; name: string; photoUrl: string | null } | null;
-    awayPlayer?: { id: string; name: string; photoUrl: string | null } | null;
+    homePlayer: { id: string; name: string; photoUrl: string | null } | null;
+    awayPlayer: { id: string; name: string; photoUrl: string | null } | null;
     homeScore: number | null;
     awayScore: number | null;
     status: string;
@@ -137,8 +143,8 @@ function MatchCard({
   // Support both team and individual player matches
   const homeName = match.homePlayer?.name ?? match.homeTeam?.name ?? "TBD";
   const awayName = match.awayPlayer?.name ?? match.awayTeam?.name ?? "TBD";
-  const homeLogo = match.homeTeam?.logoUrl ?? undefined;
-  const awayLogo = match.awayTeam?.logoUrl ?? undefined;
+  const homeLogo = match.homePlayer?.photoUrl ?? match.homeTeam?.logoUrl ?? undefined;
+  const awayLogo = match.awayPlayer?.photoUrl ?? match.awayTeam?.logoUrl ?? undefined;
 
   return (
     <Card className="hover:border-primary/30 transition-colors">
