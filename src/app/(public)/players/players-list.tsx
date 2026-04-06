@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { User, Trophy, ChevronRight, Search } from "lucide-react";
+import { User, Trophy, ChevronRight, Search, Target, TrendingUp, Swords } from "lucide-react";
 import { getInitials } from "@/lib/utils";
 
 type Player = {
@@ -25,6 +25,12 @@ type Player = {
   nationality: string | null;
   _count: { matchEvents: number; awards: number };
   teams: { team: { name: string; logoUrl: string | null } }[];
+  // Aggregated stats
+  stats?: {
+    goals: number;
+    assists: number;
+    matches: number;
+  };
 };
 
 export function PlayersList({ players }: { players: Player[] }) {
@@ -76,49 +82,51 @@ export function PlayersList({ players }: { players: Player[] }) {
   return (
     <div>
       {/* Filters */}
-      <div className="flex flex-wrap gap-3 mb-6">
-        <div className="relative flex-1 min-w-[200px]">
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+        <div className="relative flex-1 min-w-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Search players…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
+            className="pl-9 w-full"
           />
         </div>
 
-        {positions.length > 0 && (
-          <Select value={positionFilter} onValueChange={setPositionFilter}>
-            <SelectTrigger className="w-[160px]">
-              <SelectValue placeholder="Position" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Positions</SelectItem>
-              {positions.map((pos) => (
-                <SelectItem key={pos} value={pos}>
-                  {pos}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+        <div className="flex gap-2">
+          {positions.length > 0 && (
+            <Select value={positionFilter} onValueChange={setPositionFilter}>
+              <SelectTrigger className="w-[130px] sm:w-[160px]">
+                <SelectValue placeholder="Position" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Positions</SelectItem>
+                {positions.map((pos) => (
+                  <SelectItem key={pos} value={pos}>
+                    {pos}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
 
-        {teams.length > 0 && (
-          <Select value={teamFilter} onValueChange={setTeamFilter}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Team" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Teams</SelectItem>
-              <SelectItem value="__free">Free Agents</SelectItem>
-              {teams.map((team) => (
-                <SelectItem key={team} value={team}>
-                  {team}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
+          {teams.length > 0 && (
+            <Select value={teamFilter} onValueChange={setTeamFilter}>
+              <SelectTrigger className="w-[130px] sm:w-[160px]">
+                <SelectValue placeholder="Team" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Teams</SelectItem>
+                <SelectItem value="__free">Free Agents</SelectItem>
+                {teams.map((team) => (
+                  <SelectItem key={team} value={team}>
+                    {team}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
       </div>
 
       {/* Count */}
@@ -133,62 +141,64 @@ export function PlayersList({ players }: { players: Player[] }) {
           <p className="text-muted-foreground">No players match your filters.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
           {filtered.map((player) => {
             const currentTeam = player.teams[0]?.team;
             return (
               <Link key={player.id} href={`/players/${player.slug}`}>
-                <Card className="hover:border-primary/50 transition-all hover:-translate-y-0.5 cursor-pointer h-full group">
-                  <CardContent className="p-5">
+                <Card className="hover:border-primary/50 transition-all hover:-translate-y-0.5 cursor-pointer h-full group overflow-hidden">
+                  <CardContent className="p-3 sm:p-4">
+                    {/* Header: Avatar + Position */}
                     <div className="flex items-start justify-between">
-                      <Avatar className="h-16 w-16">
+                      <Avatar className="h-12 w-12 sm:h-14 sm:w-14">
                         <AvatarImage src={player.photoUrl ?? undefined} />
-                        <AvatarFallback className="text-xl">
+                        <AvatarFallback className="text-sm sm:text-base">
                           {getInitials(player.name)}
                         </AvatarFallback>
                       </Avatar>
-                      <ChevronRight className="w-5 h-5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                      {player.position && (
+                        <span className="text-[10px] sm:text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                          {player.position}
+                        </span>
+                      )}
                     </div>
 
-                    <h3 className="font-bold text-lg mt-4 group-hover:text-primary transition-colors">
+                    {/* Name */}
+                    <h3 className="font-bold text-sm sm:text-base mt-3 group-hover:text-primary transition-colors truncate">
                       {player.name}
                     </h3>
 
                     {player.nickname && (
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-xs text-muted-foreground truncate">
                         &quot;{player.nickname}&quot;
                       </p>
                     )}
 
-                    {player.position && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {player.position}
-                      </p>
-                    )}
-
-                    <div className="flex items-center gap-4 mt-4 pt-4 border-t border-border/50">
-                      {currentTeam ? (
-                        <div className="flex items-center gap-2">
-                          <Avatar className="h-5 w-5">
-                            <AvatarImage src={currentTeam.logoUrl ?? undefined} />
-                            <AvatarFallback className="text-[10px]">
-                              {getInitials(currentTeam.name)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="text-sm text-muted-foreground truncate">
-                            {currentTeam.name}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">Free Agent</span>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-4 mt-2">
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Trophy className="w-3 h-3" />
-                        <span>{player._count.awards} awards</span>
+                    {/* Team & Awards Row */}
+                    <div className="flex items-center justify-between mt-3 pt-2 border-t border-border/50">
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        {currentTeam ? (
+                          <>
+                            <Avatar className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0">
+                              <AvatarImage src={currentTeam.logoUrl ?? undefined} />
+                              <AvatarFallback className="text-[8px]">
+                                {getInitials(currentTeam.name)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="text-xs text-muted-foreground truncate">
+                              {currentTeam.name}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Free Agent</span>
+                        )}
                       </div>
+                      {player._count.awards > 0 && (
+                        <div className="flex items-center gap-0.5 text-xs text-yellow-500 flex-shrink-0">
+                          <Trophy className="w-3 h-3" />
+                          <span>{player._count.awards}</span>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
