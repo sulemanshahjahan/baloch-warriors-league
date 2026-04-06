@@ -207,6 +207,35 @@ export async function deleteMatchEvent(eventId: string, matchId: string) {
   return { success: true, data: undefined };
 }
 
+export async function deleteMatch(matchId: string) {
+  const session = await auth();
+  if (!session) return { success: false, error: "Unauthorized" };
+
+  // Get match to find tournament for standings recompute
+  const match = await prisma.match.findUnique({
+    where: { id: matchId },
+    select: { tournamentId: true, status: true },
+  });
+
+  if (!match) return { success: false, error: "Match not found" };
+
+  // Delete related data first (events, participants)
+  await prisma.matchEvent.deleteMany({ where: { matchId } });
+  await prisma.matchParticipant.deleteMany({ where: { matchId } });
+
+  // Delete the match
+  await prisma.match.delete({ where: { id: matchId } });
+
+  // Recompute standings if match was completed
+  if (match.status === "COMPLETED") {
+    await recomputeStandings(match.tournamentId);
+  }
+
+  revalidatePath("/admin/matches");
+  revalidatePath(`/admin/tournaments/${match.tournamentId}`);
+  return { success: true, data: undefined };
+}
+
 // ─── STANDINGS ENGINE ───────────────────────────────────────
 
 async function recomputeStandings(tournamentId: string) {

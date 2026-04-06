@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/table";
 import { Plus, Swords, Edit } from "lucide-react";
 import { formatDate, gameLabel, statusColor, statusLabel } from "@/lib/utils";
+import { DeleteButton } from "./delete-button";
 
 export const metadata = { title: "Matches" };
 
@@ -108,12 +109,16 @@ export default async function MatchesPage() {
                       {match.scheduledAt ? formatDate(match.scheduledAt) : "—"}
                     </TableCell>
                     <TableCell>
-                      <div className="flex justify-end">
+                      <div className="flex justify-end gap-1">
                         <Button variant="ghost" size="icon" asChild className="h-8 w-8">
                           <Link href={`/admin/matches/${match.id}`}>
                             <Edit className="w-4 h-4" />
                           </Link>
                         </Button>
+                        <DeleteButton
+                          matchId={match.id}
+                          matchName={`${(match as any).homePlayer?.name ?? match.homeTeam?.shortName ?? match.homeTeam?.name ?? "TBD"} vs ${(match as any).awayPlayer?.name ?? match.awayTeam?.shortName ?? match.awayTeam?.name ?? "TBD"}`}
+                        />
                       </div>
                     </TableCell>
                   </TableRow>

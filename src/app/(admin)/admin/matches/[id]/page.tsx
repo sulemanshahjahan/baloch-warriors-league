@@ -5,6 +5,7 @@ import { AdminHeader } from "@/components/admin/header";
 import { getMatchById } from "@/lib/actions/match";
 import { MatchResultForm } from "./match-result-form";
 import { MatchEventManager } from "./match-event-manager";
+import { DeleteMatchButton } from "./delete-match-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -54,26 +55,33 @@ export default async function MatchDetailPage({ params }: MatchDetailPageProps) 
       />
 
       <main className="flex-1 p-6 space-y-6">
-        {/* Match metadata */}
-        <div className="flex flex-wrap items-center gap-3">
-          <span
-            className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${statusColor(match.status)}`}
-          >
-            {statusLabel(match.status)}
-          </span>
-          <span className="text-sm text-muted-foreground flex items-center gap-1.5">
-            <Trophy className="w-3.5 h-3.5" />
-            {gameLabel(match.tournament.gameCategory)}
-          </span>
-          {match.round && (
-            <span className="text-sm text-muted-foreground">{match.round}</span>
-          )}
-          {match.scheduledAt && (
-            <span className="text-sm text-muted-foreground flex items-center gap-1.5">
-              <Calendar className="w-3.5 h-3.5" />
-              {formatDateTime(match.scheduledAt)}
+        {/* Match metadata & actions */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <span
+              className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${statusColor(match.status)}`}
+            >
+              {statusLabel(match.status)}
             </span>
-          )}
+            <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+              <Trophy className="w-3.5 h-3.5" />
+              {gameLabel(match.tournament.gameCategory)}
+            </span>
+            {match.round && (
+              <span className="text-sm text-muted-foreground">{match.round}</span>
+            )}
+            {match.scheduledAt && (
+              <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5" />
+                {formatDateTime(match.scheduledAt)}
+              </span>
+            )}
+          </div>
+          <DeleteMatchButton
+            matchId={match.id}
+            homeName={homeName}
+            awayName={awayName}
+          />
         </div>
 
         {/* Score display */}
