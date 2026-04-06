@@ -25,16 +25,31 @@ export default async function MatchDetailPage({ params }: MatchDetailPageProps) 
 
   if (!match) notFound();
 
+  // Handle both team matches and individual player matches
   const homeTeamPlayers =
     match.homeTeam?.players.map((tp) => tp.player) ?? [];
   const awayTeamPlayers =
     match.awayTeam?.players.map((tp) => tp.player) ?? [];
-  const allPlayers = [...homeTeamPlayers, ...awayTeamPlayers];
+  
+  // For individual player matches (eFootball 1v1), use homePlayer/awayPlayer
+  const homeIndividualPlayer = match.homePlayer ? [match.homePlayer] : [];
+  const awayIndividualPlayer = match.awayPlayer ? [match.awayPlayer] : [];
+  
+  const allPlayers = [
+    ...homeTeamPlayers, 
+    ...awayTeamPlayers,
+    ...homeIndividualPlayer,
+    ...awayIndividualPlayer
+  ];
+  
+  // Show team names or player names depending on match type
+  const homeName = match.homeTeam?.name ?? match.homePlayer?.name ?? "TBD";
+  const awayName = match.awayTeam?.name ?? match.awayPlayer?.name ?? "TBD";
 
   return (
     <div className="flex flex-col flex-1">
       <AdminHeader
-        title={`${match.homeTeam?.name ?? "TBD"} vs ${match.awayTeam?.name ?? "TBD"}`}
+        title={`${homeName} vs ${awayName}`}
         description={match.tournament.name}
       />
 
@@ -66,7 +81,7 @@ export default async function MatchDetailPage({ params }: MatchDetailPageProps) 
           <CardContent className="pt-6">
             <div className="flex items-center justify-between gap-4">
               <div className="text-center flex-1">
-                <p className="text-xl font-bold">{match.homeTeam?.name ?? "TBD"}</p>
+                <p className="text-xl font-bold">{homeName}</p>
                 <p className="text-sm text-muted-foreground">Home</p>
               </div>
               <div className="text-center shrink-0">
@@ -93,7 +108,7 @@ export default async function MatchDetailPage({ params }: MatchDetailPageProps) 
                 )}
               </div>
               <div className="text-center flex-1">
-                <p className="text-xl font-bold">{match.awayTeam?.name ?? "TBD"}</p>
+                <p className="text-xl font-bold">{awayName}</p>
                 <p className="text-sm text-muted-foreground">Away</p>
               </div>
             </div>
