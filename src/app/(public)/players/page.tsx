@@ -15,8 +15,8 @@ export const metadata: Metadata = {
   },
 };
 
-async function getPlayers() {
-  return prisma.player.findMany({
+async function getPlayersWithStats() {
+  const players = await prisma.player.findMany({
     where: { isActive: true },
     orderBy: { name: "asc" },
     include: {
@@ -30,10 +30,81 @@ async function getPlayers() {
       },
     },
   });
+
+  // Get player IDs for batch queries
+  const playerIds = players.map(p => p.id);
+
+  // Get goals and assists counts
+  const goalsAgg = await prisma.matchEvent.groupBy({
+    by: ["playerId"],
+    where: { 
+      playerId: { in: playerIds },
+      type: "GOAL" 
+    },
+    _count: { type: true },
+  });
+
+  const assistsAgg = await prisma.matchEvent.groupBy({
+    by: ["playerId"],
+    where: { 
+      playerId: { in: playerIds },
+      type: "ASSIST" 
+    },
+    _count: { type: true },
+  });
+
+  // Get matches played (count unique matches per player)
+  const playerMatches = await prisma.match.findMany({
+    where: {
+      status: "COMPLETED",
+      OR: [
+        { homePlayerId: { in: playerIds } },
+        { awayPlayerId: { in: playerIds } },
+      ],
+    },
+    select: {
+      homePlayerId: true,
+      awayPlayerId: true,
+    },
+  });
+
+  // Count matches per player
+  const matchesCount = new Map<string, number>();
+  for (const match of playerMatches) {
+    if (match.homePlayerId) {
+      matchesCount.set(match.homePlayerId, (matchesCount.get(match.homePlayerId) || 0) + 1);
+    }
+    if (match.awayPlayerId) {
+      matchesCount.set(match.awayPlayerId, (matchesCount.get(match.awayPlayerId) || 0) + 1);
+    }
+  }
+
+  // Get tournaments played
+  const tournamentCounts = await prisma.tournamentPlayer.groupBy({
+    by: ["playerId"],
+    where: { playerId: { in: playerIds } },
+    _count: { tournamentId: true },
+  });
+
+  // Build stats maps
+  const goalsMap = new Map(goalsAgg.map(g => [g.playerId!, g._count.type]));
+  const assistsMap = new Map(assistsAgg.map(a => [a.playerId!, a._count.type]));
+  const tournamentsMap = new Map(tournamentCounts.map(t => [t.playerId!, t._count.tournamentId]));
+
+  // Merge stats into players
+  return players.map(player => ({
+    ...player,
+    stats: {
+      goals: goalsMap.get(player.id) || 0,
+      assists: assistsMap.get(player.id) || 0,
+      matches: matchesCount.get(player.id) || 0,
+      tournaments: tournamentsMap.get(player.id) || 0,
+    },
+  }));
 }
 
 export default async function PlayersPage() {
-  const players = await getPlayers();
+  const players = await getPlayersWithStats();
 
   return (
     <div className="min-h-screen">
