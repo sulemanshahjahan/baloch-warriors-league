@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { AdminHeader } from "@/components/admin/header";
 import { getAwards, getAwardStats } from "@/lib/actions/award";
+import { requireRole } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -31,6 +32,7 @@ const AWARD_TYPE_LABELS: Record<string, string> = {
 };
 
 export default async function AwardsPage() {
+  await requireRole("ADMIN");
   const [awards, stats] = await Promise.all([getAwards(), getAwardStats()]);
 
   return (

@@ -4,6 +4,7 @@ import { AdminHeader } from "@/components/admin/header";
 import { TeamForm } from "@/components/admin/team-form";
 import { prisma } from "@/lib/db";
 import { ArrowLeft } from "lucide-react";
+import { requireRole } from "@/lib/auth";
 
 export const metadata = { title: "Edit Team" };
 
@@ -12,6 +13,7 @@ interface EditTeamPageProps {
 }
 
 export default async function EditTeamPage({ params }: EditTeamPageProps) {
+  await requireRole("ADMIN");
   const { id } = await params;
   const team = await prisma.team.findUnique({
     where: { id },

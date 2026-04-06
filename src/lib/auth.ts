@@ -2,6 +2,33 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
+import { redirect } from "next/navigation";
+
+// Role hierarchy: SUPER_ADMIN > ADMIN > EDITOR
+const ROLE_LEVELS: Record<string, number> = {
+  SUPER_ADMIN: 3,
+  ADMIN: 2,
+  EDITOR: 1,
+};
+
+export async function requireRole(minRole: "EDITOR" | "ADMIN" | "SUPER_ADMIN") {
+  const session = await auth();
+  if (!session) redirect("/login");
+
+  const userRole = (session.user as { role?: string })?.role ?? "EDITOR";
+  const userLevel = ROLE_LEVELS[userRole] ?? 0;
+  const requiredLevel = ROLE_LEVELS[minRole] ?? 0;
+
+  if (userLevel < requiredLevel) {
+    redirect("/admin?error=forbidden");
+  }
+
+  return session;
+}
+
+export function getUserRole(session: Awaited<ReturnType<typeof auth>>): string {
+  return (session?.user as { role?: string })?.role ?? "EDITOR";
+}
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [

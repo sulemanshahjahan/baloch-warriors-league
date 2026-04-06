@@ -1,17 +1,42 @@
 export const dynamic = "force-dynamic";
 
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getOverallStats } from "@/lib/actions/stats";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart3, Trophy, Target, TrendingUp, Swords, Users } from "lucide-react";
-import { getInitials } from "@/lib/utils";
+import { getInitials, gameLabel } from "@/lib/utils";
+import { StatsGameFilter } from "./stats-game-filter";
 
-export const metadata = { title: "Statistics | BWL" };
+export const metadata: Metadata = {
+  title: "Stats & Leaderboards",
+  description: "BWL overall leaderboards — top scorers, top assists, and Man of the Match awards.",
+  openGraph: {
+    title: "Stats & Leaderboards | Baloch Warriors League",
+    description: "League-wide statistics including top scorers, assists, and MOTM leaders.",
+    type: "website",
+  },
+};
 
-export default async function StatsPage() {
-  const stats = await getOverallStats();
+const GAME_CATEGORIES = [
+  { value: "all", label: "All Games" },
+  { value: "FOOTBALL", label: "Football" },
+  { value: "EFOOTBALL", label: "eFootball" },
+  { value: "PUBG", label: "PUBG" },
+  { value: "SNOOKER", label: "Snooker" },
+  { value: "CHECKERS", label: "Checkers" },
+];
+
+interface StatsPageProps {
+  searchParams: Promise<{ game?: string }>;
+}
+
+export default async function StatsPage({ searchParams }: StatsPageProps) {
+  const { game } = await searchParams;
+  const gameCategory = game ?? "all";
+  const stats = await getOverallStats(gameCategory);
 
   return (
     <div className="min-h-screen">
@@ -36,9 +61,13 @@ export default async function StatsPage() {
       </section>
 
       {/* Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+
+        {/* Game category filter */}
+        <StatsGameFilter categories={GAME_CATEGORIES} current={gameCategory} />
+
         {/* Overall Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
           {[
             { label: "Matches", value: stats.totals.matches, icon: Swords },
             { label: "Goals", value: stats.totals.goals, icon: Target },
@@ -74,27 +103,27 @@ export default async function StatsPage() {
           </TabsList>
 
           <TabsContent value="scorers" className="mt-0">
-            <LeaderboardCard 
-              title="Top Goal Scorers" 
-              data={stats.topScorers} 
+            <LeaderboardCard
+              title="Top Goal Scorers"
+              data={stats.topScorers}
               icon={Target}
               color="text-green-400"
             />
           </TabsContent>
 
           <TabsContent value="assists" className="mt-0">
-            <LeaderboardCard 
-              title="Top Assists" 
-              data={stats.topAssists} 
+            <LeaderboardCard
+              title="Top Assists"
+              data={stats.topAssists}
               icon={TrendingUp}
               color="text-blue-400"
             />
           </TabsContent>
 
           <TabsContent value="motm" className="mt-0">
-            <LeaderboardCard 
-              title="Most Man of the Match" 
-              data={stats.mostMOTM} 
+            <LeaderboardCard
+              title="Most Man of the Match"
+              data={stats.mostMOTM}
               icon={Trophy}
               color="text-yellow-400"
             />
@@ -105,13 +134,13 @@ export default async function StatsPage() {
   );
 }
 
-function LeaderboardCard({ 
-  title, 
-  data, 
+function LeaderboardCard({
+  title,
+  data,
   icon: Icon,
   color,
-}: { 
-  title: string; 
+}: {
+  title: string;
   data: Array<{ player: { id: string; name: string; slug: string; photoUrl: string | null } | undefined; count: number; matches: number }>;
   icon: React.ComponentType<{ className?: string }>;
   color: string;
@@ -137,7 +166,7 @@ function LeaderboardCard({
                   className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <span className={`text-lg font-bold w-6 ${i < 3 ? color : 'text-muted-foreground'}`}>
+                    <span className={`text-lg font-bold w-6 ${i < 3 ? color : "text-muted-foreground"}`}>
                       {i + 1}
                     </span>
                     <Avatar className="h-10 w-10">

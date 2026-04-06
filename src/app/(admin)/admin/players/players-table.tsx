@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { bulkDeletePlayers, bulkCreatePlayers } from "@/lib/actions/player";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -23,10 +25,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Edit, Eye, Trash2, AlertTriangle, Upload } from "lucide-react";
+import { Plus, Edit, Eye, Trash2, AlertTriangle, Upload, Search } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getInitials } from "@/lib/utils";
-import { useRouter } from "next/navigation";
+import { Pagination } from "@/components/admin/pagination";
 
 interface Player {
   id: string;
@@ -42,15 +44,29 @@ interface Player {
 
 interface PlayersTableProps {
   players: Player[];
+  currentPage: number;
+  totalPages: number;
+  total: number;
+  itemsPerPage: number;
+  search?: string;
 }
 
-export function PlayersTable({ players }: PlayersTableProps) {
+export function PlayersTable({ 
+  players, 
+  currentPage, 
+  totalPages, 
+  total, 
+  itemsPerPage,
+  search,
+}: PlayersTableProps) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [importOpen, setImportOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [importText, setImportText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState(search ?? "");
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const allSelected = players.length > 0 && selectedIds.length === players.length;
   const someSelected = selectedIds.length > 0 && selectedIds.length < players.length;
@@ -109,12 +125,24 @@ export function PlayersTable({ players }: PlayersTableProps) {
     }
   };
 
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const params = new URLSearchParams(searchParams.toString());
+    if (searchQuery) {
+      params.set("search", searchQuery);
+    } else {
+      params.delete("search");
+    }
+    params.delete("page");
+    router.push(`/admin/players?${params.toString()}`);
+  };
+
   const selectedPlayers = players.filter((p) => selectedIds.includes(p.id));
 
   return (
     <>
       {/* Toolbar */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           {players.length > 0 && (
             <Checkbox
@@ -126,11 +154,22 @@ export function PlayersTable({ players }: PlayersTableProps) {
             />
           )}
           <span className="text-sm text-muted-foreground">
-            {selectedIds.length > 0 ? `${selectedIds.length} selected` : players.length > 0 ? `${players.length} players` : ""}
+            {selectedIds.length > 0 ? `${selectedIds.length} selected` : total > 0 ? `${total} players total` : ""}
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          {/* Search */}
+          <form onSubmit={handleSearch} className="relative flex-1 sm:flex-none">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search players..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 w-full sm:w-[200px]"
+            />
+          </form>
+
           {selectedIds.length > 0 && (
             <Button
               variant="destructive"
@@ -215,100 +254,111 @@ export function PlayersTable({ players }: PlayersTableProps) {
           </Button>
         </div>
       ) : (
-        <div className="rounded-lg border border-border overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/50">
-                <TableHead className="w-10">
-                  <span className="sr-only">Select</span>
-                </TableHead>
-                <TableHead>Player</TableHead>
-                <TableHead>Position</TableHead>
-                <TableHead>Skill</TableHead>
-                <TableHead>Current Team</TableHead>
-                <TableHead>Nationality</TableHead>
-                <TableHead className="text-center">Events</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {players.map((player) => (
-                <TableRow key={player.id} className={selectedIds.includes(player.id) ? "bg-primary/5" : ""}>
-                  <TableCell className="py-2">
-                    <Checkbox
-                      checked={selectedIds.includes(player.id)}
-                      onCheckedChange={() => toggleSelect(player.id)}
-                      aria-label={`Select ${player.name}`}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={player.photoUrl ?? undefined} />
-                        <AvatarFallback className="text-xs">
-                          {getInitials(player.name)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium">{player.name}</p>
-                        {player.nickname && (
-                          <p className="text-xs text-muted-foreground">
-                            &quot;{player.nickname}&quot;
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {player.position ?? "—"}
-                  </TableCell>
-                  <TableCell>
-                    {player.skillLevel ? (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-500/20 text-yellow-500">
-                        {player.skillLevel}
-                      </span>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {player.teams[0]?.team.name ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {player.nationality ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-center text-sm">
-                    {player._count.matchEvents}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        asChild
-                        className="h-8 w-8"
-                      >
-                        <Link href={`/admin/players/${player.id}`}>
-                          <Eye className="w-4 h-4" />
-                        </Link>
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        asChild
-                        className="h-8 w-8"
-                      >
-                        <Link href={`/admin/players/${player.id}/edit`}>
-                          <Edit className="w-4 h-4" />
-                        </Link>
-                      </Button>
-                    </div>
-                  </TableCell>
+        <>
+          <div className="rounded-lg border border-border overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  <TableHead className="w-10">
+                    <span className="sr-only">Select</span>
+                  </TableHead>
+                  <TableHead>Player</TableHead>
+                  <TableHead>Position</TableHead>
+                  <TableHead>Skill</TableHead>
+                  <TableHead>Current Team</TableHead>
+                  <TableHead>Nationality</TableHead>
+                  <TableHead className="text-center">Events</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {players.map((player) => (
+                  <TableRow key={player.id} className={selectedIds.includes(player.id) ? "bg-primary/5" : ""}>
+                    <TableCell className="py-2">
+                      <Checkbox
+                        checked={selectedIds.includes(player.id)}
+                        onCheckedChange={() => toggleSelect(player.id)}
+                        aria-label={`Select ${player.name}`}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-8 w-8">
+                          <AvatarImage src={player.photoUrl ?? undefined} />
+                          <AvatarFallback className="text-xs">
+                            {getInitials(player.name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="font-medium">{player.name}</p>
+                          {player.nickname && (
+                            <p className="text-xs text-muted-foreground">
+                              &quot;{player.nickname}&quot;
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {player.position ?? "—"}
+                    </TableCell>
+                    <TableCell>
+                      {player.skillLevel ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-500/20 text-yellow-500">
+                          {player.skillLevel}
+                        </span>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {player.teams[0]?.team.name ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {player.nationality ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-center text-sm">
+                      {player._count.matchEvents}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          asChild
+                          className="h-8 w-8"
+                        >
+                          <Link href={`/admin/players/${player.id}`}>
+                            <Eye className="w-4 h-4" />
+                          </Link>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          asChild
+                          className="h-8 w-8"
+                        >
+                          <Link href={`/admin/players/${player.id}/edit`}>
+                            <Edit className="w-4 h-4" />
+                          </Link>
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            total={total}
+            itemsPerPage={itemsPerPage}
+            basePath="/admin/players"
+            searchParams={search ? { search } : {}}
+          />
+        </>
       )}
 
       {/* Bulk Delete Confirmation */}

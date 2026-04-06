@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { slugify } from "@/lib/utils";
 import { z } from "zod";
 import type { ActionResult } from "@/lib/utils";
+import { logActivity } from "./activity-log";
 
 const newsSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters"),
@@ -51,6 +52,13 @@ export async function createNewsPost(formData: FormData): Promise<ActionResult<{
     },
   });
 
+  await logActivity({
+    action: "CREATE",
+    entityType: "NEWS",
+    entityId: post.id,
+    details: { title: data.title, isPublished: data.isPublished },
+  });
+
   revalidatePath("/admin/news");
   revalidatePath("/news");
 
@@ -86,6 +94,13 @@ export async function updateNewsPost(id: string, formData: FormData): Promise<Ac
     },
   });
 
+  await logActivity({
+    action: "UPDATE",
+    entityType: "NEWS",
+    entityId: id,
+    details: { title: data.title, isPublished: data.isPublished },
+  });
+
   revalidatePath("/admin/news");
   revalidatePath(`/admin/news/${id}`);
   revalidatePath("/news");
@@ -97,6 +112,12 @@ export async function deleteNewsPost(id: string): Promise<ActionResult> {
   await requireAdmin();
 
   await prisma.newsPost.delete({ where: { id } });
+
+  await logActivity({
+    action: "DELETE",
+    entityType: "NEWS",
+    entityId: id,
+  });
 
   revalidatePath("/admin/news");
   revalidatePath("/news");
@@ -111,6 +132,36 @@ export async function getNewsPosts(params?: { published?: boolean }) {
     },
     orderBy: { createdAt: "desc" },
   });
+}
+
+export async function getNewsPostsPaginated(options?: {
+  page?: number;
+  limit?: number;
+  published?: boolean;
+  search?: string;
+}) {
+  const page = Math.max(1, options?.page ?? 1);
+  const limit = Math.max(1, Math.min(100, options?.limit ?? 25));
+  const skip = (page - 1) * limit;
+
+  const where = {
+    ...(options?.published !== undefined && { isPublished: options.published }),
+    ...(options?.search && {
+      title: { contains: options.search, mode: "insensitive" as const },
+    }),
+  };
+
+  const [posts, total] = await Promise.all([
+    prisma.newsPost.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
+    }),
+    prisma.newsPost.count({ where }),
+  ]);
+
+  return { posts, total, page, limit, totalPages: Math.ceil(total / limit) };
 }
 
 export async function getNewsPostById(id: string) {

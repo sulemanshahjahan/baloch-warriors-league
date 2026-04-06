@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { AdminHeader } from "@/components/admin/header";
-import { getNewsPosts } from "@/lib/actions/news";
+import { getNewsPostsPaginated } from "@/lib/actions/news";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -16,21 +16,39 @@ import {
 import { Plus, Newspaper, Edit, Eye } from "lucide-react";
 import { DeleteNewsButton } from "./delete-button";
 import { formatDate } from "@/lib/utils";
+import { Pagination } from "@/components/admin/pagination";
+import { NewsSearch } from "./news-search";
 
 export const metadata = { title: "News" };
 
-export default async function NewsPage() {
-  const posts = await getNewsPosts();
+const ITEMS_PER_PAGE = 25;
+
+interface NewsPageProps {
+  searchParams: Promise<{ page?: string; search?: string }>;
+}
+
+export default async function NewsPage({ searchParams }: NewsPageProps) {
+  const { page, search } = await searchParams;
+  const currentPage = Math.max(1, parseInt(page ?? "1", 10));
+  
+  const { posts, total, totalPages } = await getNewsPostsPaginated({
+    page: currentPage,
+    limit: ITEMS_PER_PAGE,
+    search,
+  });
 
   return (
     <div className="flex flex-col flex-1">
       <AdminHeader
         title="News"
-        description={`${posts.length} post${posts.length !== 1 ? "s" : ""}`}
+        description={`${total} post${total !== 1 ? "s" : ""}`}
       />
 
       <main className="flex-1 p-6 space-y-6">
-        <div className="flex justify-end">
+        {/* Toolbar */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <NewsSearch initialSearch={search} />
+          
           <Button asChild>
             <Link href="/admin/news/new">
               <Plus className="w-4 h-4" />
@@ -54,54 +72,65 @@ export default async function NewsPage() {
             </Button>
           </div>
         ) : (
-          <div className="rounded-lg border border-border overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50">
-                  <TableHead>Title</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Published</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {posts.map((post) => (
-                  <TableRow key={post.id}>
-                    <TableCell className="font-medium">{post.title}</TableCell>
-                    <TableCell>
-                      <Badge variant={post.isPublished ? "default" : "secondary"}>
-                        {post.isPublished ? "Published" : "Draft"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {post.publishedAt ? formatDate(post.publishedAt) : "—"}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {formatDate(post.createdAt)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center justify-end gap-2">
-                        {post.isPublished && (
+          <>
+            <div className="rounded-lg border border-border overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50">
+                    <TableHead>Title</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Published</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {posts.map((post) => (
+                    <TableRow key={post.id}>
+                      <TableCell className="font-medium">{post.title}</TableCell>
+                      <TableCell>
+                        <Badge variant={post.isPublished ? "default" : "secondary"}>
+                          {post.isPublished ? "Published" : "Draft"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {post.publishedAt ? formatDate(post.publishedAt) : "—"}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {formatDate(post.createdAt)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center justify-end gap-2">
+                          {post.isPublished && (
+                            <Button variant="ghost" size="icon" asChild className="h-8 w-8">
+                              <Link href={`/news/${post.slug}`} target="_blank">
+                                <Eye className="w-4 h-4" />
+                              </Link>
+                            </Button>
+                          )}
                           <Button variant="ghost" size="icon" asChild className="h-8 w-8">
-                            <Link href={`/news/${post.slug}`} target="_blank">
-                              <Eye className="w-4 h-4" />
+                            <Link href={`/admin/news/${post.id}/edit`}>
+                              <Edit className="w-4 h-4" />
                             </Link>
                           </Button>
-                        )}
-                        <Button variant="ghost" size="icon" asChild className="h-8 w-8">
-                          <Link href={`/admin/news/${post.id}/edit`}>
-                            <Edit className="w-4 h-4" />
-                          </Link>
-                        </Button>
-                        <DeleteNewsButton id={post.id} title={post.title} />
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                          <DeleteNewsButton id={post.id} title={post.title} />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              total={total}
+              itemsPerPage={ITEMS_PER_PAGE}
+              basePath="/admin/news"
+              searchParams={search ? { search } : {}}
+            />
+          </>
         )}
       </main>
     </div>

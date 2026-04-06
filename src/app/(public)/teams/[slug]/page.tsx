@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
@@ -32,6 +33,22 @@ import {
 
 interface TeamPageProps {
   params: Promise<{ slug: string }>;
+}
+
+export async function generateMetadata({ params }: TeamPageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const team = await prisma.team.findUnique({ where: { slug }, select: { name: true, logoUrl: true } });
+  if (!team) return { title: "Team Not Found" };
+  return {
+    title: team.name,
+    description: `View ${team.name}'s roster, match history, and tournament record in BWL.`,
+    openGraph: {
+      title: `${team.name} | BWL`,
+      description: `${team.name} — roster, results, and stats in the Baloch Warriors League.`,
+      images: team.logoUrl ? [{ url: team.logoUrl }] : [],
+      type: "website",
+    },
+  };
 }
 
 async function getTeamBySlug(slug: string) {

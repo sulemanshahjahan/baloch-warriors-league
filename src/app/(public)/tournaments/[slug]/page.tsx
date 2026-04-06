@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
@@ -38,6 +39,22 @@ import {
 
 interface TournamentPageProps {
   params: Promise<{ slug: string }>;
+}
+
+export async function generateMetadata({ params }: TournamentPageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const t = await getTournamentBySlug(slug);
+  if (!t) return { title: "Tournament Not Found" };
+  return {
+    title: t.name,
+    description: t.description ?? `View fixtures, standings, and stats for ${t.name}.`,
+    openGraph: {
+      title: `${t.name} | BWL`,
+      description: t.description ?? `Tournament details, fixtures, and standings for ${t.name}.`,
+      images: t.bannerUrl ? [{ url: t.bannerUrl }] : [],
+      type: "website",
+    },
+  };
 }
 
 async function getTournamentBySlug(slug: string) {

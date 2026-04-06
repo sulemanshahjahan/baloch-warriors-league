@@ -6,17 +6,21 @@ import { prisma } from "@/lib/db";
 import { slugify } from "@/lib/utils";
 import { tournamentSchema } from "@/lib/validations/tournament";
 import type { ActionResult } from "@/lib/utils";
+import { logActivity } from "./activity-log";
 
 async function requireAdmin() {
   const session = await auth();
-  if (!session) throw new Error("Unauthorized");
+  if (!session) return null;
+  const role = (session.user as { role?: string })?.role ?? "EDITOR";
+  if (role === "EDITOR") return null;
   return { session };
 }
 
 export async function createTournament(
   formData: FormData
 ): Promise<ActionResult<{ id: string; slug: string }>> {
-  await requireAdmin();
+  const admin = await requireAdmin();
+  if (!admin) return { success: false, error: "Unauthorized: Admin role required" };
 
   const raw = Object.fromEntries(formData.entries());
   const parsed = tournamentSchema.safeParse({
@@ -58,6 +62,13 @@ export async function createTournament(
       isFeatured: data.isFeatured ?? false,
       ...(data.seasonId ? { season: { connect: { id: data.seasonId } } } : {}),
     },
+  });
+
+  await logActivity({
+    action: "CREATE",
+    entityType: "TOURNAMENT",
+    entityId: tournament.id,
+    details: { name: data.name, gameCategory: data.gameCategory },
   });
 
   revalidatePath("/admin/tournaments");
@@ -109,6 +120,13 @@ export async function updateTournament(
     },
   });
 
+  await logActivity({
+    action: "UPDATE",
+    entityType: "TOURNAMENT",
+    entityId: id,
+    details: { name: data.name, status: data.status },
+  });
+
   revalidatePath("/admin/tournaments");
   revalidatePath(`/admin/tournaments/${id}`);
   revalidatePath("/");
@@ -120,6 +138,12 @@ export async function deleteTournament(id: string): Promise<ActionResult> {
   await requireAdmin();
 
   await prisma.tournament.delete({ where: { id } });
+
+  await logActivity({
+    action: "DELETE",
+    entityType: "TOURNAMENT",
+    entityId: id,
+  });
 
   revalidatePath("/admin/tournaments");
   revalidatePath("/");
@@ -213,11 +237,18 @@ export async function enrollTeamInTournament(
   await requireAdmin();
 
   try {
-    await prisma.tournamentTeam.create({
+    const enrollment = await prisma.tournamentTeam.create({
       data: {
         tournamentId,
         teamId,
       },
+    });
+
+    await logActivity({
+      action: "ENROLL",
+      entityType: "TOURNAMENT",
+      entityId: tournamentId,
+      details: { teamId, enrollmentId: enrollment.id },
     });
 
     revalidatePath(`/admin/tournaments/${tournamentId}`);
@@ -235,6 +266,13 @@ export async function removeTeamFromTournament(
 
   await prisma.tournamentTeam.delete({
     where: { id: tournamentTeamId },
+  });
+
+  await logActivity({
+    action: "UNENROLL",
+    entityType: "TOURNAMENT",
+    entityId: tournamentId,
+    details: { teamEnrollmentId: tournamentTeamId },
   });
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);

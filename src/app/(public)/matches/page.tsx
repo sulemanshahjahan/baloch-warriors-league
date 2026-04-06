@@ -1,7 +1,18 @@
 export const dynamic = "force-dynamic";
 
+import type { Metadata } from "next";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+
+export const metadata: Metadata = {
+  title: "Matches",
+  description: "View all BWL match fixtures and results — upcoming, live, and completed.",
+  openGraph: {
+    title: "Matches | Baloch Warriors League",
+    description: "All BWL fixtures, live scores, and completed match results.",
+    type: "website",
+  },
+};
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -147,7 +158,8 @@ function MatchCard({
   const awayLogo = match.awayPlayer?.photoUrl ?? match.awayTeam?.logoUrl ?? undefined;
 
   return (
-    <Card className="hover:border-primary/30 transition-colors">
+    <Link href={`/matches/${match.id}`} className="block">
+    <Card className="hover:border-primary/30 transition-colors cursor-pointer">
       <CardContent className="p-4">
         {/* Header */}
         <div className="flex items-center justify-between mb-3">
@@ -239,16 +251,27 @@ function MatchCard({
           ) : (
             <span className="text-sm text-muted-foreground">Date TBD</span>
           )}
-          <Link
-            href={`/tournaments/${match.tournament.slug}`}
-            className="text-sm text-primary hover:underline flex items-center gap-1"
-          >
-            View Tournament
-            <ArrowRight className="w-4 h-4" />
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href={`/tournaments/${match.tournament.slug}`}
+              onClick={(e) => e.stopPropagation()}
+              className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+            >
+              {match.tournament.name}
+            </Link>
+            <Link
+              href={`/matches/${match.id}`}
+              onClick={(e) => e.stopPropagation()}
+              className="text-sm text-primary hover:underline flex items-center gap-1"
+            >
+              Details
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
         </div>
       </CardContent>
     </Card>
+    </Link>
   );
 }
 

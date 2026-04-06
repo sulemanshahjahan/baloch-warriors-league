@@ -1,6 +1,17 @@
 export const dynamic = "force-dynamic";
 
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "Tournaments",
+  description: "Browse all BWL tournaments — football, eFootball, PUBG, snooker, and checkers competitions.",
+  openGraph: {
+    title: "Tournaments | Baloch Warriors League",
+    description: "Browse all BWL tournaments across multiple game categories.",
+    type: "website",
+  },
+};
 import { prisma } from "@/lib/db";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";

@@ -2,30 +2,36 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { AdminHeader } from "@/components/admin/header";
-import { getMatches } from "@/lib/actions/match";
+import { getMatchesPaginated } from "@/lib/actions/match";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Plus, Swords, Edit } from "lucide-react";
-import { formatDate, gameLabel, statusColor, statusLabel } from "@/lib/utils";
-import { DeleteButton } from "./delete-button";
+import { Plus, Swords } from "lucide-react";
+import { MatchesFilter } from "./matches-filter";
+import { Pagination } from "@/components/admin/pagination";
 
 export const metadata = { title: "Matches" };
 
-export default async function MatchesPage() {
-  const matches = await getMatches();
+const ITEMS_PER_PAGE = 25;
+
+interface MatchesPageProps {
+  searchParams: Promise<{ page?: string; status?: string; tournamentId?: string }>;
+}
+
+export default async function MatchesPage({ searchParams }: MatchesPageProps) {
+  const { page, status, tournamentId } = await searchParams;
+  const currentPage = Math.max(1, parseInt(page ?? "1", 10));
+  
+  const { matches, total, totalPages } = await getMatchesPaginated({
+    page: currentPage,
+    limit: ITEMS_PER_PAGE,
+    status,
+    tournamentId,
+  });
 
   return (
     <div className="flex flex-col flex-1">
       <AdminHeader
         title="Matches"
-        description={`${matches.length} match${matches.length !== 1 ? "es" : ""} total`}
+        description={`${total} match${total !== 1 ? "es" : ""} total`}
       />
 
       <main className="flex-1 p-6 space-y-6">
@@ -53,79 +59,15 @@ export default async function MatchesPage() {
             </Button>
           </div>
         ) : (
-          <div className="rounded-lg border border-border overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50">
-                  <TableHead>Match</TableHead>
-                  <TableHead>Tournament</TableHead>
-                  <TableHead>Round</TableHead>
-                  <TableHead className="text-center">Score</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {matches.map((match) => (
-                  <TableRow key={match.id}>
-                    <TableCell>
-                      <div className="text-sm">
-                        <span className="font-medium">
-                          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                          {(match as any).homePlayer?.name ?? match.homeTeam?.shortName ?? match.homeTeam?.name ?? "TBD"}
-                        </span>
-                        <span className="text-muted-foreground mx-2">vs</span>
-                        <span className="font-medium">
-                          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                          {(match as any).awayPlayer?.name ?? match.awayTeam?.shortName ?? match.awayTeam?.name ?? "TBD"}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      <div>
-                        <p>{match.tournament.name}</p>
-                        <p className="text-xs opacity-70">
-                          {gameLabel(match.tournament.gameCategory)}
-                        </p>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {match.round ?? "—"}
-                    </TableCell>
-                    <TableCell className="text-center font-bold text-sm">
-                      {match.status === "COMPLETED"
-                        ? `${match.homeScore ?? 0} – ${match.awayScore ?? 0}`
-                        : "—"}
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(match.status)}`}
-                      >
-                        {statusLabel(match.status)}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {match.scheduledAt ? formatDate(match.scheduledAt) : "—"}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" asChild className="h-8 w-8">
-                          <Link href={`/admin/matches/${match.id}`}>
-                            <Edit className="w-4 h-4" />
-                          </Link>
-                        </Button>
-                        <DeleteButton
-                          matchId={match.id}
-                          matchName={`${(match as any).homePlayer?.name ?? match.homeTeam?.shortName ?? match.homeTeam?.name ?? "TBD"} vs ${(match as any).awayPlayer?.name ?? match.awayTeam?.shortName ?? match.awayTeam?.name ?? "TBD"}`}
-                        />
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <>
+            <MatchesFilter 
+              matches={matches} 
+              currentPage={currentPage}
+              totalPages={totalPages}
+              total={total}
+              itemsPerPage={ITEMS_PER_PAGE}
+            />
+          </>
         )}
       </main>
     </div>

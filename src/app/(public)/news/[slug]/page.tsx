@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
@@ -9,6 +10,25 @@ import { formatDate } from "@/lib/utils";
 
 interface NewsPostPageProps {
   params: Promise<{ slug: string }>;
+}
+
+export async function generateMetadata({ params }: NewsPostPageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const post = await prisma.newsPost.findUnique({
+    where: { slug, isPublished: true },
+    select: { title: true, excerpt: true, coverUrl: true },
+  });
+  if (!post) return { title: "Post Not Found" };
+  return {
+    title: post.title,
+    description: post.excerpt ?? `Read the latest news from BWL: ${post.title}`,
+    openGraph: {
+      title: `${post.title} | BWL News`,
+      description: post.excerpt ?? `BWL news article: ${post.title}`,
+      images: post.coverUrl ? [{ url: post.coverUrl }] : [],
+      type: "article",
+    },
+  };
 }
 
 async function getPost(slug: string) {

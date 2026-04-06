@@ -1,6 +1,17 @@
 export const dynamic = "force-dynamic";
 
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "News",
+  description: "Latest news and announcements from the Baloch Warriors League.",
+  openGraph: {
+    title: "News | Baloch Warriors League",
+    description: "Stay up to date with the latest BWL news and announcements.",
+    type: "website",
+  },
+};
 import { prisma } from "@/lib/db";
 import { Card, CardContent } from "@/components/ui/card";
 import { Newspaper, Calendar, ChevronRight } from "lucide-react";

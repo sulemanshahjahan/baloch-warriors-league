@@ -28,10 +28,12 @@ import {
   formatLabel,
 } from "@/lib/utils";
 import { DeleteTournamentButton } from "./delete-button";
+import { requireRole } from "@/lib/auth";
 
 export const metadata = { title: "Tournaments" };
 
 export default async function TournamentsPage() {
+  await requireRole("ADMIN");
   const tournaments = await getTournaments();
 
   return (

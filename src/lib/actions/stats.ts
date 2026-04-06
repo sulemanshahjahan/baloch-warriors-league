@@ -3,7 +3,11 @@
 import { prisma } from "@/lib/db";
 
 // Overall stats across all tournaments
-export async function getOverallStats() {
+export async function getOverallStats(gameCategory?: string) {
+  const gameCategoryFilter = gameCategory && gameCategory !== "all"
+    ? { match: { tournament: { gameCategory: gameCategory as never } } }
+    : {};
+
   const [
     topScorers,
     topAssists,
@@ -14,7 +18,7 @@ export async function getOverallStats() {
     // Top scorers overall
     prisma.matchEvent.groupBy({
       by: ["playerId"],
-      where: { type: "GOAL", playerId: { not: null } },
+      where: { type: "GOAL", playerId: { not: null }, ...gameCategoryFilter },
       _count: { type: true },
       orderBy: { _count: { type: "desc" } },
       take: 20,
@@ -22,7 +26,7 @@ export async function getOverallStats() {
     // Top assists overall
     prisma.matchEvent.groupBy({
       by: ["playerId"],
-      where: { type: "ASSIST", playerId: { not: null } },
+      where: { type: "ASSIST", playerId: { not: null }, ...gameCategoryFilter },
       _count: { type: true },
       orderBy: { _count: { type: "desc" } },
       take: 20,
@@ -30,23 +34,23 @@ export async function getOverallStats() {
     // Most MOTM
     prisma.matchEvent.groupBy({
       by: ["playerId"],
-      where: { type: "MOTM", playerId: { not: null } },
+      where: { type: "MOTM", playerId: { not: null }, ...gameCategoryFilter },
       _count: { type: true },
       orderBy: { _count: { type: "desc" } },
       take: 20,
     }),
     // Total counts
     Promise.all([
-      prisma.match.count({ where: { status: "COMPLETED" } }),
-      prisma.matchEvent.count({ where: { type: "GOAL" } }),
-      prisma.matchEvent.count({ where: { type: "ASSIST" } }),
-      prisma.matchEvent.count({ where: { type: "YELLOW_CARD" } }),
-      prisma.matchEvent.count({ where: { type: "RED_CARD" } }),
-      prisma.matchEvent.count({ where: { type: "MOTM" } }),
+      prisma.match.count({ where: { status: "COMPLETED", ...(gameCategory && gameCategory !== "all" ? { tournament: { gameCategory: gameCategory as never } } : {}) } }),
+      prisma.matchEvent.count({ where: { type: "GOAL", ...gameCategoryFilter } }),
+      prisma.matchEvent.count({ where: { type: "ASSIST", ...gameCategoryFilter } }),
+      prisma.matchEvent.count({ where: { type: "YELLOW_CARD", ...gameCategoryFilter } }),
+      prisma.matchEvent.count({ where: { type: "RED_CARD", ...gameCategoryFilter } }),
+      prisma.matchEvent.count({ where: { type: "MOTM", ...gameCategoryFilter } }),
     ]),
     // All completed individual matches for calculating matches played
     prisma.match.findMany({
-      where: { status: "COMPLETED", homePlayerId: { not: null } },
+      where: { status: "COMPLETED", homePlayerId: { not: null }, ...(gameCategory && gameCategory !== "all" ? { tournament: { gameCategory: gameCategory as never } } : {}) },
       select: {
         homePlayerId: true,
         awayPlayerId: true,

@@ -3,9 +3,11 @@ export const dynamic = "force-dynamic";
 import { notFound } from "next/navigation";
 import { AdminHeader } from "@/components/admin/header";
 import { getMatchById } from "@/lib/actions/match";
+import { requireRole } from "@/lib/auth";
 import { MatchResultForm } from "./match-result-form";
 import { MatchEventManager } from "./match-event-manager";
 import { DeleteMatchButton } from "./delete-match-button";
+import { RescheduleForm } from "./reschedule-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -21,6 +23,7 @@ interface MatchDetailPageProps {
 }
 
 export default async function MatchDetailPage({ params }: MatchDetailPageProps) {
+  await requireRole("ADMIN");
   const { id } = await params;
   const match = await getMatchById(id);
 
@@ -122,6 +125,14 @@ export default async function MatchDetailPage({ params }: MatchDetailPageProps) 
             </div>
           </CardContent>
         </Card>
+
+        {/* Reschedule Form - only shown for non-completed matches */}
+        <RescheduleForm
+          matchId={match.id}
+          currentScheduledAt={match.scheduledAt}
+          currentStatus={match.status}
+          currentNotes={match.notes}
+        />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Result Entry Form */}

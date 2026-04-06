@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
 import type { ActionResult } from "@/lib/utils";
+import { logActivity } from "./activity-log";
 
 const awardSchema = z.object({
   tournamentId: z.string().min(1, "Tournament is required"),
@@ -51,7 +52,7 @@ export async function createAward(formData: FormData): Promise<ActionResult> {
 
   const data = parsed.data;
 
-  await prisma.award.create({
+  const award = await prisma.award.create({
     data: {
       tournamentId: data.tournamentId,
       type: data.type,
@@ -59,6 +60,18 @@ export async function createAward(formData: FormData): Promise<ActionResult> {
       playerId: data.playerId || null,
       teamId: data.teamId || null,
       description: data.description || null,
+    },
+  });
+
+  await logActivity({
+    action: "ASSIGN_AWARD",
+    entityType: "AWARD",
+    entityId: award.id,
+    details: {
+      tournamentId: data.tournamentId,
+      type: data.type,
+      playerId: data.playerId,
+      teamId: data.teamId,
     },
   });
 
@@ -72,6 +85,13 @@ export async function deleteAward(id: string, tournamentId: string): Promise<Act
   await requireAdmin();
 
   await prisma.award.delete({ where: { id } });
+
+  await logActivity({
+    action: "REMOVE_AWARD",
+    entityType: "AWARD",
+    entityId: id,
+    details: { tournamentId },
+  });
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath("/admin/awards");

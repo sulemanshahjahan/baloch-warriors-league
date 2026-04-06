@@ -1,11 +1,19 @@
 export const dynamic = "force-dynamic";
 
-import Link from "next/link";
+import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
-import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { User, Trophy, ChevronRight, Users } from "lucide-react";
-import { getInitials } from "@/lib/utils";
+import { Users } from "lucide-react";
+import { PlayersList } from "./players-list";
+
+export const metadata: Metadata = {
+  title: "Players",
+  description: "Browse all BWL players — view profiles, stats, and tournament history.",
+  openGraph: {
+    title: "Players | Baloch Warriors League",
+    description: "All BWL players with profiles and career statistics.",
+    type: "website",
+  },
+};
 
 async function getPlayers() {
   return prisma.player.findMany({
@@ -52,78 +60,7 @@ export default async function PlayersPage() {
 
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {players.length === 0 ? (
-          <div className="text-center py-16">
-            <User className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-            <p className="text-muted-foreground">No players registered yet.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {players.map((player) => {
-              const currentTeam = player.teams[0]?.team;
-              return (
-                <Link key={player.id} href={`/players/${player.slug}`}>
-                  <Card className="hover:border-primary/50 transition-all hover:-translate-y-0.5 cursor-pointer h-full group">
-                    <CardContent className="p-5">
-                      <div className="flex items-start justify-between">
-                        <Avatar className="h-16 w-16">
-                          <AvatarImage src={player.photoUrl ?? undefined} />
-                          <AvatarFallback className="text-xl">
-                            {getInitials(player.name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <ChevronRight className="w-5 h-5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </div>
-
-                      <h3 className="font-bold text-lg mt-4 group-hover:text-primary transition-colors">
-                        {player.name}
-                      </h3>
-
-                      {player.nickname && (
-                        <p className="text-sm text-muted-foreground">
-                          &quot;{player.nickname}&quot;
-                        </p>
-                      )}
-
-                      {player.position && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {player.position}
-                        </p>
-                      )}
-
-                      <div className="flex items-center gap-4 mt-4 pt-4 border-t border-border/50">
-                        {currentTeam ? (
-                          <div className="flex items-center gap-2">
-                            <Avatar className="h-5 w-5">
-                              <AvatarImage src={currentTeam.logoUrl ?? undefined} />
-                              <AvatarFallback className="text-[10px]">
-                                {getInitials(currentTeam.name)}
-                              </AvatarFallback>
-                            </Avatar>
-                            <span className="text-sm text-muted-foreground truncate">
-                              {currentTeam.name}
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">
-                            Free Agent
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-4 mt-2">
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Trophy className="w-3 h-3" />
-                          <span>{player._count.awards} awards</span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
-              );
-            })}
-          </div>
-        )}
+        <PlayersList players={players} />
       </div>
     </div>
   );

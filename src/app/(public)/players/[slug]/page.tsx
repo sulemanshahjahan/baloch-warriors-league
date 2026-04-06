@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
@@ -24,6 +25,22 @@ import {
 
 interface PlayerPageProps {
   params: Promise<{ slug: string }>;
+}
+
+export async function generateMetadata({ params }: PlayerPageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const player = await prisma.player.findUnique({ where: { slug }, select: { name: true, bio: true, photoUrl: true } });
+  if (!player) return { title: "Player Not Found" };
+  return {
+    title: player.name,
+    description: player.bio ?? `View ${player.name}'s stats, match history, and career in BWL.`,
+    openGraph: {
+      title: `${player.name} | BWL`,
+      description: player.bio ?? `${player.name}'s profile and statistics in the Baloch Warriors League.`,
+      images: player.photoUrl ? [{ url: player.photoUrl }] : [],
+      type: "profile",
+    },
+  };
 }
 
 async function getPlayerBySlug(slug: string) {

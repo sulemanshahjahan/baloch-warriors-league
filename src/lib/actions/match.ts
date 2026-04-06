@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
+import { logActivity } from "./activity-log";
 
 const matchSchema = z.object({
   tournamentId: z.string().min(1, "Tournament is required"),
@@ -43,9 +44,14 @@ const matchEventSchema = z.object({
   description: z.string().optional(),
 });
 
+function isEditor(session: Awaited<ReturnType<typeof auth>>) {
+  return (session?.user as { role?: string })?.role === "EDITOR";
+}
+
 export async function createMatch(formData: FormData) {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };
+  if (isEditor(session)) return { success: false, error: "Unauthorized: Admin role required" };
 
   const raw = Object.fromEntries(formData.entries());
   const parsed = matchSchema.safeParse(raw);
@@ -69,6 +75,17 @@ export async function createMatch(formData: FormData) {
       scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : null,
       venueId: data.venueId || null,
       notes: data.notes || null,
+      status: data.status,
+    },
+  });
+
+  await logActivity({
+    action: "CREATE",
+    entityType: "MATCH",
+    entityId: match.id,
+    details: { 
+      tournamentId: data.tournamentId,
+      round: data.round,
       status: data.status,
     },
   });
@@ -163,6 +180,18 @@ export async function updateMatchResult(
     await recomputeStandings(match.tournamentId);
   }
 
+  await logActivity({
+    action: data.status === "COMPLETED" ? "COMPLETE" : "UPDATE",
+    entityType: "MATCH",
+    entityId: matchId,
+    details: {
+      homeScore: data.homeScore,
+      awayScore: data.awayScore,
+      status: data.status,
+      tournamentId: match.tournamentId,
+    },
+  });
+
   revalidatePath(`/admin/matches/${matchId}`);
   revalidatePath(`/admin/tournaments/${match.tournamentId}`);
   revalidatePath("/admin/matches");
@@ -182,7 +211,7 @@ export async function addMatchEvent(formData: FormData) {
 
   const data = parsed.data;
 
-  await prisma.matchEvent.create({
+  const event = await prisma.matchEvent.create({
     data: {
       matchId: data.matchId,
       playerId: data.playerId || null,
@@ -191,6 +220,18 @@ export async function addMatchEvent(formData: FormData) {
       minute: data.minute ? Number(data.minute) : null,
       value: data.value ? Number(data.value) : null,
       description: data.description || null,
+    },
+  });
+
+  await logActivity({
+    action: "ADD_EVENT",
+    entityType: "MATCH",
+    entityId: data.matchId,
+    details: {
+      eventId: event.id,
+      type: data.type,
+      playerId: data.playerId,
+      teamId: data.teamId,
     },
   });
 
@@ -203,6 +244,14 @@ export async function deleteMatchEvent(eventId: string, matchId: string) {
   if (!session) return { success: false, error: "Unauthorized" };
 
   await prisma.matchEvent.delete({ where: { id: eventId } });
+
+  await logActivity({
+    action: "REMOVE_EVENT",
+    entityType: "MATCH",
+    entityId: matchId,
+    details: { eventId },
+  });
+
   revalidatePath(`/admin/matches/${matchId}`);
   return { success: true, data: undefined };
 }
@@ -230,6 +279,13 @@ export async function deleteMatch(matchId: string) {
   if (match.status === "COMPLETED") {
     await recomputeStandings(match.tournamentId);
   }
+
+  await logActivity({
+    action: "DELETE",
+    entityType: "MATCH",
+    entityId: matchId,
+    details: { tournamentId: match.tournamentId },
+  });
 
   revalidatePath("/admin/matches");
   revalidatePath(`/admin/tournaments/${match.tournamentId}`);
@@ -434,6 +490,40 @@ async function recomputeIndividualStandings(tournamentId: string) {
   }
 }
 
+export async function rescheduleMatch(matchId: string, formData: FormData) {
+  const session = await auth();
+  if (!session) return { success: false, error: "Unauthorized" };
+
+  const scheduledAt = formData.get("scheduledAt") as string;
+  const status = formData.get("status") as string;
+  const notes = formData.get("notes") as string;
+
+  const allowedStatuses = ["SCHEDULED", "POSTPONED", "CANCELLED"];
+  if (status && !allowedStatuses.includes(status)) {
+    return { success: false, error: "Invalid status for rescheduling" };
+  }
+
+  await prisma.match.update({
+    where: { id: matchId },
+    data: {
+      scheduledAt: scheduledAt ? new Date(scheduledAt) : undefined,
+      status: (status as never) || undefined,
+      notes: notes || null,
+    },
+  });
+
+  await logActivity({
+    action: status === "POSTPONED" ? "POSTPONE" : "RESCHEDULE",
+    entityType: "MATCH",
+    entityId: matchId,
+    details: { scheduledAt, status, notes },
+  });
+
+  revalidatePath(`/admin/matches/${matchId}`);
+  revalidatePath("/admin/matches");
+  return { success: true, data: undefined };
+}
+
 export async function getMatches(params?: { status?: string; tournamentId?: string }) {
   return prisma.match.findMany({
     where: {
@@ -450,6 +540,42 @@ export async function getMatches(params?: { status?: string; tournamentId?: stri
       motmPlayer: { select: { id: true, name: true } },
     },
   });
+}
+
+export async function getMatchesPaginated(options?: {
+  status?: string;
+  tournamentId?: string;
+  page?: number;
+  limit?: number;
+}) {
+  const page = Math.max(1, options?.page ?? 1);
+  const limit = Math.max(1, Math.min(100, options?.limit ?? 25));
+  const skip = (page - 1) * limit;
+
+  const where = {
+    ...(options?.status && { status: options.status as never }),
+    ...(options?.tournamentId && { tournamentId: options.tournamentId }),
+  };
+
+  const [matches, total] = await Promise.all([
+    prisma.match.findMany({
+      where,
+      orderBy: [{ scheduledAt: "desc" }],
+      skip,
+      take: limit,
+      include: {
+        tournament: { select: { id: true, name: true, gameCategory: true } },
+        homeTeam: { select: { id: true, name: true, shortName: true, logoUrl: true } },
+        awayTeam: { select: { id: true, name: true, shortName: true, logoUrl: true } },
+        homePlayer: { select: { id: true, name: true, slug: true, photoUrl: true } },
+        awayPlayer: { select: { id: true, name: true, slug: true, photoUrl: true } },
+        motmPlayer: { select: { id: true, name: true } },
+      },
+    }),
+    prisma.match.count({ where }),
+  ]);
+
+  return { matches, total, page, limit, totalPages: Math.ceil(total / limit) };
 }
 
 export async function getMatchById(id: string) {

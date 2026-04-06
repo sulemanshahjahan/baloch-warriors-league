@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { AdminHeader } from "@/components/admin/header";
-import { getTeams } from "@/lib/actions/team";
+import { getTeamsPaginated } from "@/lib/actions/team";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -16,21 +16,39 @@ import { Plus, Users, Edit, Eye } from "lucide-react";
 import { DeleteTeamButton } from "./delete-button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getInitials } from "@/lib/utils";
+import { Pagination } from "@/components/admin/pagination";
+import { TeamsSearch } from "./teams-search";
 
 export const metadata = { title: "Teams" };
 
-export default async function TeamsPage() {
-  const teams = await getTeams();
+const ITEMS_PER_PAGE = 25;
+
+interface TeamsPageProps {
+  searchParams: Promise<{ page?: string; search?: string }>;
+}
+
+export default async function TeamsPage({ searchParams }: TeamsPageProps) {
+  const { page, search } = await searchParams;
+  const currentPage = Math.max(1, parseInt(page ?? "1", 10));
+  
+  const { teams, total, totalPages } = await getTeamsPaginated({
+    page: currentPage,
+    limit: ITEMS_PER_PAGE,
+    search,
+  });
 
   return (
     <div className="flex flex-col flex-1">
       <AdminHeader
         title="Teams"
-        description={`${teams.length} active team${teams.length !== 1 ? "s" : ""}`}
+        description={`${total} active team${total !== 1 ? "s" : ""}`}
       />
 
       <main className="flex-1 p-6 space-y-6">
-        <div className="flex justify-end">
+        {/* Toolbar */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <TeamsSearch initialSearch={search} />
+          
           <Button asChild>
             <Link href="/admin/teams/new">
               <Plus className="w-4 h-4" />
@@ -54,71 +72,82 @@ export default async function TeamsPage() {
             </Button>
           </div>
         ) : (
-          <div className="rounded-lg border border-border overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50">
-                  <TableHead>Team</TableHead>
-                  <TableHead>Short Name</TableHead>
-                  <TableHead>Captain</TableHead>
-                  <TableHead className="text-center">Players</TableHead>
-                  <TableHead className="text-center">Tournaments</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {teams.map((team) => (
-                  <TableRow key={team.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage src={team.logoUrl ?? undefined} />
-                          <AvatarFallback
-                            className="text-xs"
-                            style={{
-                              backgroundColor: team.primaryColor
-                                ? `${team.primaryColor}33`
-                                : undefined,
-                            }}
-                          >
-                            {getInitials(team.name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="font-medium">{team.name}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {team.shortName ?? "—"}
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {team.captain?.name ?? "—"}
-                    </TableCell>
-                    <TableCell className="text-center text-sm">
-                      {team._count.players}
-                    </TableCell>
-                    <TableCell className="text-center text-sm">
-                      {team._count.tournaments}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center justify-end gap-2">
-                        <Button variant="ghost" size="icon" asChild className="h-8 w-8">
-                          <Link href={`/admin/teams/${team.id}`}>
-                            <Eye className="w-4 h-4" />
-                          </Link>
-                        </Button>
-                        <Button variant="ghost" size="icon" asChild className="h-8 w-8">
-                          <Link href={`/admin/teams/${team.id}/edit`}>
-                            <Edit className="w-4 h-4" />
-                          </Link>
-                        </Button>
-                        <DeleteTeamButton id={team.id} name={team.name} />
-                      </div>
-                    </TableCell>
+          <>
+            <div className="rounded-lg border border-border overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50">
+                    <TableHead>Team</TableHead>
+                    <TableHead>Short Name</TableHead>
+                    <TableHead>Captain</TableHead>
+                    <TableHead className="text-center">Players</TableHead>
+                    <TableHead className="text-center">Tournaments</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {teams.map((team) => (
+                    <TableRow key={team.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={team.logoUrl ?? undefined} />
+                            <AvatarFallback
+                              className="text-xs"
+                              style={{
+                                backgroundColor: team.primaryColor
+                                  ? `${team.primaryColor}33`
+                                  : undefined,
+                              }}
+                            >
+                              {getInitials(team.name)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <span className="font-medium">{team.name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {team.shortName ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {team.captain?.name ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-center text-sm">
+                        {team._count.players}
+                      </TableCell>
+                      <TableCell className="text-center text-sm">
+                        {team._count.tournaments}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center justify-end gap-2">
+                          <Button variant="ghost" size="icon" asChild className="h-8 w-8">
+                            <Link href={`/admin/teams/${team.id}`}>
+                              <Eye className="w-4 h-4" />
+                            </Link>
+                          </Button>
+                          <Button variant="ghost" size="icon" asChild className="h-8 w-8">
+                            <Link href={`/admin/teams/${team.id}/edit`}>
+                              <Edit className="w-4 h-4" />
+                            </Link>
+                          </Button>
+                          <DeleteTeamButton id={team.id} name={team.name} />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              total={total}
+              itemsPerPage={ITEMS_PER_PAGE}
+              basePath="/admin/teams"
+              searchParams={search ? { search } : {}}
+            />
+          </>
         )}
       </main>
     </div>

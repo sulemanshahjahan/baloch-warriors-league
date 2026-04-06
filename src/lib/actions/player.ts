@@ -5,6 +5,11 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { slugify } from "@/lib/utils";
 import { z } from "zod";
+import { logActivity } from "./activity-log";
+
+function isEditorOnly(session: Awaited<ReturnType<typeof auth>>) {
+  return (session?.user as { role?: string })?.role === "EDITOR";
+}
 
 const playerSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -20,6 +25,7 @@ const playerSchema = z.object({
 export async function createPlayer(formData: FormData) {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };
+  if (isEditorOnly(session)) return { success: false, error: "Unauthorized: Admin role required" };
 
   const raw = Object.fromEntries(formData.entries());
   const parsed = playerSchema.safeParse(raw);
@@ -47,6 +53,13 @@ export async function createPlayer(formData: FormData) {
     },
   });
 
+  await logActivity({
+    action: "CREATE",
+    entityType: "PLAYER",
+    entityId: player.id,
+    details: { name: data.name, position: data.position },
+  });
+
   revalidatePath("/admin/players");
   return { success: true, data: { id: player.id } };
 }
@@ -54,6 +67,7 @@ export async function createPlayer(formData: FormData) {
 export async function updatePlayer(id: string, formData: FormData) {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };
+  if (isEditorOnly(session)) return { success: false, error: "Unauthorized: Admin role required" };
 
   const raw = Object.fromEntries(formData.entries());
   const parsed = playerSchema.safeParse(raw);
@@ -78,6 +92,13 @@ export async function updatePlayer(id: string, formData: FormData) {
     },
   });
 
+  await logActivity({
+    action: "UPDATE",
+    entityType: "PLAYER",
+    entityId: id,
+    details: { name: data.name },
+  });
+
   revalidatePath("/admin/players");
   revalidatePath(`/admin/players/${id}`);
   return { success: true, data: undefined };
@@ -86,10 +107,18 @@ export async function updatePlayer(id: string, formData: FormData) {
 export async function deletePlayer(id: string) {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };
+  if (isEditorOnly(session)) return { success: false, error: "Unauthorized: Admin role required" };
 
   await prisma.player.update({
     where: { id },
     data: { isActive: false },
+  });
+
+  await logActivity({
+    action: "DELETE",
+    entityType: "PLAYER",
+    entityId: id,
+    details: { softDelete: true },
   });
 
   revalidatePath("/admin/players");
@@ -99,6 +128,7 @@ export async function deletePlayer(id: string) {
 export async function bulkDeletePlayers(ids: string[]) {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };
+  if (isEditorOnly(session)) return { success: false, error: "Unauthorized: Admin role required" };
 
   await prisma.player.updateMany({
     where: { id: { in: ids } },
@@ -122,6 +152,7 @@ const bulkPlayerSchema = z.array(
 export async function bulkCreatePlayers(players: { name: string; nickname?: string; position?: string; nationality?: string; skillLevel?: number }[]) {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };
+  if (isEditorOnly(session)) return { success: false, error: "Unauthorized: Admin role required" };
 
   const parsed = bulkPlayerSchema.safeParse(players);
   if (!parsed.success) {
@@ -167,6 +198,45 @@ export async function getPlayers() {
       },
     },
   });
+}
+
+export async function getPlayersPaginated(options?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+}) {
+  const page = Math.max(1, options?.page ?? 1);
+  const limit = Math.max(1, Math.min(100, options?.limit ?? 25));
+  const skip = (page - 1) * limit;
+
+  const where = {
+    isActive: true,
+    ...(options?.search && {
+      name: { contains: options.search, mode: "insensitive" as const },
+    }),
+  };
+
+  const [players, total] = await Promise.all([
+    prisma.player.findMany({
+      where,
+      orderBy: { name: "asc" },
+      skip,
+      take: limit,
+      include: {
+        teams: {
+          where: { isActive: true },
+          include: { team: { select: { name: true } } },
+          take: 1,
+        },
+        _count: {
+          select: { matchEvents: true, awards: true },
+        },
+      },
+    }),
+    prisma.player.count({ where }),
+  ]);
+
+  return { players, total, page, limit, totalPages: Math.ceil(total / limit) };
 }
 
 export async function getPlayerById(id: string) {

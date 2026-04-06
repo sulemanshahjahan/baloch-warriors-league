@@ -16,6 +16,9 @@ import {
   Globe,
   Menu,
   X,
+  MapPin,
+  Calendar,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -67,6 +70,21 @@ const navItems = [
     label: "News",
     href: "/admin/news",
     icon: Newspaper,
+  },
+  {
+    label: "Venues",
+    href: "/admin/venues",
+    icon: MapPin,
+  },
+  {
+    label: "Seasons",
+    href: "/admin/seasons",
+    icon: Calendar,
+  },
+  {
+    label: "Admin Users",
+    href: "/admin/users",
+    icon: ShieldCheck,
   },
 ];
 

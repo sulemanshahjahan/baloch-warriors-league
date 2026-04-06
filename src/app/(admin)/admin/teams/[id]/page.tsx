@@ -15,14 +15,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Edit, Users, Trophy, UserPlus, User, ArrowLeft } from "lucide-react";
+import { RemovePlayerButton } from "./remove-player-button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getInitials, gameLabel, statusColor, statusLabel } from "@/lib/utils";
+import { requireRole } from "@/lib/auth";
 
 interface TeamDetailPageProps {
   params: Promise<{ id: string }>;
 }
 
 export default async function TeamDetailPage({ params }: TeamDetailPageProps) {
+  await requireRole("ADMIN");
   const { id } = await params;
   const team = await getTeamById(id);
 
@@ -178,78 +181,150 @@ export default async function TeamDetailPage({ params }: TeamDetailPageProps) {
           </Card>
         </div>
 
-        {/* Players */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2">
-                <User className="w-4 h-4 text-purple-400" />
-                Squad
-              </CardTitle>
-              <Button variant="outline" size="sm" asChild>
-                <Link href={`/admin/players?teamId=${id}`}>
-                  <UserPlus className="w-4 h-4" />
-                  Add Player
-                </Link>
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {team.players.length === 0 ? (
-              <div className="text-center py-8">
-                <Users className="w-10 h-10 text-muted-foreground mx-auto mb-3 opacity-50" />
-                <p className="text-sm text-muted-foreground">
-                  No players in the squad yet.
-                </p>
-                <Button variant="outline" size="sm" className="mt-3" asChild>
-                  <Link href="/admin/players/new">Add First Player</Link>
-                </Button>
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead>Player</TableHead>
-                    <TableHead>Position</TableHead>
-                    <TableHead className="text-center">Jersey #</TableHead>
-                    <TableHead className="text-right">Joined</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {team.players.map(({ player, jerseyNumber, joinedAt }) => (
-                    <TableRow key={player.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src={player.photoUrl ?? undefined} />
-                            <AvatarFallback className="text-xs">
-                              {getInitials(player.name)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <Link
-                            href={`/admin/players/${player.id}`}
-                            className="font-medium hover:text-primary hover:underline"
-                          >
-                            {player.name}
-                          </Link>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {player.position ?? "—"}
-                      </TableCell>
-                      <TableCell className="text-center text-sm">
-                        {jerseyNumber ?? "—"}
-                      </TableCell>
-                      <TableCell className="text-right text-sm text-muted-foreground">
-                        {new Date(joinedAt).toLocaleDateString()}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+        {/* Active Squad */}
+        {(() => {
+          const activePlayers = team.players.filter((p) => p.isActive);
+          const formerPlayers = team.players.filter((p) => !p.isActive);
+
+          return (
+            <>
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <User className="w-4 h-4 text-purple-400" />
+                      Squad ({activePlayers.length})
+                    </CardTitle>
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={`/admin/players?teamId=${id}`}>
+                        <UserPlus className="w-4 h-4" />
+                        Add Player
+                      </Link>
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {activePlayers.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Users className="w-10 h-10 text-muted-foreground mx-auto mb-3 opacity-50" />
+                      <p className="text-sm text-muted-foreground">
+                        No players in the squad yet.
+                      </p>
+                      <Button variant="outline" size="sm" className="mt-3" asChild>
+                        <Link href="/admin/players/new">Add First Player</Link>
+                      </Button>
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50">
+                          <TableHead>Player</TableHead>
+                          <TableHead>Position</TableHead>
+                          <TableHead className="text-center">Jersey #</TableHead>
+                          <TableHead className="text-right">Joined</TableHead>
+                          <TableHead className="w-10" />
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {activePlayers.map(({ id: teamPlayerId, player, jerseyNumber, joinedAt }) => (
+                          <TableRow key={teamPlayerId}>
+                            <TableCell>
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-8 w-8">
+                                  <AvatarImage src={player.photoUrl ?? undefined} />
+                                  <AvatarFallback className="text-xs">
+                                    {getInitials(player.name)}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <Link
+                                  href={`/admin/players/${player.id}`}
+                                  className="font-medium hover:text-primary hover:underline"
+                                >
+                                  {player.name}
+                                </Link>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {player.position ?? "—"}
+                            </TableCell>
+                            <TableCell className="text-center text-sm">
+                              {jerseyNumber ?? "—"}
+                            </TableCell>
+                            <TableCell className="text-right text-sm text-muted-foreground">
+                              {new Date(joinedAt).toLocaleDateString()}
+                            </TableCell>
+                            <TableCell>
+                              <RemovePlayerButton
+                                teamPlayerId={teamPlayerId}
+                                teamId={id}
+                                playerName={player.name}
+                              />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Transfer History */}
+              {formerPlayers.length > 0 && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Users className="w-4 h-4 text-muted-foreground" />
+                      Former Players
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50">
+                          <TableHead>Player</TableHead>
+                          <TableHead>Position</TableHead>
+                          <TableHead className="text-right">Joined</TableHead>
+                          <TableHead className="text-right">Left</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {formerPlayers.map(({ id: teamPlayerId, player, joinedAt, leftAt }) => (
+                          <TableRow key={teamPlayerId} className="opacity-60">
+                            <TableCell>
+                              <div className="flex items-center gap-3">
+                                <Avatar className="h-8 w-8">
+                                  <AvatarImage src={player.photoUrl ?? undefined} />
+                                  <AvatarFallback className="text-xs">
+                                    {getInitials(player.name)}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <Link
+                                  href={`/admin/players/${player.id}`}
+                                  className="font-medium hover:text-primary hover:underline"
+                                >
+                                  {player.name}
+                                </Link>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {player.position ?? "—"}
+                            </TableCell>
+                            <TableCell className="text-right text-sm text-muted-foreground">
+                              {new Date(joinedAt).toLocaleDateString()}
+                            </TableCell>
+                            <TableCell className="text-right text-sm text-muted-foreground">
+                              {leftAt ? new Date(leftAt).toLocaleDateString() : "—"}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          );
+        })()}
       </main>
     </div>
   );

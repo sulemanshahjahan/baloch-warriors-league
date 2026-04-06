@@ -3,6 +3,7 @@ import Link from "next/link";
 import { AdminHeader } from "@/components/admin/header";
 import { PlayerForm } from "@/components/admin/player-form";
 import { prisma } from "@/lib/db";
+import { requireRole } from "@/lib/auth";
 import { ArrowLeft } from "lucide-react";
 
 export const metadata = { title: "Edit Player" };
@@ -12,6 +13,7 @@ interface EditPlayerPageProps {
 }
 
 export default async function EditPlayerPage({ params }: EditPlayerPageProps) {
+  await requireRole("ADMIN");
   const { id } = await params;
   const player = await prisma.player.findUnique({
     where: { id },

@@ -30,12 +30,14 @@ import { PlayerEnrollment } from "./player-enrollment";
 import { AwardsManager } from "./awards-manager";
 import { GroupsManager } from "./groups-manager";
 import { QuickMatchEditor } from "./quick-match-editor";
+import { requireRole } from "@/lib/auth";
 
 interface TournamentDetailPageProps {
   params: Promise<{ id: string }>;
 }
 
 export default async function TournamentDetailPage({ params }: TournamentDetailPageProps) {
+  await requireRole("ADMIN");
   const { id } = await params;
   const [tournament, availableTeams, availablePlayers] = await Promise.all([
     getTournamentById(id),

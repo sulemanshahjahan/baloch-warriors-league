@@ -12,6 +12,7 @@ import {
   Clock,
   CheckCircle2,
   TrendingUp,
+  Target,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,13 +25,20 @@ async function getDashboardStats() {
     activeTournaments,
     totalTeams,
     totalPlayers,
+    totalMatches,
+    liveMatches,
+    totalGoals,
     recentMatches,
     upcomingMatches,
+    postponedMatches,
   ] = await Promise.all([
     prisma.tournament.count(),
     prisma.tournament.count({ where: { status: "ACTIVE" } }),
     prisma.team.count({ where: { isActive: true } }),
     prisma.player.count({ where: { isActive: true } }),
+    prisma.match.count({ where: { status: "COMPLETED" } }),
+    prisma.match.count({ where: { status: "LIVE" } }),
+    prisma.matchEvent.count({ where: { type: "GOAL" } }),
     prisma.match.findMany({
       where: { status: "COMPLETED" },
       orderBy: { completedAt: "desc" },
@@ -39,6 +47,8 @@ async function getDashboardStats() {
         tournament: { select: { name: true, gameCategory: true } },
         homeTeam: { select: { name: true, shortName: true } },
         awayTeam: { select: { name: true, shortName: true } },
+        homePlayer: { select: { name: true } },
+        awayPlayer: { select: { name: true } },
       },
     }),
     prisma.match.findMany({
@@ -49,8 +59,11 @@ async function getDashboardStats() {
         tournament: { select: { name: true, gameCategory: true } },
         homeTeam: { select: { name: true, shortName: true } },
         awayTeam: { select: { name: true, shortName: true } },
+        homePlayer: { select: { name: true } },
+        awayPlayer: { select: { name: true } },
       },
     }),
+    prisma.match.count({ where: { status: "POSTPONED" } }),
   ]);
 
   return {
@@ -58,8 +71,12 @@ async function getDashboardStats() {
     activeTournaments,
     totalTeams,
     totalPlayers,
+    totalMatches,
+    liveMatches,
+    totalGoals,
     recentMatches,
     upcomingMatches,
+    postponedMatches,
   };
 }
 
@@ -78,7 +95,7 @@ const statCards = [
     icon: Activity,
     color: "text-green-400",
     bg: "bg-green-400/10",
-    href: "/admin/tournaments?status=ACTIVE",
+    href: "/admin/tournaments",
   },
   {
     label: "Teams",
@@ -96,9 +113,30 @@ const statCards = [
     bg: "bg-purple-400/10",
     href: "/admin/players",
   },
+  {
+    label: "Matches Played",
+    key: "totalMatches" as const,
+    icon: CheckCircle2,
+    color: "text-emerald-400",
+    bg: "bg-emerald-400/10",
+    href: "/admin/matches",
+  },
+  {
+    label: "Total Goals",
+    key: "totalGoals" as const,
+    icon: TrendingUp,
+    color: "text-orange-400",
+    bg: "bg-orange-400/10",
+    href: "/admin/matches",
+  },
 ];
 
-export default async function AdminDashboard() {
+export default async function AdminDashboard({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error } = await searchParams;
   const stats = await getDashboardStats();
 
   return (
@@ -109,8 +147,31 @@ export default async function AdminDashboard() {
       />
 
       <main className="flex-1 p-6 space-y-6">
+        {error === "forbidden" && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            You don&apos;t have permission to access that page.
+          </div>
+        )}
+
+        {/* Live match alert */}
+        {stats.liveMatches > 0 && (
+          <Link href="/admin/matches">
+            <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm font-medium hover:bg-red-500/15 transition-colors">
+              <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse shrink-0" />
+              {stats.liveMatches} match{stats.liveMatches !== 1 ? "es" : ""} currently LIVE — click to manage
+            </div>
+          </Link>
+        )}
+        {stats.postponedMatches > 0 && (
+          <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 text-sm">
+            <span className="font-medium">{stats.postponedMatches} postponed match{stats.postponedMatches !== 1 ? "es" : ""}</span>
+            <span className="text-yellow-400/70">need rescheduling</span>
+            <Link href="/admin/matches" className="ml-auto text-yellow-400 hover:underline text-xs">View →</Link>
+          </div>
+        )}
+
         {/* Stat Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
           {statCards.map((card) => (
             <Link key={card.key} href={card.href}>
               <Card className="hover:border-border/80 transition-colors cursor-pointer">
@@ -178,11 +239,11 @@ export default async function AdminDashboard() {
                       </div>
                       <div className="flex items-center gap-2 text-sm font-medium">
                         <span className="truncate">
-                          {match.homeTeam?.shortName ?? match.homeTeam?.name ?? "TBD"}
+                          {(match as any).homePlayer?.name ?? match.homeTeam?.shortName ?? match.homeTeam?.name ?? "TBD"}
                         </span>
                         <span className="text-muted-foreground shrink-0">vs</span>
                         <span className="truncate">
-                          {match.awayTeam?.shortName ?? match.awayTeam?.name ?? "TBD"}
+                          {(match as any).awayPlayer?.name ?? match.awayTeam?.shortName ?? match.awayTeam?.name ?? "TBD"}
                         </span>
                       </div>
                     </div>

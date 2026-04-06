@@ -5,6 +5,11 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { slugify } from "@/lib/utils";
 import { z } from "zod";
+import { logActivity } from "./activity-log";
+
+function isEditorOnly(session: Awaited<ReturnType<typeof auth>>) {
+  return (session?.user as { role?: string })?.role === "EDITOR";
+}
 
 const teamSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
@@ -17,6 +22,7 @@ const teamSchema = z.object({
 export async function createTeam(formData: FormData) {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };
+  if (isEditorOnly(session)) return { success: false, error: "Unauthorized: Admin role required" };
 
   const raw = Object.fromEntries(formData.entries());
   const parsed = teamSchema.safeParse(raw);
@@ -41,6 +47,13 @@ export async function createTeam(formData: FormData) {
     },
   });
 
+  await logActivity({
+    action: "CREATE",
+    entityType: "TEAM",
+    entityId: team.id,
+    details: { name: data.name },
+  });
+
   revalidatePath("/admin/teams");
   return { success: true, data: { id: team.id } };
 }
@@ -48,6 +61,7 @@ export async function createTeam(formData: FormData) {
 export async function updateTeam(id: string, formData: FormData) {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };
+  if (isEditorOnly(session)) return { success: false, error: "Unauthorized: Admin role required" };
 
   const raw = Object.fromEntries(formData.entries());
   const parsed = teamSchema.safeParse(raw);
@@ -69,6 +83,13 @@ export async function updateTeam(id: string, formData: FormData) {
     },
   });
 
+  await logActivity({
+    action: "UPDATE",
+    entityType: "TEAM",
+    entityId: id,
+    details: { name: data.name },
+  });
+
   revalidatePath("/admin/teams");
   revalidatePath(`/admin/teams/${id}`);
   return { success: true, data: undefined };
@@ -77,8 +98,16 @@ export async function updateTeam(id: string, formData: FormData) {
 export async function deleteTeam(id: string) {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };
+  if (isEditorOnly(session)) return { success: false, error: "Unauthorized: Admin role required" };
 
   await prisma.team.delete({ where: { id } });
+
+  await logActivity({
+    action: "DELETE",
+    entityType: "TEAM",
+    entityId: id,
+  });
+
   revalidatePath("/admin/teams");
   return { success: true, data: undefined };
 }
@@ -90,9 +119,17 @@ export async function addPlayerToTeam(
 ) {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };
+  if (isEditorOnly(session)) return { success: false, error: "Unauthorized: Admin role required" };
 
-  await prisma.teamPlayer.create({
+  const teamPlayer = await prisma.teamPlayer.create({
     data: { teamId, playerId, jerseyNumber: jerseyNumber ?? null },
+  });
+
+  await logActivity({
+    action: "ENROLL",
+    entityType: "TEAM",
+    entityId: teamId,
+    details: { playerId, jerseyNumber, teamPlayerId: teamPlayer.id },
   });
 
   revalidatePath(`/admin/teams/${teamId}`);
@@ -102,10 +139,18 @@ export async function addPlayerToTeam(
 export async function removePlayerFromTeam(teamPlayerId: string, teamId: string) {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };
+  if (isEditorOnly(session)) return { success: false, error: "Unauthorized: Admin role required" };
 
   await prisma.teamPlayer.update({
     where: { id: teamPlayerId },
     data: { leftAt: new Date(), isActive: false },
+  });
+
+  await logActivity({
+    action: "UNENROLL",
+    entityType: "TEAM",
+    entityId: teamId,
+    details: { teamPlayerId },
   });
 
   revalidatePath(`/admin/teams/${teamId}`);
@@ -123,15 +168,48 @@ export async function getTeams() {
   });
 }
 
+export async function getTeamsPaginated(options?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+}) {
+  const page = Math.max(1, options?.page ?? 1);
+  const limit = Math.max(1, Math.min(100, options?.limit ?? 25));
+  const skip = (page - 1) * limit;
+
+  const where = {
+    isActive: true,
+    ...(options?.search && {
+      name: { contains: options.search, mode: "insensitive" as const },
+    }),
+  };
+
+  const [teams, total] = await Promise.all([
+    prisma.team.findMany({
+      where,
+      orderBy: { name: "asc" },
+      skip,
+      take: limit,
+      include: {
+        _count: { select: { players: true, tournaments: true } },
+        captain: { select: { name: true } },
+      },
+    }),
+    prisma.team.count({ where }),
+  ]);
+
+  return { teams, total, page, limit, totalPages: Math.ceil(total / limit) };
+}
+
 export async function getTeamById(id: string) {
   return prisma.team.findUnique({
     where: { id },
     include: {
       players: {
-        where: { isActive: true },
         include: {
           player: { select: { id: true, name: true, position: true, photoUrl: true } },
         },
+        orderBy: [{ isActive: "desc" }, { joinedAt: "desc" }],
       },
       captain: { select: { id: true, name: true } },
       tournaments: {
