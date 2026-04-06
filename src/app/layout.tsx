@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import "./globals.css";
 import { LoadingProgress } from "@/components/loading-progress";
 
@@ -20,7 +21,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="min-h-screen bg-background text-foreground antialiased">
-        <LoadingProgress />
+        <Suspense fallback={null}>
+          <LoadingProgress />
+        </Suspense>
         {children}
       </body>
     </html>
