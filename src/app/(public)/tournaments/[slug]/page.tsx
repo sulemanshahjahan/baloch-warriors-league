@@ -85,6 +85,19 @@ async function getTournamentBySlug(slug: string) {
         include: {
           team: { select: { id: true, slug: true, name: true, logoUrl: true } },
           player: { select: { id: true, slug: true, name: true, photoUrl: true } },
+          group: { select: { id: true, name: true } },
+        },
+      },
+      groups: {
+        orderBy: { orderIndex: "asc" },
+        include: {
+          standings: {
+            orderBy: [{ points: "desc" }, { goalDiff: "desc" }],
+            include: {
+              team: { select: { id: true, slug: true, name: true, logoUrl: true } },
+              player: { select: { id: true, slug: true, name: true, photoUrl: true } },
+            },
+          },
         },
       },
       awards: {
@@ -226,12 +239,101 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
           </TabsList>
 
           {/* Standings */}
-          <TabsContent value="standings" className="mt-0">
+          <TabsContent value="standings" className="mt-0 space-y-6">
+            {/* Group Standings */}
+            {tournament.groups.length > 0 && (
+              <>
+                {tournament.groups.map((group) => (
+                  <Card key={group.id}>
+                    <CardHeader>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <BarChart3 className="w-4 h-4 text-yellow-400" />
+                        {group.name} Standings
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {group.standings.length === 0 ? (
+                        <p className="text-muted-foreground text-center py-4">
+                          No standings available for this group yet.
+                        </p>
+                      ) : (
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-muted/50">
+                              <TableHead className="w-12">#</TableHead>
+                              <TableHead>
+                                {tournament.participantType === "INDIVIDUAL" ? "Player" : "Team"}
+                              </TableHead>
+                              <TableHead className="text-center">P</TableHead>
+                              <TableHead className="text-center">W</TableHead>
+                              <TableHead className="text-center">D</TableHead>
+                              <TableHead className="text-center">L</TableHead>
+                              <TableHead className="text-center">GF</TableHead>
+                              <TableHead className="text-center">GA</TableHead>
+                              <TableHead className="text-center">GD</TableHead>
+                              <TableHead className="text-center font-bold">Pts</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {group.standings.map((s, i) => (
+                              <TableRow key={s.id}>
+                                <TableCell className="font-medium">{i + 1}</TableCell>
+                                <TableCell>
+                                  {tournament.participantType === "INDIVIDUAL" ? (
+                                    <Link
+                                      href={`/players/${s.player?.slug}`}
+                                      className="flex items-center gap-2 hover:text-primary"
+                                    >
+                                      <Avatar className="h-6 w-6">
+                                        <AvatarImage src={s.player?.photoUrl ?? undefined} />
+                                        <AvatarFallback className="text-[10px]">
+                                          {getInitials(s.player?.name ?? "")}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      {s.player?.name}
+                                    </Link>
+                                  ) : (
+                                    <Link
+                                      href={`/teams/${s.team?.slug}`}
+                                      className="flex items-center gap-2 hover:text-primary"
+                                    >
+                                      <Avatar className="h-6 w-6">
+                                        <AvatarImage src={s.team?.logoUrl ?? undefined} />
+                                        <AvatarFallback className="text-[10px]">
+                                          {getInitials(s.team?.name ?? "")}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      {s.team?.name}
+                                    </Link>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-center">{s.played}</TableCell>
+                                <TableCell className="text-center">{s.won}</TableCell>
+                                <TableCell className="text-center">{s.drawn}</TableCell>
+                                <TableCell className="text-center">{s.lost}</TableCell>
+                                <TableCell className="text-center">{s.goalsFor}</TableCell>
+                                <TableCell className="text-center">{s.goalsAgainst}</TableCell>
+                                <TableCell className="text-center">{s.goalDiff}</TableCell>
+                                <TableCell className="text-center font-bold">
+                                  {s.points}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </>
+            )}
+
+            {/* Overall League Table */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <BarChart3 className="w-4 h-4 text-yellow-400" />
-                  League Table
+                  {tournament.groups.length > 0 ? "Overall League Table" : "League Table"}
                 </CardTitle>
               </CardHeader>
               <CardContent>
