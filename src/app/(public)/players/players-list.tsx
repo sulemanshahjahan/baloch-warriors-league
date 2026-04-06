@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { User, Trophy, ChevronRight, Search, Target, Swords, SwordsIcon } from "lucide-react";
+import { User, Trophy, Search, Target, Swords, SwordsIcon } from "lucide-react";
 import { getInitials } from "@/lib/utils";
 
 type Player = {
@@ -144,8 +144,6 @@ export function PlayersList({ players }: { players: Player[] }) {
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
           {filtered.map((player) => {
             const currentTeam = player.teams[0]?.team;
-            const hasStats = player.stats.goals > 0 || player.stats.assists > 0 || player.stats.matches > 0;
-            
             return (
               <Link key={player.id} href={`/players/${player.slug}`}>
                 <Card className="hover:border-primary/50 transition-all hover:-translate-y-0.5 cursor-pointer h-full group overflow-hidden">
@@ -186,32 +184,30 @@ export function PlayersList({ players }: { players: Player[] }) {
                       </div>
                     </div>
 
-                    {/* Stats Row */}
-                    {hasStats && (
-                      <div className="grid grid-cols-3 gap-1 mt-3 pt-3 border-t border-border/50">
-                        <div className="text-center">
-                          <div className="flex items-center justify-center gap-0.5 text-green-400">
-                            <Target className="w-3 h-3" />
-                            <span className="text-xs font-bold">{player.stats.goals}</span>
-                          </div>
-                          <span className="text-[10px] text-muted-foreground">Goals</span>
+                    {/* Stats Row - Always show for consistent layout */}
+                    <div className="grid grid-cols-3 gap-1 mt-3 pt-3 border-t border-border/50">
+                      <div className="text-center">
+                        <div className="flex items-center justify-center gap-0.5 text-green-400">
+                          <Target className="w-3 h-3" />
+                          <span className="text-xs font-bold">{player.stats.goals}</span>
                         </div>
-                        <div className="text-center">
-                          <div className="flex items-center justify-center gap-0.5 text-blue-400">
-                            <SwordsIcon className="w-3 h-3" />
-                            <span className="text-xs font-bold">{player.stats.assists}</span>
-                          </div>
-                          <span className="text-[10px] text-muted-foreground">Assists</span>
-                        </div>
-                        <div className="text-center">
-                          <div className="flex items-center justify-center gap-0.5 text-orange-400">
-                            <Swords className="w-3 h-3" />
-                            <span className="text-xs font-bold">{player.stats.matches}</span>
-                          </div>
-                          <span className="text-[10px] text-muted-foreground">Matches</span>
-                        </div>
+                        <span className="text-[10px] text-muted-foreground">Goals</span>
                       </div>
-                    )}
+                      <div className="text-center">
+                        <div className="flex items-center justify-center gap-0.5 text-blue-400">
+                          <SwordsIcon className="w-3 h-3" />
+                          <span className="text-xs font-bold">{player.stats.assists}</span>
+                        </div>
+                        <span className="text-[10px] text-muted-foreground">Assists</span>
+                      </div>
+                      <div className="text-center">
+                        <div className="flex items-center justify-center gap-0.5 text-orange-400">
+                          <Swords className="w-3 h-3" />
+                          <span className="text-xs font-bold">{player.stats.matches}</span>
+                        </div>
+                        <span className="text-[10px] text-muted-foreground">Matches</span>
+                      </div>
+                    </div>
 
                     {/* Team */}
                     <div className="flex items-center justify-center gap-1.5 mt-2 pt-2 border-t border-border/50">
