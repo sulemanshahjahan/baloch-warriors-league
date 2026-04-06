@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import { Prisma } from "@prisma/client";
 
 export type ActivityLogAction = 
   | "CREATE"
@@ -44,7 +45,7 @@ interface LogActivityParams {
   action: ActivityLogAction;
   entityType?: EntityType;
   entityId?: string;
-  details?: Record<string, unknown>;
+  details?: Prisma.InputJsonValue;
 }
 
 export async function logActivity({
@@ -62,7 +63,7 @@ export async function logActivity({
       action,
       entityType,
       entityId,
-      details: details ?? {},
+      details: details ?? Prisma.JsonNull,
     },
   });
 }

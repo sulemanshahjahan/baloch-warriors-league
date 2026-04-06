@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db";
 import { z } from "zod";
 import { logActivity } from "./activity-log";
 
-function isEditorOnly(session: Awaited<ReturnType<typeof auth>>) {
+function isEditorOnly(session: { user?: { role?: string } } | null) {
   return (session?.user as { role?: string })?.role === "EDITOR";
 }
 

@@ -44,7 +44,7 @@ const matchEventSchema = z.object({
   description: z.string().optional(),
 });
 
-function isEditor(session: Awaited<ReturnType<typeof auth>>) {
+function isEditor(session: { user?: { role?: string } } | null) {
   return (session?.user as { role?: string })?.role === "EDITOR";
 }
 

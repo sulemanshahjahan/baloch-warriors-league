@@ -26,7 +26,7 @@ export async function requireRole(minRole: "EDITOR" | "ADMIN" | "SUPER_ADMIN") {
   return session;
 }
 
-export function getUserRole(session: Awaited<ReturnType<typeof auth>>): string {
+export function getUserRole(session: { user?: { role?: string } } | null): string {
   return (session?.user as { role?: string })?.role ?? "EDITOR";
 }
 
