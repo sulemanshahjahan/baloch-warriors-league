@@ -26,6 +26,7 @@ interface PlayerFormProps {
     photoUrl: string | null;
     position: string | null;
     nationality: string | null;
+    skillLevel: number | null;
     bio: string | null;
     dateOfBirth: Date | null;
     isActive: boolean;
@@ -116,7 +117,7 @@ export function PlayerForm({ player }: PlayerFormProps) {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="nationality">Nationality</Label>
                 <Input
@@ -137,6 +138,18 @@ export function PlayerForm({ player }: PlayerFormProps) {
                       ? new Date(player.dateOfBirth).toISOString().split("T")[0]
                       : ""
                   }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="skillLevel">Skill Level (0-99)</Label>
+                <Input
+                  id="skillLevel"
+                  name="skillLevel"
+                  type="number"
+                  min={0}
+                  max={99}
+                  defaultValue={player.skillLevel ?? 50}
+                  placeholder="50"
                 />
               </div>
             </div>

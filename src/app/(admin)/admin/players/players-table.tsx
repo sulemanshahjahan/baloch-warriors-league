@@ -35,6 +35,7 @@ interface Player {
   photoUrl: string | null;
   position: string | null;
   nationality: string | null;
+  skillLevel: number | null;
   teams: { team: { name: string } }[];
   _count: { matchEvents: number };
 }
@@ -223,6 +224,7 @@ export function PlayersTable({ players }: PlayersTableProps) {
                 </TableHead>
                 <TableHead>Player</TableHead>
                 <TableHead>Position</TableHead>
+                <TableHead>Skill</TableHead>
                 <TableHead>Current Team</TableHead>
                 <TableHead>Nationality</TableHead>
                 <TableHead className="text-center">Events</TableHead>
@@ -259,6 +261,15 @@ export function PlayersTable({ players }: PlayersTableProps) {
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {player.position ?? "—"}
+                  </TableCell>
+                  <TableCell>
+                    {player.skillLevel ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-500/20 text-yellow-500">
+                        {player.skillLevel}
+                      </span>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-sm">
                     {player.teams[0]?.team.name ?? "—"}

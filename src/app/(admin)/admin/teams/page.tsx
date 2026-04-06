@@ -12,7 +12,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Users, Edit, Eye, Trash2 } from "lucide-react";
+import { Plus, Users, Edit, Eye } from "lucide-react";
+import { DeleteTeamButton } from "./delete-button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getInitials } from "@/lib/utils";
 
@@ -110,6 +111,7 @@ export default async function TeamsPage() {
                             <Edit className="w-4 h-4" />
                           </Link>
                         </Button>
+                        <DeleteTeamButton id={team.id} name={team.name} />
                       </div>
                     </TableCell>
                   </TableRow>

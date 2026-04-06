@@ -101,7 +101,7 @@ export default function NewPlayerPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="dateOfBirth">Date of Birth</Label>
                   <Input id="dateOfBirth" name="dateOfBirth" type="date" />
@@ -109,6 +109,18 @@ export default function NewPlayerPage() {
                 <div className="space-y-2">
                   <Label htmlFor="photoUrl">Photo URL</Label>
                   <Input id="photoUrl" name="photoUrl" type="url" placeholder="https://..." />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="skillLevel">Skill Level (0-99)</Label>
+                  <Input
+                    id="skillLevel"
+                    name="skillLevel"
+                    type="number"
+                    min={0}
+                    max={99}
+                    defaultValue={50}
+                    placeholder="50"
+                  />
                 </div>
               </div>
 

@@ -14,6 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Plus, Newspaper, Edit, Eye } from "lucide-react";
+import { DeleteNewsButton } from "./delete-button";
 import { formatDate } from "@/lib/utils";
 
 export const metadata = { title: "News" };
@@ -93,6 +94,7 @@ export default async function NewsPage() {
                             <Edit className="w-4 h-4" />
                           </Link>
                         </Button>
+                        <DeleteNewsButton id={post.id} title={post.title} />
                       </div>
                     </TableCell>
                   </TableRow>

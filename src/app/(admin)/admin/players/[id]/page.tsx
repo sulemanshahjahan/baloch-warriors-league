@@ -68,6 +68,11 @@ export default async function PlayerDetailPage({ params }: PlayerDetailPageProps
                 {player.position && (
                   <Badge variant="secondary">{player.position}</Badge>
                 )}
+                {player.skillLevel && (
+                  <Badge variant="outline" className="text-yellow-500">
+                    LVL {player.skillLevel}
+                  </Badge>
+                )}
                 {currentTeam && (
                   <Link
                     href={`/admin/teams/${currentTeam.id}`}

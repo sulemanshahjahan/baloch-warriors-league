@@ -225,6 +225,7 @@ model Player {
   dateOfBirth DateTime?
   nationality String?
   position    String?
+  skillLevel  Int?      @default(50) // 0-99 rating for seeding
   bio         String?   @db.Text
   isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())

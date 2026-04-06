@@ -12,6 +12,7 @@ const playerSchema = z.object({
   photoUrl: z.string().url().optional().or(z.literal("")),
   position: z.string().optional(),
   nationality: z.string().optional(),
+  skillLevel: z.coerce.number().min(0).max(99).optional().or(z.literal("")),
   bio: z.string().optional(),
   dateOfBirth: z.string().optional(),
 });
@@ -40,6 +41,7 @@ export async function createPlayer(formData: FormData) {
       photoUrl: data.photoUrl || null,
       position: data.position || null,
       nationality: data.nationality || null,
+      skillLevel: data.skillLevel ? Number(data.skillLevel) : 50,
       bio: data.bio || null,
       dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null,
     },
@@ -70,6 +72,7 @@ export async function updatePlayer(id: string, formData: FormData) {
       photoUrl: data.photoUrl || null,
       position: data.position || null,
       nationality: data.nationality || null,
+      skillLevel: data.skillLevel ? Number(data.skillLevel) : 50,
       bio: data.bio || null,
       dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null,
     },
@@ -112,10 +115,11 @@ const bulkPlayerSchema = z.array(
     nickname: z.string().optional(),
     position: z.string().optional(),
     nationality: z.string().optional(),
+    skillLevel: z.number().min(0).max(99).optional(),
   })
 );
 
-export async function bulkCreatePlayers(players: { name: string; nickname?: string; position?: string; nationality?: string }[]) {
+export async function bulkCreatePlayers(players: { name: string; nickname?: string; position?: string; nationality?: string; skillLevel?: number }[]) {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };
 
@@ -137,6 +141,7 @@ export async function bulkCreatePlayers(players: { name: string; nickname?: stri
         nickname: data.nickname || null,
         position: data.position || null,
         nationality: data.nationality || null,
+        skillLevel: data.skillLevel ?? 50,
         isActive: true,
       },
     });
