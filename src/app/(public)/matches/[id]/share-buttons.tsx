@@ -128,16 +128,16 @@ export function ShareButtons({
     }
 
     // Tournament name
-    ctx.fillStyle = "#888";
-    ctx.font = "600 24px system-ui";
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "700 36px system-ui";
     ctx.textAlign = "center";
-    ctx.fillText(tournamentName.toUpperCase(), size / 2, 170);
+    ctx.fillText(tournamentName.toUpperCase(), size / 2, 175);
 
     // Match round
     if (matchInfo) {
-      ctx.fillStyle = "#666";
-      ctx.font = "500 20px system-ui";
-      ctx.fillText(matchInfo, size / 2, 205);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "500 24px system-ui";
+      ctx.fillText(matchInfo, size / 2, 215);
     }
 
     // Synchronous avatar draw — no async, no interleaved clip states
@@ -208,8 +208,8 @@ export function ShareButtons({
     ctx.stroke();
 
     // Footer
-    ctx.fillStyle = "#555";
-    ctx.font = "20px system-ui";
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "600 26px system-ui";
     ctx.textAlign = "center";
     ctx.fillText("bwlleague.com", size / 2, 760);
 
