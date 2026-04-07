@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 
 // Use ISR instead of full SSG to avoid DB connection pool exhaustion
 export const revalidate = 60;
-export const dynamicParams = true;
+export const dynamicParams = false;
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { SmartAvatar } from "@/components/public/smart-avatar";
@@ -36,6 +36,14 @@ import { ShareButtons } from "./share-buttons";
 
 interface MatchPageProps {
   params: Promise<{ id: string }>;
+}
+
+// Generate static pages for all matches at build time
+export async function generateStaticParams() {
+  const matches = await prisma.match.findMany({
+    select: { id: true },
+  });
+  return matches.map((m) => ({ id: m.id }));
 }
 
 async function getMatch(id: string) {

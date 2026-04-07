@@ -5,13 +5,22 @@ import { prisma } from "@/lib/db";
 
 // Use ISR instead of full SSG to avoid DB connection pool exhaustion
 export const revalidate = 300;
-export const dynamicParams = true;
+export const dynamicParams = false;
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft, Calendar } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 
 interface NewsPostPageProps {
   params: Promise<{ slug: string }>;
+}
+
+// Generate static pages for all news posts at build time
+export async function generateStaticParams() {
+  const posts = await prisma.newsPost.findMany({
+    where: { isPublished: true },
+    select: { slug: true },
+  });
+  return posts.map((p) => ({ slug: p.slug }));
 }
 
 export async function generateMetadata({ params }: NewsPostPageProps): Promise<Metadata> {

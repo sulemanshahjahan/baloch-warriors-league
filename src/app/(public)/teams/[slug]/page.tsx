@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 
 // Use ISR instead of full SSG to avoid DB connection pool exhaustion
 export const revalidate = 60;
-export const dynamicParams = true;
+export const dynamicParams = false;
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -36,6 +36,15 @@ import {
 
 interface TeamPageProps {
   params: Promise<{ slug: string }>;
+}
+
+// Generate static pages for all teams at build time
+export async function generateStaticParams() {
+  const teams = await prisma.team.findMany({
+    where: { isActive: true },
+    select: { slug: true },
+  });
+  return teams.map((t) => ({ slug: t.slug }));
 }
 
 export async function generateMetadata({ params }: TeamPageProps): Promise<Metadata> {

@@ -5,7 +5,7 @@ import { getTournamentStats } from "@/lib/actions/stats";
 
 // Use ISR instead of full SSG to avoid DB connection pool exhaustion
 export const revalidate = 60;
-export const dynamicParams = true;
+export const dynamicParams = false;
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,6 +16,14 @@ import { SmartAvatar } from "@/components/public/smart-avatar";
 
 interface TournamentStatsPageProps {
   params: Promise<{ slug: string }>;
+}
+
+// Generate static pages for all tournaments at build time
+export async function generateStaticParams() {
+  const tournaments = await prisma.tournament.findMany({
+    select: { slug: true },
+  });
+  return tournaments.map((t) => ({ slug: t.slug }));
 }
 
 async function getTournamentBySlug(slug: string) {

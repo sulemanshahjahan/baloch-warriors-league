@@ -55,6 +55,14 @@ interface TournamentPageProps {
   params: Promise<{ slug: string }>;
 }
 
+// Generate static pages for all tournaments at build time
+export async function generateStaticParams() {
+  const tournaments = await prisma.tournament.findMany({
+    select: { slug: true },
+  });
+  return tournaments.map((t) => ({ slug: t.slug }));
+}
+
 function computeForm(
   participantId: string,
   matches: MatchForForm[],

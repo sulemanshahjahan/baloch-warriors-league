@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 
 // Use ISR instead of full SSG to avoid DB connection pool exhaustion
 export const revalidate = 60;
-export const dynamicParams = true;
+export const dynamicParams = false;
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -28,6 +28,15 @@ import {
 
 interface PlayerPageProps {
   params: Promise<{ slug: string }>;
+}
+
+// Generate static pages for all players at build time
+export async function generateStaticParams() {
+  const players = await prisma.player.findMany({
+    where: { isActive: true },
+    select: { slug: true },
+  });
+  return players.map((p) => ({ slug: p.slug }));
 }
 
 export async function generateMetadata({ params }: PlayerPageProps): Promise<Metadata> {
