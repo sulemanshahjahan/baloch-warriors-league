@@ -24,6 +24,7 @@ import {
   statusColor,
   statusLabel,
   formatLabel,
+  getRoundDisplayName,
 } from "@/lib/utils";
 import { TeamEnrollment } from "./team-enrollment";
 import { PlayerEnrollment } from "./player-enrollment";
@@ -326,7 +327,7 @@ export default async function TournamentDetailPage({ params }: TournamentDetailP
                   {tournament.matches.map((match) => (
                     <TableRow key={match.id} className="group">
                       <TableCell className="text-sm text-muted-foreground">
-                        {match.round ?? "—"}
+                        {getRoundDisplayName(match.round, match.roundNumber)}
                       </TableCell>
                       <TableCell className="font-medium text-sm">
                         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
