@@ -36,6 +36,7 @@ import {
   statusLabel,
   formatLabel,
   getInitials,
+  getRoundDisplayName,
 } from "@/lib/utils";
 
 type FormResult = "W" | "D" | "L";
@@ -690,6 +691,7 @@ function MatchCard({
   match: {
     id: string;
     round: string | null;
+    roundNumber: number | null;
     homeTeam: { id: string; name: string; shortName: string | null; logoUrl?: string | null } | null;
     awayTeam: { id: string; name: string; shortName: string | null; logoUrl?: string | null } | null;
     homePlayer: { id: string; name: string; slug?: string; photoUrl?: string | null } | null;
@@ -721,7 +723,7 @@ function MatchCard({
       <div className="flex-1">
         <div className="flex items-center gap-2 mb-2">
           {match.round && (
-            <span className="text-xs text-muted-foreground">{match.round}</span>
+            <span className="text-xs text-muted-foreground">{getRoundDisplayName(match.round, match.roundNumber)}</span>
           )}
           {match.scheduledAt && (
             <span className="text-xs text-muted-foreground">
