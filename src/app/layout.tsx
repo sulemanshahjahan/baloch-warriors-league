@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import "./globals.css";
 import { LoadingProgress } from "@/components/loading-progress";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Analytics } from "@vercel/analytics/next";
 
 export const metadata: Metadata = {
   title: {
@@ -27,6 +28,7 @@ export default function RootLayout({
         </Suspense>
         {children}
         <SpeedInsights />
+        <Analytics />
       </body>
     </html>
   );
