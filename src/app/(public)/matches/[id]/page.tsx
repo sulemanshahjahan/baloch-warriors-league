@@ -96,6 +96,7 @@ export async function generateMetadata({ params }: MatchPageProps): Promise<Meta
   const ogImageUrl = `${baseUrl}/matches/${id}/opengraph-image`;
 
   return {
+    metadataBase: new URL(baseUrl),
     title: `${homeName} vs ${awayName}${score} | ${match.tournament.name}`,
     description: `Match result and events from ${match.tournament.name}.`,
     openGraph: {

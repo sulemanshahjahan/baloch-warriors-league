@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useRef } from "react";
 
 interface ShareButtonsProps {
   homeName: string;
@@ -27,7 +27,6 @@ export function ShareButtons({
   homePhoto,
   awayPhoto,
 }: ShareButtonsProps) {
-  const [showPreview, setShowPreview] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   // Format match info
@@ -59,8 +58,19 @@ export function ShareButtons({
     alert("Copied to clipboard! Paste in Instagram.");
   };
 
+  // Helper to load image
+  const loadImage = (url: string): Promise<HTMLImageElement> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = url;
+    });
+  };
+
   // Generate and download scorecard image
-  const generateScorecard = () => {
+  const generateScorecard = async () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -80,75 +90,129 @@ export function ShareButtons({
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, size, size);
 
-    // BWL Logo/header
-    ctx.fillStyle = "#ef4444";
-    ctx.fillRect(size / 2 - 40, 40, 80, 80);
-    ctx.fillStyle = "#fff";
-    ctx.font = "bold 48px system-ui";
-    ctx.textAlign = "center";
-    ctx.fillText("B", size / 2, 95);
+    // Load and draw BWL logo
+    try {
+      const logoUrl = "https://bwlleague.com/logo.png"; // Use actual logo URL
+      const logoImg = await loadImage(logoUrl);
+      const logoSize = 100;
+      ctx.drawImage(logoImg, size / 2 - logoSize / 2, 30, logoSize, logoSize);
+    } catch {
+      // Fallback to BWL text if logo fails to load
+      ctx.fillStyle = "#ef4444";
+      ctx.fillRect(size / 2 - 50, 40, 100, 100);
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 60px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText("BWL", size / 2, 105);
+    }
 
     // Tournament name
     ctx.fillStyle = "#888";
     ctx.font = "600 24px system-ui";
-    ctx.fillText(tournamentName.toUpperCase(), size / 2, 160);
+    ctx.textAlign = "center";
+    ctx.fillText(tournamentName.toUpperCase(), size / 2, 170);
 
     // Match info
     if (matchInfo) {
       ctx.fillStyle = "#666";
       ctx.font = "500 20px system-ui";
-      ctx.fillText(matchInfo, size / 2, 200);
+      ctx.fillText(matchInfo, size / 2, 210);
     }
 
-    // Draw player photos if available
-    const drawAvatar = (url: string | null | undefined, x: number, y: number, name: string) => {
+    // Draw player avatars with photos
+    const drawPlayerAvatar = async (
+      photoUrl: string | null | undefined,
+      x: number,
+      y: number,
+      name: string
+    ) => {
       ctx.save();
       ctx.beginPath();
-      ctx.arc(x, y, 60, 0, Math.PI * 2);
+      ctx.arc(x, y, 70, 0, Math.PI * 2);
       ctx.clip();
-      
-      // Draw placeholder circle
-      ctx.fillStyle = "#333";
-      ctx.fill();
-      
-      // Draw initials
-      ctx.fillStyle = "#fff";
-      ctx.font = "bold 32px system-ui";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      const initials = name
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase();
-      ctx.fillText(initials, x, y);
-      
+
+      if (photoUrl) {
+        try {
+          const img = await loadImage(photoUrl);
+          // Draw image to fill the circle
+          const aspect = img.width / img.height;
+          let drawWidth = 140;
+          let drawHeight = 140;
+          if (aspect > 1) {
+            drawWidth = 140 * aspect;
+          } else {
+            drawHeight = 140 / aspect;
+          }
+          ctx.drawImage(
+            img,
+            x - drawWidth / 2,
+            y - drawHeight / 2,
+            drawWidth,
+            drawHeight
+          );
+        } catch {
+          // Fallback to colored circle with initials
+          ctx.fillStyle = "#333";
+          ctx.fill();
+          ctx.fillStyle = "#fff";
+          ctx.font = "bold 40px system-ui";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          const initials = name
+            .split(" ")
+            .map((n) => n[0])
+            .join("")
+            .slice(0, 2)
+            .toUpperCase();
+          ctx.fillText(initials, x, y);
+        }
+      } else {
+        // No photo - draw initials
+        ctx.fillStyle = "#333";
+        ctx.fill();
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 40px system-ui";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        const initials = name
+          .split(" ")
+          .map((n) => n[0])
+          .join("")
+          .slice(0, 2)
+          .toUpperCase();
+        ctx.fillText(initials, x, y);
+      }
+
+      // Draw border
+      ctx.strokeStyle = "#444";
+      ctx.lineWidth = 4;
+      ctx.stroke();
+
       ctx.restore();
+
+      // Draw name below avatar
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 28px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText(name, x, y + 110);
     };
 
-    // Home player
-    drawAvatar(homePhoto, 200, 320, homeName);
-    ctx.fillStyle = "#fff";
-    ctx.font = "bold 32px system-ui";
-    ctx.textAlign = "center";
-    ctx.fillText(homeName, 200, 420);
+    // Draw both players
+    await Promise.all([
+      drawPlayerAvatar(homePhoto, 200, 380, homeName),
+      drawPlayerAvatar(awayPhoto, 600, 380, awayName),
+    ]);
 
-    // Away player
-    drawAvatar(awayPhoto, 600, 320, awayName);
-    ctx.fillStyle = "#fff";
-    ctx.font = "bold 32px system-ui";
-    ctx.fillText(awayName, 600, 420);
-
-    // VS or Score
+    // Score in center
     ctx.fillStyle = "#ef4444";
-    ctx.font = "bold 72px system-ui";
-    ctx.fillText(`${homeScore} - ${awayScore}`, size / 2, 340);
+    ctx.font = "bold 80px system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText(`${homeScore} - ${awayScore}`, size / 2, 400);
 
     // Footer
     ctx.fillStyle = "#444";
     ctx.font = "20px system-ui";
-    ctx.fillText("bwlleague.com", size / 2, 750);
+    ctx.fillText("bwlleague.com", size / 2, 760);
 
     // Download
     const link = document.createElement("a");
