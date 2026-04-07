@@ -144,15 +144,21 @@ export function getInitials(name: string): string {
  * - Round 2: Final
  */
 export function getRoundDisplayName(
-  round: string | null,
-  roundNumber: number | null,
-  matchNumber: number | null = null,
-  totalRounds: number | null = null,
+  round: string | null | undefined,
+  roundNumber: number | null | undefined,
+  matchNumber: number | null | undefined = null,
+  totalRounds: number | null | undefined = null,
   isOnlyMatchInRound: boolean = false
 ): string {
+  // Normalize inputs - handle undefined
+  const safeRound = round ?? null;
+  const safeRoundNumber = roundNumber ?? null;
+  const safeMatchNumber = matchNumber ?? null;
+  const safeTotalRounds = totalRounds ?? null;
+  
   // If round already has a proper descriptive name, use it and add match number
-  if (round) {
-    const lowerRound = round.toLowerCase();
+  if (safeRound) {
+    const lowerRound = safeRound.toLowerCase();
     
     // Check for already descriptive round names
     if (lowerRound.includes("final")) {
@@ -174,11 +180,11 @@ export function getRoundDisplayName(
     
     // Group stage matches - keep as is
     if (lowerRound.includes("group")) {
-      return round;
+      return safeRound;
     }
     
     // If it's "Round X" format, try to determine based on context
-    const roundMatch = round.match(/^round\s*(\d+)$/i);
+    const roundMatch = safeRound.match(/^round\s*(\d+)$/i);
     if (roundMatch) {
       const num = parseInt(roundMatch[1], 10);
       
@@ -187,34 +193,34 @@ export function getRoundDisplayName(
       // If we see "Round X" with matchNumber=1 and no descriptive name, and the roundNumber
       // is reasonably high (2+), it's likely the Final.
       // This fixes data inconsistency where finals weren't properly labeled.
-      if (matchNumber === 1 && num >= 2) {
+      if (safeMatchNumber === 1 && num >= 2) {
         // Likely a final - this is an educated guess for mislabeled data
         return "Final";
       }
       
       // Try to infer based on total rounds if available
-      if (totalRounds) {
-        return inferRoundNameFromTotalRounds(num, totalRounds, matchNumber);
+      if (safeTotalRounds) {
+        return inferRoundNameFromTotalRounds(num, safeTotalRounds, safeMatchNumber);
       }
       
       // Otherwise use the simple heuristic based on round number alone
-      return inferRoundNameFromNumber(num, matchNumber);
+      return inferRoundNameFromNumber(num, safeMatchNumber);
     }
     
     // Any other round name, return as-is with match number if provided
-    return formatRoundWithMatchNumber(round, matchNumber);
+    return formatRoundWithMatchNumber(safeRound, safeMatchNumber);
   }
   
   // No round name, try to infer from roundNumber
-  if (roundNumber) {
-    if (totalRounds) {
-      return inferRoundNameFromTotalRounds(roundNumber, totalRounds, matchNumber);
+  if (safeRoundNumber) {
+    if (safeTotalRounds) {
+      return inferRoundNameFromTotalRounds(safeRoundNumber, safeTotalRounds, safeMatchNumber);
     }
-    return inferRoundNameFromNumber(roundNumber, matchNumber);
+    return inferRoundNameFromNumber(safeRoundNumber, safeMatchNumber);
   }
   
   // Default fallback
-  return matchNumber ? `Match ${matchNumber}` : "Match";
+  return safeMatchNumber ? `Match ${safeMatchNumber}` : "Match";
 }
 
 /**
