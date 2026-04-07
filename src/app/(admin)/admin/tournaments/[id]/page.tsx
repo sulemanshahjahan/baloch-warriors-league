@@ -61,6 +61,24 @@ export default async function TournamentDetailPage({ params }: TournamentDetailP
   );
   const allPlayers = enrolledTeamPlayers.flat();
 
+  // Sort matches: Knockout first (Final -> Semi -> etc.), then Group rounds
+  const sortedMatches = [...tournament.matches].sort((a, b) => {
+    const aIsKnockout = a.round && !/Group\s+[A-Z]/i.test(a.round);
+    const bIsKnockout = b.round && !/Group\s+[A-Z]/i.test(b.round);
+    
+    if (aIsKnockout && !bIsKnockout) return -1;
+    if (!aIsKnockout && bIsKnockout) return 1;
+    
+    if (aIsKnockout && bIsKnockout) {
+      return (b.roundNumber || 0) - (a.roundNumber || 0);
+    }
+    
+    const aGroup = a.round?.match(/Group\s+([A-Z])/i)?.[1] || "";
+    const bGroup = b.round?.match(/Group\s+([A-Z])/i)?.[1] || "";
+    if (aGroup !== bGroup) return aGroup.localeCompare(bGroup);
+    return (a.roundNumber || 0) - (b.roundNumber || 0);
+  });
+
   return (
     <div className="flex flex-col flex-1">
       <AdminHeader
@@ -324,7 +342,7 @@ export default async function TournamentDetailPage({ params }: TournamentDetailP
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {tournament.matches.map((match) => (
+                  {sortedMatches.map((match) => (
                     <TableRow key={match.id} className="group">
                       <TableCell className="text-sm text-muted-foreground">
                         {getRoundDisplayName(match.round, match.roundNumber)}
