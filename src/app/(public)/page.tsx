@@ -14,6 +14,7 @@ import {
   statusColor,
   statusLabel,
   getInitials,
+  getRoundDisplayName,
 } from "@/lib/utils";
 import { SmartAvatar } from "@/components/public/smart-avatar";
 
@@ -42,6 +43,8 @@ async function getHomeData() {
         take: 5,
         select: {
           id: true,
+          round: true,
+          roundNumber: true,
           homeScore: true,
           awayScore: true,
           tournament: { select: { name: true, gameCategory: true } },
@@ -58,6 +61,8 @@ async function getHomeData() {
         take: 5,
         select: {
           id: true,
+          round: true,
+          roundNumber: true,
           scheduledAt: true,
           tournament: { select: { name: true, gameCategory: true } },
           homeTeam: { select: { id: true, name: true } },
@@ -252,7 +257,7 @@ export default async function HomePage() {
                     <Link key={match.id} href={`/matches/${match.id}`}>
                       <Card className="overflow-hidden hover:border-border/80 transition-colors">
                         <CardContent className="p-4">
-                          <div className="flex items-center gap-2 mb-3">
+                          <div className="flex items-center gap-2 mb-2">
                             <span
                               className={`text-xs px-2 py-0.5 rounded-full font-medium ${gameColor(match.tournament.gameCategory as never)}`}
                             >
@@ -262,6 +267,11 @@ export default async function HomePage() {
                               {match.tournament.name}
                             </span>
                           </div>
+                          {match.round && (
+                            <p className="text-xs font-medium text-primary mb-2">
+                              {getRoundDisplayName(match.round, match.roundNumber)}
+                            </p>
+                          )}
 
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2 flex-1 justify-end">
@@ -332,7 +342,7 @@ export default async function HomePage() {
                     <Link key={match.id} href={`/matches/${match.id}`}>
                       <Card className="hover:border-border/80 transition-colors">
                         <CardContent className="p-4">
-                          <div className="flex items-center gap-2 mb-2">
+                          <div className="flex items-center gap-2 mb-1">
                             <span
                               className={`text-xs px-2 py-0.5 rounded-full font-medium ${gameColor(match.tournament.gameCategory as never)}`}
                             >
@@ -342,6 +352,11 @@ export default async function HomePage() {
                               {match.tournament.name}
                             </span>
                           </div>
+                          {match.round && (
+                            <p className="text-xs font-medium text-primary mb-1">
+                              {getRoundDisplayName(match.round, match.roundNumber)}
+                            </p>
+                          )}
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2 flex-1 justify-end">
                               <p className="font-semibold text-sm text-right truncate">{homeName}</p>

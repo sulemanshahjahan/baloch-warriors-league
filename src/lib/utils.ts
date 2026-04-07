@@ -113,19 +113,43 @@ export function getInitials(name: string): string {
  * Fixes legacy "Round X" labels to proper round names (Final, Semi-finals, etc.)
  */
 export function getRoundDisplayName(round: string | null, roundNumber: number | null): string {
+  // If it's already a proper name (not "Round 2", etc.), use it directly
   if (round && !round.match(/^round\s*\d+$/i)) {
-    // If it's already a proper name (not "Round 2", etc.), use it
     return round;
   }
   
-  // Map round number to proper name (assuming standard knockout progression)
-  // roundNumber 1 = first knockout round (could be quarter/semi/final depending on size)
-  // We detect based on typical patterns
+  // Map round number to proper knockout round name
+  // Higher round numbers = later rounds (closer to final)
+  if (roundNumber) {
+    switch (roundNumber) {
+      case 1:
+        return "Quarter-finals";
+      case 2:
+        return "Semi-finals";
+      case 3:
+        return "Final";
+      default:
+        if (roundNumber > 3) return "Final";
+    }
+  }
   
-  // Check if this looks like a final (roundNumber higher than typical)
-  if (roundNumber && roundNumber >= 2) {
-    // This is likely a final created with the old buggy code
-    return "Final";
+  // Fallback: try to extract number from "Round X" format
+  if (round) {
+    const match = round.match(/^round\s*(\d+)$/i);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      switch (num) {
+        case 1:
+          return "Quarter-finals";
+        case 2:
+          return "Semi-finals";
+        case 3:
+          return "Final";
+        default:
+          if (num > 3) return "Final";
+          return `Round ${num}`;
+      }
+    }
   }
   
   return round || "Match";

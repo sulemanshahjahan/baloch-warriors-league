@@ -30,6 +30,7 @@ import {
   statusColor,
   statusLabel,
   getInitials,
+  getRoundDisplayName,
 } from "@/lib/utils";
 import { ShareButtons } from "./share-buttons";
 
@@ -226,7 +227,9 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
           </div>
 
           {match.round && (
-            <p className="text-sm text-muted-foreground text-center mb-4">{match.round}</p>
+            <p className="text-sm text-muted-foreground text-center mb-4">
+              {getRoundDisplayName(match.round, match.roundNumber)}
+            </p>
           )}
 
           {/* Main scoreline */}

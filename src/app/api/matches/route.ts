@@ -14,6 +14,7 @@ export async function GET() {
         status: true,
         scheduledAt: true,
         round: true,
+        roundNumber: true,
         homeScore: true,
         awayScore: true,
         tournament: {

@@ -11,6 +11,7 @@ import {
   gameColor,
   statusColor,
   statusLabel,
+  getRoundDisplayName,
 } from "@/lib/utils";
 import { SmartAvatar } from "@/components/public/smart-avatar";
 
@@ -19,6 +20,7 @@ type Match = {
   status: string;
   scheduledAt: string | null;
   round: string | null;
+  roundNumber: number | null;
   homeScore: number | null;
   awayScore: number | null;
   tournament: { name: string; slug: string; gameCategory: string };
@@ -64,7 +66,9 @@ function MatchCard({ match }: { match: Match }) {
           </div>
 
           {match.round && (
-            <p className="text-xs text-muted-foreground mb-3">{match.round}</p>
+            <p className="text-xs text-muted-foreground mb-3">
+              {getRoundDisplayName(match.round, match.roundNumber)}
+            </p>
           )}
 
           <div className="flex items-center justify-between gap-4">
