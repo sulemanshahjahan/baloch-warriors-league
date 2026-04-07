@@ -1,5 +1,3 @@
-export const dynamic = "force-dynamic";
-
 import type { Metadata } from "next";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
@@ -27,23 +25,31 @@ import {
 } from "@/lib/utils";
 
 async function getMatches() {
+  // Fetch matches with pagination - limit to recent 50
   const matches = await prisma.match.findMany({
     orderBy: { scheduledAt: "desc" },
-    include: {
+    take: 50,
+    select: {
+      id: true,
+      status: true,
+      scheduledAt: true,
+      round: true,
+      homeScore: true,
+      awayScore: true,
       tournament: {
         select: { name: true, slug: true, gameCategory: true },
       },
       homeTeam: {
-        select: { id: true, name: true, shortName: true, logoUrl: true },
+        select: { id: true, name: true, shortName: true },
       },
       awayTeam: {
-        select: { id: true, name: true, shortName: true, logoUrl: true },
+        select: { id: true, name: true, shortName: true },
       },
       homePlayer: {
-        select: { id: true, name: true, photoUrl: true },
+        select: { id: true, name: true },
       },
       awayPlayer: {
-        select: { id: true, name: true, photoUrl: true },
+        select: { id: true, name: true },
       },
     },
   });
@@ -136,10 +142,10 @@ function MatchCard({
   match: {
     id: string;
     round: string | null;
-    homeTeam: { id: string; name: string; shortName: string | null; logoUrl: string | null } | null;
-    awayTeam: { id: string; name: string; shortName: string | null; logoUrl: string | null } | null;
-    homePlayer: { id: string; name: string; photoUrl: string | null } | null;
-    awayPlayer: { id: string; name: string; photoUrl: string | null } | null;
+    homeTeam: { id: string; name: string; shortName: string | null; logoUrl?: string | null } | null;
+    awayTeam: { id: string; name: string; shortName: string | null; logoUrl?: string | null } | null;
+    homePlayer: { id: string; name: string; photoUrl?: string | null } | null;
+    awayPlayer: { id: string; name: string; photoUrl?: string | null } | null;
     homeScore: number | null;
     awayScore: number | null;
     status: string;
@@ -254,14 +260,12 @@ function MatchCard({
           <div className="flex items-center gap-3">
             <Link
               href={`/tournaments/${match.tournament.slug}`}
-              onClick={(e) => e.stopPropagation()}
               className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
             >
               {match.tournament.name}
             </Link>
             <Link
               href={`/matches/${match.id}`}
-              onClick={(e) => e.stopPropagation()}
               className="text-sm text-primary hover:underline flex items-center gap-1"
             >
               Details
