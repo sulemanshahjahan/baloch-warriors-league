@@ -714,6 +714,7 @@ function MatchCard({
     id: string;
     round: string | null;
     roundNumber: number | null;
+    matchNumber: number | null;
     homeTeam: { id: string; name: string; shortName: string | null } | null;
     awayTeam: { id: string; name: string; shortName: string | null } | null;
     homePlayer: { id: string; name: string; slug?: string } | null;
