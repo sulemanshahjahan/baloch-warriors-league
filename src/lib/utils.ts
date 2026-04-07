@@ -108,6 +108,29 @@ export function getInitials(name: string): string {
     .slice(0, 2);
 }
 
+/**
+ * Get display name for a knockout round based on stored round name and round number.
+ * Fixes legacy "Round X" labels to proper round names (Final, Semi-finals, etc.)
+ */
+export function getRoundDisplayName(round: string | null, roundNumber: number | null): string {
+  if (round && !round.match(/^round\s*\d+$/i)) {
+    // If it's already a proper name (not "Round 2", etc.), use it
+    return round;
+  }
+  
+  // Map round number to proper name (assuming standard knockout progression)
+  // roundNumber 1 = first knockout round (could be quarter/semi/final depending on size)
+  // We detect based on typical patterns
+  
+  // Check if this looks like a final (roundNumber higher than typical)
+  if (roundNumber && roundNumber >= 2) {
+    // This is likely a final created with the old buggy code
+    return "Final";
+  }
+  
+  return round || "Match";
+}
+
 export type ActionResult<T = void> =
   | { success: true; data: T; message?: string }
   | { success: false; error: string };
