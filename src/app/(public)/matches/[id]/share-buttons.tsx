@@ -73,14 +73,25 @@ export function ShareButtons({
   const generateScorecard = async () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Canvas size (square for easy sharing)
     const size = 800;
     canvas.width = size;
     canvas.height = size;
+
+    // Step 1: load ALL images in parallel before touching the canvas
+    const [logoResult, homeResult, awayResult] = await Promise.allSettled([
+      loadImage("https://bwlleague.com/logo.png"),
+      homePhoto ? loadImage(homePhoto) : Promise.reject("none"),
+      awayPhoto ? loadImage(awayPhoto) : Promise.reject("none"),
+    ]);
+
+    const logoImg = logoResult.status === "fulfilled" ? logoResult.value : null;
+    const homeImg = homeResult.status === "fulfilled" ? homeResult.value : null;
+    const awayImg = awayResult.status === "fulfilled" ? awayResult.value : null;
+
+    // Step 2: draw everything synchronously — no more awaits after this point
 
     // Background
     const gradient = ctx.createLinearGradient(0, 0, size, size);
@@ -90,14 +101,10 @@ export function ShareButtons({
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, size, size);
 
-    // Load and draw BWL logo
-    try {
-      const logoUrl = "https://bwlleague.com/logo.png"; // Use actual logo URL
-      const logoImg = await loadImage(logoUrl);
-      const logoSize = 100;
-      ctx.drawImage(logoImg, size / 2 - logoSize / 2, 30, logoSize, logoSize);
-    } catch {
-      // Fallback to BWL text if logo fails to load
+    // Logo
+    if (logoImg) {
+      ctx.drawImage(logoImg, size / 2 - 50, 30, 100, 100);
+    } else {
       ctx.fillStyle = "#ef4444";
       ctx.fillRect(size / 2 - 50, 40, 100, 100);
       ctx.fillStyle = "#fff";
@@ -112,109 +119,87 @@ export function ShareButtons({
     ctx.textAlign = "center";
     ctx.fillText(tournamentName.toUpperCase(), size / 2, 170);
 
-    // Match info
+    // Match round
     if (matchInfo) {
       ctx.fillStyle = "#666";
       ctx.font = "500 20px system-ui";
-      ctx.fillText(matchInfo, size / 2, 210);
+      ctx.fillText(matchInfo, size / 2, 205);
     }
 
-    // Draw player avatars with photos
-    const drawPlayerAvatar = async (
-      photoUrl: string | null | undefined,
-      x: number,
-      y: number,
-      name: string
-    ) => {
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(x, y, 70, 0, Math.PI * 2);
-      ctx.clip();
+    // Synchronous avatar draw — no async, no interleaved clip states
+    const drawAvatar = (img: HTMLImageElement | null, x: number, y: number, name: string) => {
+      const r = 70;
+      const initials = name.split(" ").map((n) => n[0] ?? "").join("").slice(0, 2).toUpperCase();
 
-      if (photoUrl) {
-        try {
-          const img = await loadImage(photoUrl);
-          // Draw image to fill the circle
-          const aspect = img.width / img.height;
-          let drawWidth = 140;
-          let drawHeight = 140;
-          if (aspect > 1) {
-            drawWidth = 140 * aspect;
-          } else {
-            drawHeight = 140 / aspect;
-          }
-          ctx.drawImage(
-            img,
-            x - drawWidth / 2,
-            y - drawHeight / 2,
-            drawWidth,
-            drawHeight
-          );
-        } catch {
-          // Fallback to colored circle with initials
-          ctx.fillStyle = "#333";
-          ctx.fill();
-          ctx.fillStyle = "#fff";
-          ctx.font = "bold 40px system-ui";
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          const initials = name
-            .split(" ")
-            .map((n) => n[0])
-            .join("")
-            .slice(0, 2)
-            .toUpperCase();
-          ctx.fillText(initials, x, y);
-        }
+      // Background circle
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fillStyle = "#2a2a2a";
+      ctx.fill();
+
+      if (img) {
+        // Clip to circle, draw image, restore — all synchronous
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.clip();
+        const aspect = img.width / img.height;
+        const dw = aspect >= 1 ? r * 2 * aspect : r * 2;
+        const dh = aspect >= 1 ? r * 2 : (r * 2) / aspect;
+        ctx.drawImage(img, x - dw / 2, y - dh / 2, dw, dh);
+        ctx.restore();
       } else {
-        // No photo - draw initials
-        ctx.fillStyle = "#333";
-        ctx.fill();
+        // Initials fallback
         ctx.fillStyle = "#fff";
         ctx.font = "bold 40px system-ui";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        const initials = name
-          .split(" ")
-          .map((n) => n[0])
-          .join("")
-          .slice(0, 2)
-          .toUpperCase();
         ctx.fillText(initials, x, y);
+        ctx.textBaseline = "alphabetic";
       }
 
-      // Draw border
-      ctx.strokeStyle = "#444";
-      ctx.lineWidth = 4;
+      // Border — drawn after restore so it's never clipped
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.strokeStyle = "#ef4444";
+      ctx.lineWidth = 3;
       ctx.stroke();
 
-      ctx.restore();
-
-      // Draw name below avatar
+      // Name below avatar
       ctx.fillStyle = "#fff";
-      ctx.font = "bold 28px system-ui";
+      ctx.font = "bold 26px system-ui";
       ctx.textAlign = "center";
-      ctx.fillText(name, x, y + 110);
+      ctx.textBaseline = "alphabetic";
+      ctx.fillText(name, x, y + r + 42);
     };
 
-    // Draw both players
-    await Promise.all([
-      drawPlayerAvatar(homePhoto, 200, 380, homeName),
-      drawPlayerAvatar(awayPhoto, 600, 380, awayName),
-    ]);
+    // Draw home (left) then away (right) — sequential, no concurrency
+    drawAvatar(homeImg, 200, 370, homeName);
+    drawAvatar(awayImg, 600, 370, awayName);
 
-    // Score in center
+    // Score — drawn last so it sits on top between the two avatars
     ctx.fillStyle = "#ef4444";
     ctx.font = "bold 80px system-ui";
     ctx.textAlign = "center";
-    ctx.fillText(`${homeScore} - ${awayScore}`, size / 2, 400);
+    ctx.textBaseline = "middle";
+    ctx.fillText(`${homeScore} - ${awayScore}`, size / 2, 370);
+    ctx.textBaseline = "alphabetic";
+
+    // Divider
+    ctx.strokeStyle = "#222";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(80, 540);
+    ctx.lineTo(720, 540);
+    ctx.stroke();
 
     // Footer
-    ctx.fillStyle = "#444";
+    ctx.fillStyle = "#555";
     ctx.font = "20px system-ui";
+    ctx.textAlign = "center";
     ctx.fillText("bwlleague.com", size / 2, 760);
 
-    // Download
+    // Step 3: toDataURL only after all drawing is complete
     const link = document.createElement("a");
     link.download = `BWL-${homeName}-vs-${awayName}.png`;
     link.href = canvas.toDataURL("image/png");
