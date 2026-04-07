@@ -97,13 +97,29 @@ async function getTournamentBySlug(slug: string) {
     prisma.award.count({ where: { tournamentId: tournament.id } }),
   ]);
 
-  // Fetch only group names - no standings (will load client-side)
+  // Fetch groups with standings (essential fields only)
   const groups = await prisma.tournamentGroup.findMany({
     where: { tournamentId: tournament.id },
     orderBy: { orderIndex: "asc" },
     select: {
       id: true,
       name: true,
+      standings: {
+        orderBy: [{ points: "desc" }, { goalDiff: "desc" }],
+        select: {
+          id: true,
+          played: true,
+          won: true,
+          drawn: true,
+          lost: true,
+          goalsFor: true,
+          goalsAgainst: true,
+          goalDiff: true,
+          points: true,
+          team: { select: { id: true, slug: true, name: true } },
+          player: { select: { id: true, slug: true, name: true } },
+        },
+      },
     },
   });
 
@@ -152,7 +168,24 @@ async function getTournamentBySlug(slug: string) {
     },
   });
 
-  // No overall standings - will be fetched client-side
+  // Fetch overall standings (no group filter, essential fields only)
+  const standings = await prisma.standing.findMany({
+    where: { tournamentId: tournament.id, groupId: null },
+    orderBy: [{ points: "desc" }, { goalDiff: "desc" }],
+    select: {
+      id: true,
+      played: true,
+      won: true,
+      drawn: true,
+      lost: true,
+      goalsFor: true,
+      goalsAgainst: true,
+      goalDiff: true,
+      points: true,
+      team: { select: { id: true, slug: true, name: true } },
+      player: { select: { id: true, slug: true, name: true } },
+    },
+  });
 
   return {
     ...tournament,
@@ -168,7 +201,7 @@ async function getTournamentBySlug(slug: string) {
     awards,
     teams,
     players,
-    standings: [], // Empty - will be fetched client-side
+    standings,
   };
 }
 
@@ -303,7 +336,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
 
           {/* Standings */}
           <TabsContent value="standings" className="mt-0 space-y-6">
-            {/* Group Standings - Loaded client-side */}
+            {/* Group Standings */}
             {tournament.groups.length > 0 && (
               <>
                 {tournament.groups.map((group) => (
@@ -315,9 +348,16 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-muted-foreground text-center py-4">
-                        Standings will be loaded dynamically.
-                      </p>
+                      {group.standings.length === 0 ? (
+                        <p className="text-muted-foreground text-center py-4">
+                          No standings available for this group yet.
+                        </p>
+                      ) : (
+                        <StandingsTable 
+                          standings={group.standings} 
+                          participantType={tournament.participantType}
+                        />
+                      )}
                     </CardContent>
                   </Card>
                 ))}
@@ -333,9 +373,16 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground text-center py-8">
-                  Standings will be loaded dynamically.
-                </p>
+                {tournament.standings.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">
+                    No standings available yet. Matches need to be played first.
+                  </p>
+                ) : (
+                  <StandingsTable 
+                    standings={tournament.standings}
+                    participantType={tournament.participantType}
+                  />
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -544,5 +591,78 @@ function MatchCard({
         </div>
       </div>
     </div>
+  );
+}
+
+
+// Standings Table Component
+function StandingsTable({ 
+  standings, 
+  participantType 
+}: { 
+  standings: Array<{
+    id: string;
+    played: number;
+    won: number;
+    drawn: number;
+    lost: number;
+    goalsFor: number;
+    goalsAgainst: number;
+    goalDiff: number;
+    points: number;
+    team: { id: string; slug: string; name: string } | null;
+    player: { id: string; slug: string; name: string } | null;
+  }>;
+  participantType: string;
+}) {
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow className="bg-muted/50">
+          <TableHead className="w-12">#</TableHead>
+          <TableHead>{participantType === "INDIVIDUAL" ? "Player" : "Team"}</TableHead>
+          <TableHead className="text-center">P</TableHead>
+          <TableHead className="text-center">W</TableHead>
+          <TableHead className="text-center">D</TableHead>
+          <TableHead className="text-center">L</TableHead>
+          <TableHead className="text-center">GF</TableHead>
+          <TableHead className="text-center">GA</TableHead>
+          <TableHead className="text-center">GD</TableHead>
+          <TableHead className="text-center font-bold">Pts</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {standings.map((s, i) => (
+          <TableRow key={s.id}>
+            <TableCell className="font-medium">{i + 1}</TableCell>
+            <TableCell>
+              {participantType === "INDIVIDUAL" ? (
+                <Link
+                  href={`/players/${s.player?.slug}`}
+                  className="hover:text-primary"
+                >
+                  {s.player?.name}
+                </Link>
+              ) : (
+                <Link
+                  href={`/teams/${s.team?.slug}`}
+                  className="hover:text-primary"
+                >
+                  {s.team?.name}
+                </Link>
+              )}
+            </TableCell>
+            <TableCell className="text-center">{s.played}</TableCell>
+            <TableCell className="text-center">{s.won}</TableCell>
+            <TableCell className="text-center">{s.drawn}</TableCell>
+            <TableCell className="text-center">{s.lost}</TableCell>
+            <TableCell className="text-center">{s.goalsFor}</TableCell>
+            <TableCell className="text-center">{s.goalsAgainst}</TableCell>
+            <TableCell className="text-center">{s.goalDiff}</TableCell>
+            <TableCell className="text-center font-bold">{s.points}</TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 }
