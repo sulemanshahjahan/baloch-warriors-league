@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -14,17 +14,17 @@ import {
 } from "@/components/ui/select";
 import { User, Trophy, Search, Target, Swords, SwordsIcon } from "lucide-react";
 import { getInitials } from "@/lib/utils";
+import { SmartAvatar } from "@/components/public/smart-avatar";
 
 type Player = {
   id: string;
   slug: string;
   name: string;
   nickname: string | null;
-  photoUrl: string | null;
   position: string | null;
   nationality: string | null;
   _count: { matchEvents: number; awards: number };
-  teams: { team: { name: string; logoUrl: string | null } }[];
+  teams: { team: { id: string; name: string } }[];
   stats: {
     goals: number;
     assists: number;
@@ -150,12 +150,13 @@ export function PlayersList({ players }: { players: Player[] }) {
                   <CardContent className="p-3 sm:p-4">
                     {/* Big Avatar - Centered */}
                     <div className="flex flex-col items-center">
-                      <Avatar className="h-20 w-20 sm:h-24 sm:w-24 ring-2 ring-border">
-                        <AvatarImage src={player.photoUrl ?? undefined} />
-                        <AvatarFallback className="text-xl sm:text-2xl bg-muted">
-                          {getInitials(player.name)}
-                        </AvatarFallback>
-                      </Avatar>
+                      <SmartAvatar
+                        type="player"
+                        id={player.id}
+                        name={player.name}
+                        className="h-20 w-20 sm:h-24 sm:w-24 ring-2 ring-border"
+                        fallbackClassName="text-xl sm:text-2xl bg-muted"
+                      />
                       
                       {/* Name & Nickname */}
                       <h3 className="font-bold text-sm sm:text-base mt-3 group-hover:text-primary transition-colors text-center truncate w-full">
@@ -208,12 +209,13 @@ export function PlayersList({ players }: { players: Player[] }) {
                     {/* Team - Only show if assigned */}
                     {currentTeam && (
                       <div className="flex items-center justify-center gap-1.5 mt-2 pt-2 border-t border-border/50">
-                        <Avatar className="h-4 w-4 flex-shrink-0">
-                          <AvatarImage src={currentTeam.logoUrl ?? undefined} />
-                          <AvatarFallback className="text-[8px]">
-                            {getInitials(currentTeam.name)}
-                          </AvatarFallback>
-                        </Avatar>
+                        <SmartAvatar
+                          type="team"
+                          id={currentTeam.id}
+                          name={currentTeam.name}
+                          className="h-4 w-4 flex-shrink-0"
+                          fallbackClassName="text-[8px]"
+                        />
                         <span className="text-xs text-muted-foreground truncate">
                           {currentTeam.name}
                         </span>

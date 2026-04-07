@@ -92,15 +92,22 @@ function computeForm(
 
 export async function generateMetadata({ params }: TournamentPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const t = await getTournamentBySlug(slug);
+  const t = await prisma.tournament.findUnique({
+    where: { slug },
+    select: { name: true, description: true, bannerUrl: true },
+  });
   if (!t) return { title: "Tournament Not Found" };
+  
+  // Only use bannerUrl for OG if it's an external URL (not base64)
+  const ogImage = t.bannerUrl?.startsWith("http") ? [{ url: t.bannerUrl }] : [];
+  
   return {
     title: t.name,
     description: t.description ?? `View fixtures, standings, and stats for ${t.name}.`,
     openGraph: {
       title: `${t.name} | BWL`,
       description: t.description ?? `Tournament details, fixtures, and standings for ${t.name}.`,
-      images: t.bannerUrl ? [{ url: t.bannerUrl }] : [],
+      images: ogImage,
       type: "website",
     },
   };
@@ -120,7 +127,7 @@ async function getTournamentBySlug(slug: string) {
       status: true,
       startDate: true,
       endDate: true,
-      bannerUrl: true,
+      // bannerUrl intentionally omitted — base64 stored images bloat ISR payload
       participantType: true,
       isFeatured: true,
     },
@@ -158,8 +165,8 @@ async function getTournamentBySlug(slug: string) {
           points: true,
           teamId: true,
           playerId: true,
-          team: { select: { id: true, slug: true, name: true, logoUrl: true } },
-          player: { select: { id: true, slug: true, name: true, photoUrl: true } },
+          team: { select: { id: true, slug: true, name: true } },
+          player: { select: { id: true, slug: true, name: true } },
         },
       },
     },
@@ -183,10 +190,10 @@ async function getTournamentBySlug(slug: string) {
       awayTeamId: true,
       homePlayerId: true,
       awayPlayerId: true,
-      homeTeam: { select: { id: true, name: true, shortName: true, logoUrl: true } },
-      awayTeam: { select: { id: true, name: true, shortName: true, logoUrl: true } },
-      homePlayer: { select: { id: true, name: true, photoUrl: true } },
-      awayPlayer: { select: { id: true, name: true, photoUrl: true } },
+      homeTeam: { select: { id: true, name: true, shortName: true } },
+      awayTeam: { select: { id: true, name: true, shortName: true } },
+      homePlayer: { select: { id: true, name: true } },
+      awayPlayer: { select: { id: true, name: true } },
     },
   });
 
@@ -196,8 +203,8 @@ async function getTournamentBySlug(slug: string) {
       id: true,
       type: true,
       customName: true,
-      player: { select: { id: true, name: true, slug: true, photoUrl: true } },
-      team: { select: { id: true, name: true, slug: true, logoUrl: true } },
+      player: { select: { id: true, name: true, slug: true } },
+      team: { select: { id: true, name: true, slug: true } },
     },
   });
 
@@ -205,7 +212,7 @@ async function getTournamentBySlug(slug: string) {
   const teams = await prisma.tournamentTeam.findMany({
     where: { tournamentId: tournament.id },
     select: {
-      team: { select: { id: true, slug: true, name: true, shortName: true, logoUrl: true } },
+      team: { select: { id: true, slug: true, name: true, shortName: true } },
     },
   });
 
@@ -213,7 +220,7 @@ async function getTournamentBySlug(slug: string) {
   const players = await prisma.tournamentPlayer.findMany({
     where: { tournamentId: tournament.id },
     select: {
-      player: { select: { id: true, slug: true, name: true, photoUrl: true } },
+      player: { select: { id: true, slug: true, name: true } },
     },
   });
 
@@ -233,8 +240,8 @@ async function getTournamentBySlug(slug: string) {
       points: true,
       teamId: true,
       playerId: true,
-      team: { select: { id: true, slug: true, name: true, logoUrl: true } },
-      player: { select: { id: true, slug: true, name: true, photoUrl: true } },
+      team: { select: { id: true, slug: true, name: true } },
+      player: { select: { id: true, slug: true, name: true } },
     },
   });
 
@@ -601,7 +608,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                       <CardContent className="p-4">
                         <div className="flex items-center gap-3">
                           <Avatar className="h-10 w-10">
-                            <AvatarImage src={(player as any).photoUrl ?? undefined} />
+                            {/* photo lazy-loads via SmartAvatar on /players detail page */}
                             <AvatarFallback className="text-sm">
                               {getInitials(player.name)}
                             </AvatarFallback>
@@ -623,7 +630,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                       <CardContent className="p-4">
                         <div className="flex items-center gap-3">
                           <Avatar className="h-10 w-10">
-                            <AvatarImage src={(team as any).logoUrl ?? undefined} />
+                            {/* logo lazy-loads via SmartAvatar on /teams detail page */}
                             <AvatarFallback className="text-sm">
                               {getInitials(team.name)}
                             </AvatarFallback>
@@ -660,7 +667,6 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                     : (award as any).team
                     ? `/teams/${(award as any).team.slug}`
                     : null;
-                  const winnerPhoto = (award as any).player?.photoUrl ?? (award as any).team?.logoUrl ?? null;
                   return (
                     <Card key={award.id}>
                       <CardContent className="p-4">
@@ -678,7 +684,6 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                             {winner && (
                               <div className="flex items-center gap-1.5 mt-2">
                                 <Avatar className="h-5 w-5">
-                                  <AvatarImage src={winnerPhoto ?? undefined} />
                                   <AvatarFallback className="text-[8px]">
                                     {getInitials(winner.name)}
                                   </AvatarFallback>
@@ -714,10 +719,10 @@ function MatchCard({
     id: string;
     round: string | null;
     roundNumber: number | null;
-    homeTeam: { id: string; name: string; shortName: string | null; logoUrl?: string | null } | null;
-    awayTeam: { id: string; name: string; shortName: string | null; logoUrl?: string | null } | null;
-    homePlayer: { id: string; name: string; slug?: string; photoUrl?: string | null } | null;
-    awayPlayer: { id: string; name: string; slug?: string; photoUrl?: string | null } | null;
+    homeTeam: { id: string; name: string; shortName: string | null } | null;
+    awayTeam: { id: string; name: string; shortName: string | null } | null;
+    homePlayer: { id: string; name: string; slug?: string } | null;
+    awayPlayer: { id: string; name: string; slug?: string } | null;
     homeScore: number | null;
     awayScore: number | null;
     status: string;
@@ -733,13 +738,6 @@ function MatchCard({
   const awayName = isPlayerMatch
     ? (match.awayPlayer?.name ?? "TBD")
     : (match.awayTeam?.name ?? "TBD");
-  const homeImg = isPlayerMatch
-    ? (match.homePlayer?.photoUrl ?? undefined)
-    : (match.homeTeam?.logoUrl ?? undefined);
-  const awayImg = isPlayerMatch
-    ? (match.awayPlayer?.photoUrl ?? undefined)
-    : (match.awayTeam?.logoUrl ?? undefined);
-
   return (
     <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
       <div className="flex-1">
@@ -756,7 +754,6 @@ function MatchCard({
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 flex-1">
             <Avatar className="h-6 w-6">
-              <AvatarImage src={homeImg} />
               <AvatarFallback className="text-[10px]">
                 {getInitials(homeName)}
               </AvatarFallback>
@@ -775,7 +772,6 @@ function MatchCard({
           <div className="flex items-center gap-2 flex-1 justify-end">
             <span className="font-medium">{awayName}</span>
             <Avatar className="h-6 w-6">
-              <AvatarImage src={awayImg} />
               <AvatarFallback className="text-[10px]">
                 {getInitials(awayName)}
               </AvatarFallback>
@@ -822,8 +818,8 @@ function StandingsTable({
     goalsAgainst: number;
     goalDiff: number;
     points: number;
-    team: { id: string; slug: string; name: string; logoUrl?: string | null } | null;
-    player: { id: string; slug: string; name: string; photoUrl?: string | null } | null;
+    team: { id: string; slug: string; name: string } | null;
+    player: { id: string; slug: string; name: string } | null;
   }>;
   participantType: string;
   formMatches: MatchForForm[];
@@ -849,7 +845,6 @@ function StandingsTable({
       <TableBody>
         {standings.map((s, i) => {
           const name = isIndividual ? s.player?.name : s.team?.name;
-          const photo = isIndividual ? s.player?.photoUrl : s.team?.logoUrl;
           const href = isIndividual
             ? `/players/${s.player?.slug}`
             : `/teams/${s.team?.slug}`;
@@ -861,7 +856,6 @@ function StandingsTable({
               <TableCell>
                 <Link href={href} className="flex items-center gap-2 hover:text-primary transition-colors">
                   <Avatar className="h-7 w-7 shrink-0">
-                    <AvatarImage src={photo ?? undefined} />
                     <AvatarFallback className="text-[10px]">
                       {getInitials(name ?? "")}
                     </AvatarFallback>
@@ -909,10 +903,10 @@ interface BracketMatch {
   awayTeamId: string | null;
   homePlayerId: string | null;
   awayPlayerId: string | null;
-  homeTeam: { id: string; name: string; shortName: string | null; logoUrl: string | null } | null;
-  awayTeam: { id: string; name: string; shortName: string | null; logoUrl: string | null } | null;
-  homePlayer: { id: string; name: string; photoUrl: string | null } | null;
-  awayPlayer: { id: string; name: string; photoUrl: string | null } | null;
+  homeTeam: { id: string; name: string; shortName: string | null } | null;
+  awayTeam: { id: string; name: string; shortName: string | null } | null;
+  homePlayer: { id: string; name: string } | null;
+  awayPlayer: { id: string; name: string } | null;
 }
 
 function BracketView({
@@ -1004,13 +998,6 @@ function BracketMatchCard({
   const awayName = isIndividual
     ? (match.awayPlayer?.name ?? "TBD")
     : (match.awayTeam?.name ?? "TBD");
-  const homeImg = isIndividual
-    ? (match.homePlayer?.photoUrl ?? undefined)
-    : (match.homeTeam?.logoUrl ?? undefined);
-  const awayImg = isIndividual
-    ? (match.awayPlayer?.photoUrl ?? undefined)
-    : (match.awayTeam?.logoUrl ?? undefined);
-  
   const homeScore = match.homeScore ?? 0;
   const awayScore = match.awayScore ?? 0;
   const homeWon = isCompleted && homeScore > awayScore;
@@ -1031,7 +1018,6 @@ function BracketMatchCard({
         <div className={`px-3 py-2 flex items-center justify-between gap-2 border-b border-border/50 ${homeWon ? 'bg-primary/5' : ''}`}>
           <div className="flex items-center gap-2 min-w-0">
             <Avatar className="h-5 w-5 shrink-0">
-              <AvatarImage src={homeImg} />
               <AvatarFallback className="text-[8px]">
                 {getInitials(homeName)}
               </AvatarFallback>
@@ -1051,7 +1037,6 @@ function BracketMatchCard({
         <div className={`px-3 py-2 flex items-center justify-between gap-2 ${awayWon ? 'bg-primary/5' : ''}`}>
           <div className="flex items-center gap-2 min-w-0">
             <Avatar className="h-5 w-5 shrink-0">
-              <AvatarImage src={awayImg} />
               <AvatarFallback className="text-[8px]">
                 {getInitials(awayName)}
               </AvatarFallback>

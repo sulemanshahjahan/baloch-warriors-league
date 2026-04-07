@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db";
 import { Trophy, Swords, Users, ChevronRight, Star } from "lucide-react";
 import { DownloadAppButton } from "@/components/public/download-app-button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   formatDate,
   gameLabel,
@@ -23,7 +23,15 @@ async function getHomeData() {
         where: { status: { in: ["ACTIVE", "UPCOMING"] } },
         orderBy: [{ isFeatured: "desc" }, { startDate: "asc" }],
         take: 4,
-        include: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          gameCategory: true,
+          status: true,
+          isFeatured: true,
+          participantType: true,
+          // bannerUrl intentionally omitted — base64 stored images would bloat ISR payload
           _count: { select: { teams: true, players: true, matches: true } },
         },
       }),
@@ -31,28 +39,32 @@ async function getHomeData() {
         where: { status: "COMPLETED" },
         orderBy: { completedAt: "desc" },
         take: 5,
-        include: {
+        select: {
+          id: true,
+          homeScore: true,
+          awayScore: true,
           tournament: { select: { name: true, gameCategory: true } },
-          homeTeam: { select: { name: true, shortName: true, logoUrl: true } },
-          awayTeam: { select: { name: true, shortName: true, logoUrl: true } },
-          homePlayer: { select: { name: true, photoUrl: true } },
-          awayPlayer: { select: { name: true, photoUrl: true } },
-          motmPlayer: { select: { name: true, photoUrl: true } },
+          homeTeam: { select: { id: true, name: true, shortName: true } },
+          awayTeam: { select: { id: true, name: true, shortName: true } },
+          homePlayer: { select: { id: true, name: true } },
+          awayPlayer: { select: { id: true, name: true } },
+          motmPlayer: { select: { id: true, name: true } },
         },
       }),
       prisma.match.findMany({
         where: { status: "SCHEDULED" },
         orderBy: { scheduledAt: "asc" },
         take: 5,
-        include: {
+        select: {
+          id: true,
+          scheduledAt: true,
           tournament: { select: { name: true, gameCategory: true } },
-          homeTeam: { select: { name: true, logoUrl: true } },
-          awayTeam: { select: { name: true, logoUrl: true } },
-          homePlayer: { select: { name: true, photoUrl: true } },
-          awayPlayer: { select: { name: true, photoUrl: true } },
+          homeTeam: { select: { id: true, name: true } },
+          awayTeam: { select: { id: true, name: true } },
+          homePlayer: { select: { id: true, name: true } },
+          awayPlayer: { select: { id: true, name: true } },
         },
       }),
-      // Single query using aggregate counts to avoid 4 round-trips
       prisma.$transaction([
         prisma.tournament.count(),
         prisma.team.count({ where: { isActive: true } }),
@@ -182,28 +194,17 @@ export default async function HomePage() {
               {featuredTournaments.map((t) => (
                 <Link key={t.id} href={`/tournaments/${t.slug}`}>
                   <Card className="hover:border-border/80 transition-all hover:-translate-y-0.5 cursor-pointer h-full">
-                    {t.bannerUrl && (
-                      <div className="h-32 overflow-hidden rounded-t-lg relative">
-                        <Image
-                          src={t.bannerUrl}
-                          alt={t.name}
-                          fill
-                          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                          className="object-cover"
-                        />
-                      </div>
-                    )}
                     <CardContent className="p-4">
                       <div className="flex items-center gap-2 mb-2">
                         <span
-                          className={`text-xs px-2 py-0.5 rounded-full font-medium ${gameColor(t.gameCategory)}`}
+                          className={`text-xs px-2 py-0.5 rounded-full font-medium ${gameColor(t.gameCategory as never)}`}
                         >
-                          {gameLabel(t.gameCategory)}
+                          {gameLabel(t.gameCategory as never)}
                         </span>
                         <span
-                          className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(t.status)}`}
+                          className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(t.status as never)}`}
                         >
-                          {statusLabel(t.status)}
+                          {statusLabel(t.status as never)}
                         </span>
                       </div>
                       <h3 className="font-semibold text-sm line-clamp-2 mb-2">
@@ -211,9 +212,9 @@ export default async function HomePage() {
                       </h3>
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
                         <span>
-                          {(t as any).participantType === "INDIVIDUAL" 
-                            ? `${(t as any)._count.players} players`
-                            : `${(t as any)._count.teams} teams`}
+                          {t.participantType === "INDIVIDUAL"
+                            ? `${t._count.players} players`
+                            : `${t._count.teams} teams`}
                         </span>
                         <span>{t._count.matches} matches</span>
                       </div>
@@ -239,65 +240,61 @@ export default async function HomePage() {
                 </Link>
               </div>
               <div className="space-y-3">
-                {recentResults.map((match) => (
-                  <Card key={match.id} className="overflow-hidden">
-                    <CardContent className="p-4">
-                      <div className="flex items-center gap-2 mb-3">
-                        <span
-                          className={`text-xs px-2 py-0.5 rounded-full font-medium ${gameColor(match.tournament.gameCategory)}`}
-                        >
-                          {gameLabel(match.tournament.gameCategory)}
-                        </span>
-                        <span className="text-xs text-muted-foreground truncate">
-                          {match.tournament.name}
-                        </span>
-                      </div>
+                {recentResults.map((match) => {
+                  const homeName = match.homePlayer?.name ?? match.homeTeam?.shortName ?? match.homeTeam?.name ?? "TBD";
+                  const awayName = match.awayPlayer?.name ?? match.awayTeam?.shortName ?? match.awayTeam?.name ?? "TBD";
+                  return (
+                    <Link key={match.id} href={`/matches/${match.id}`}>
+                      <Card className="overflow-hidden hover:border-border/80 transition-colors">
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-2 mb-3">
+                            <span
+                              className={`text-xs px-2 py-0.5 rounded-full font-medium ${gameColor(match.tournament.gameCategory as never)}`}
+                            >
+                              {gameLabel(match.tournament.gameCategory as never)}
+                            </span>
+                            <span className="text-xs text-muted-foreground truncate">
+                              {match.tournament.name}
+                            </span>
+                          </div>
 
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 flex-1 justify-end">
-                          <p className="font-semibold text-sm text-right truncate">
-                            {(match as any).homePlayer?.name ?? match.homeTeam?.shortName ?? match.homeTeam?.name ?? "TBD"}
-                          </p>
-                          <Avatar className="h-8 w-8 shrink-0">
-                            <AvatarImage src={(match as any).homePlayer?.photoUrl ?? match.homeTeam?.logoUrl ?? undefined} />
-                            <AvatarFallback className="text-[10px]">
-                              {getInitials((match as any).homePlayer?.name ?? match.homeTeam?.name ?? "?")}
-                            </AvatarFallback>
-                          </Avatar>
-                        </div>
-                        <div className="text-center px-2 shrink-0">
-                          <span className="text-2xl font-black">
-                            {match.homeScore ?? 0}
-                            <span className="text-muted-foreground mx-1 font-light text-lg">–</span>
-                            {match.awayScore ?? 0}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 flex-1">
-                          <Avatar className="h-8 w-8 shrink-0">
-                            <AvatarImage src={(match as any).awayPlayer?.photoUrl ?? match.awayTeam?.logoUrl ?? undefined} />
-                            <AvatarFallback className="text-[10px]">
-                              {getInitials((match as any).awayPlayer?.name ?? match.awayTeam?.name ?? "?")}
-                            </AvatarFallback>
-                          </Avatar>
-                          <p className="font-semibold text-sm truncate">
-                            {(match as any).awayPlayer?.name ?? match.awayTeam?.shortName ?? match.awayTeam?.name ?? "TBD"}
-                          </p>
-                        </div>
-                      </div>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 flex-1 justify-end">
+                              <p className="font-semibold text-sm text-right truncate">{homeName}</p>
+                              <Avatar className="h-8 w-8 shrink-0">
+                                <AvatarFallback className="text-[10px]">
+                                  {getInitials(homeName)}
+                                </AvatarFallback>
+                              </Avatar>
+                            </div>
+                            <div className="text-center px-2 shrink-0">
+                              <span className="text-2xl font-black">
+                                {match.homeScore ?? 0}
+                                <span className="text-muted-foreground mx-1 font-light text-lg">–</span>
+                                {match.awayScore ?? 0}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 flex-1">
+                              <Avatar className="h-8 w-8 shrink-0">
+                                <AvatarFallback className="text-[10px]">
+                                  {getInitials(awayName)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <p className="font-semibold text-sm truncate">{awayName}</p>
+                            </div>
+                          </div>
 
-                      {match.motmPlayer && (
-                        <div className="mt-2 flex items-center justify-center gap-1.5 text-xs text-accent">
-                          <Star className="w-3 h-3 fill-current" />
-                          <Avatar className="h-4 w-4">
-                            <AvatarImage src={(match.motmPlayer as any).photoUrl ?? undefined} />
-                            <AvatarFallback className="text-[8px]">{getInitials(match.motmPlayer.name)}</AvatarFallback>
-                          </Avatar>
-                          MOTM: {match.motmPlayer.name}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
+                          {match.motmPlayer && (
+                            <div className="mt-2 flex items-center justify-center gap-1.5 text-xs text-accent">
+                              <Star className="w-3 h-3 fill-current" />
+                              MOTM: {match.motmPlayer.name}
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  );
+                })}
               </div>
             </section>
           )}
@@ -315,52 +312,52 @@ export default async function HomePage() {
                 </Link>
               </div>
               <div className="space-y-3">
-                {upcomingMatches.map((match) => (
-                  <Card key={match.id}>
-                    <CardContent className="p-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span
-                          className={`text-xs px-2 py-0.5 rounded-full font-medium ${gameColor(match.tournament.gameCategory)}`}
-                        >
-                          {gameLabel(match.tournament.gameCategory)}
-                        </span>
-                        <span className="text-xs text-muted-foreground truncate">
-                          {match.tournament.name}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 flex-1 justify-end">
-                          <p className="font-semibold text-sm text-right truncate">
-                            {(match as any).homePlayer?.name ?? match.homeTeam?.name ?? "TBD"}
-                          </p>
-                          <Avatar className="h-7 w-7 shrink-0">
-                            <AvatarImage src={(match as any).homePlayer?.photoUrl ?? (match.homeTeam as any)?.logoUrl ?? undefined} />
-                            <AvatarFallback className="text-[10px]">
-                              {getInitials((match as any).homePlayer?.name ?? match.homeTeam?.name ?? "?")}
-                            </AvatarFallback>
-                          </Avatar>
-                        </div>
-                        <span className="text-xs text-muted-foreground px-2 shrink-0">vs</span>
-                        <div className="flex items-center gap-2 flex-1">
-                          <Avatar className="h-7 w-7 shrink-0">
-                            <AvatarImage src={(match as any).awayPlayer?.photoUrl ?? (match.awayTeam as any)?.logoUrl ?? undefined} />
-                            <AvatarFallback className="text-[10px]">
-                              {getInitials((match as any).awayPlayer?.name ?? match.awayTeam?.name ?? "?")}
-                            </AvatarFallback>
-                          </Avatar>
-                          <p className="font-semibold text-sm truncate">
-                            {(match as any).awayPlayer?.name ?? match.awayTeam?.name ?? "TBD"}
-                          </p>
-                        </div>
-                      </div>
-                      {match.scheduledAt && (
-                        <p className="text-xs text-muted-foreground text-center mt-2">
-                          {formatDate(match.scheduledAt)}
-                        </p>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
+                {upcomingMatches.map((match) => {
+                  const homeName = match.homePlayer?.name ?? match.homeTeam?.name ?? "TBD";
+                  const awayName = match.awayPlayer?.name ?? match.awayTeam?.name ?? "TBD";
+                  return (
+                    <Link key={match.id} href={`/matches/${match.id}`}>
+                      <Card className="hover:border-border/80 transition-colors">
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span
+                              className={`text-xs px-2 py-0.5 rounded-full font-medium ${gameColor(match.tournament.gameCategory as never)}`}
+                            >
+                              {gameLabel(match.tournament.gameCategory as never)}
+                            </span>
+                            <span className="text-xs text-muted-foreground truncate">
+                              {match.tournament.name}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 flex-1 justify-end">
+                              <p className="font-semibold text-sm text-right truncate">{homeName}</p>
+                              <Avatar className="h-7 w-7 shrink-0">
+                                <AvatarFallback className="text-[10px]">
+                                  {getInitials(homeName)}
+                                </AvatarFallback>
+                              </Avatar>
+                            </div>
+                            <span className="text-xs text-muted-foreground px-2 shrink-0">vs</span>
+                            <div className="flex items-center gap-2 flex-1">
+                              <Avatar className="h-7 w-7 shrink-0">
+                                <AvatarFallback className="text-[10px]">
+                                  {getInitials(awayName)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <p className="font-semibold text-sm truncate">{awayName}</p>
+                            </div>
+                          </div>
+                          {match.scheduledAt && (
+                            <p className="text-xs text-muted-foreground text-center mt-2">
+                              {formatDate(match.scheduledAt)}
+                            </p>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  );
+                })}
               </div>
             </section>
           )}

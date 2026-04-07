@@ -25,7 +25,7 @@ async function getPlayersWithStats() {
       },
       teams: {
         where: { isActive: true },
-        include: { team: { select: { name: true, logoUrl: true } } },
+        include: { team: { select: { id: true, name: true } } },
         take: 1,
       },
     },
