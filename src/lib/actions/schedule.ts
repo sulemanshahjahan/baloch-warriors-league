@@ -285,6 +285,7 @@ export async function generateKnockoutFromGroups(
     where: { id: tournamentId },
     include: {
       groups: {
+        orderBy: { orderIndex: "asc" },
         include: {
           standings: {
             orderBy: [{ points: "desc" }, { goalDiff: "desc" }],
@@ -306,45 +307,120 @@ export async function generateKnockoutFromGroups(
 
   const isIndividual = tournament.participantType === "INDIVIDUAL";
   
-  // Collect advancing participants from each group
-  const advancing: { id: string; name: string; groupName: string; position: number }[] = [];
+  // Collect advancing participants from each group, organized by group
+  const advancingByGroup: { 
+    groupName: string; 
+    participants: { id: string; name: string; position: number }[] 
+  }[] = [];
   
   for (const group of tournament.groups) {
+    const groupParticipants: { id: string; name: string; position: number }[] = [];
     for (let i = 0; i < group.standings.length; i++) {
       const standing = group.standings[i];
       const participant = isIndividual ? standing.player : standing.team;
       if (participant) {
-        advancing.push({
+        groupParticipants.push({
           id: isIndividual ? standing.playerId! : standing.teamId!,
           name: participant.name,
-          groupName: group.name,
           position: i + 1, // 1st, 2nd, etc.
         });
       }
     }
+    if (groupParticipants.length > 0) {
+      advancingByGroup.push({
+        groupName: group.name,
+        participants: groupParticipants,
+      });
+    }
   }
 
-  if (advancing.length < 2) {
+  const totalAdvancing = advancingByGroup.reduce((sum, g) => sum + g.participants.length, 0);
+  if (totalAdvancing < 2) {
     return { success: false, error: "Not enough participants to create knockout" };
   }
 
-  // Create knockout bracket
-  const bracket = generateKnockoutBracket(advancing);
+  // Calculate bracket size (next power of 2)
+  const bracketSize = Math.pow(2, Math.ceil(Math.log2(totalAdvancing)));
+  const roundCount = Math.log2(bracketSize);
+  
+  // Round names from earliest to final
+  const roundNames: Record<number, string> = {
+    1: "Final",
+    2: "Semi-finals",
+    3: "Quarter-finals",
+    4: "Round of 16",
+    5: "Round of 32",
+  };
+  
+  const firstRoundName = roundNames[roundCount] || `Round of ${bracketSize}`;
+  
+  // Build bracket with proper cross-group seeding
+  // Standard format: Group A 1st vs Group B 2nd, Group B 1st vs Group A 2nd, etc.
+  const bracket: { 
+    home: { id: string; name: string } | null; 
+    away: { id: string; name: string } | null;
+    roundName: string;
+    roundNumber: number;
+  }[] = [];
+
+  const groupCount = advancingByGroup.length;
+  
+  // For 2 groups with 2 advancing each (4 teams) - Semi-finals
+  // Match 1: Group A 1st vs Group B 2nd
+  // Match 2: Group B 1st vs Group A 2nd
+  
+  // For 4 groups with 2 advancing each (8 teams) - Quarter-finals
+  // Match 1: Group A 1st vs Group B 2nd
+  // Match 2: Group C 1st vs Group D 2nd
+  // Match 3: Group B 1st vs Group A 2nd
+  // Match 4: Group D 1st vs Group C 2nd
+  
+  // Create proper cross-group pairings
+  for (let i = 0; i < groupCount; i++) {
+    const groupA = advancingByGroup[i];
+    const groupB = advancingByGroup[groupCount - 1 - i]; // Opposite group
+    
+    if (!groupA || !groupB) continue;
+    
+    const groupA1st = groupA.participants.find(p => p.position === 1);
+    const groupA2nd = groupA.participants.find(p => p.position === 2);
+    const groupB1st = groupB.participants.find(p => p.position === 1);
+    const groupB2nd = groupB.participants.find(p => p.position === 2);
+    
+    // Cross pairing: Group X 1st vs Group Y 2nd
+    if (groupA1st && groupB2nd) {
+      bracket.push({
+        home: { id: groupA1st.id, name: groupA1st.name },
+        away: { id: groupB2nd.id, name: groupB2nd.name },
+        roundName: firstRoundName,
+        roundNumber: 1,
+      });
+    } else if (groupA1st) {
+      // Bye for A1st
+      bracket.push({
+        home: { id: groupA1st.id, name: groupA1st.name },
+        away: null,
+        roundName: firstRoundName,
+        roundNumber: 1,
+      });
+    }
+  }
+
+  // Handle odd numbers or missing pairings by filling remaining slots
   let createdMatches = 0;
 
-  for (let i = 0; i < bracket.length; i++) {
-    const [home, away] = bracket[i];
-    if (!home) continue;
+  for (const match of bracket) {
+    if (!match.home) continue;
 
     if (isIndividual) {
       await prisma.match.create({
         data: {
           tournamentId,
-          round: "Knockout Stage",
-          roundNumber: 100, // Higher than group stage
-          matchNumber: i + 1,
-          homePlayerId: home.id,
-          awayPlayerId: away?.id || null,
+          round: match.roundName,
+          roundNumber: match.roundNumber,
+          matchNumber: createdMatches + 1,
+          homePlayerId: match.home.id,
+          awayPlayerId: match.away?.id || null,
           status: "SCHEDULED" as MatchStatus,
         },
       });
@@ -352,11 +428,11 @@ export async function generateKnockoutFromGroups(
       await prisma.match.create({
         data: {
           tournamentId,
-          round: "Knockout Stage",
-          roundNumber: 100,
-          matchNumber: i + 1,
-          homeTeamId: home.id,
-          awayTeamId: away?.id || null,
+          round: match.roundName,
+          roundNumber: match.roundNumber,
+          matchNumber: createdMatches + 1,
+          homeTeamId: match.home.id,
+          awayTeamId: match.away?.id || null,
           status: "SCHEDULED" as MatchStatus,
         },
       });
@@ -367,7 +443,7 @@ export async function generateKnockoutFromGroups(
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath("/admin/matches");
 
-  return { success: true, count: createdMatches, advancing: advancing.length };
+  return { success: true, count: createdMatches, advancing: totalAdvancing };
 }
 
 // ─── DELETE SCHEDULE ───────────────────────────────────────
