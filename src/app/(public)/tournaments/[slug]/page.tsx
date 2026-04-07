@@ -608,12 +608,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                     <Card className="hover:border-primary/50 transition-all cursor-pointer">
                       <CardContent className="p-4">
                         <div className="flex items-center gap-3">
-                          <Avatar className="h-10 w-10">
-                            {/* photo lazy-loads via SmartAvatar on /players detail page */}
-                            <AvatarFallback className="text-sm">
-                              {getInitials(player.name)}
-                            </AvatarFallback>
-                          </Avatar>
+                          <SmartAvatar type="player" id={player.id} name={player.name} className="h-10 w-10" fallbackClassName="text-sm" />
                           <div>
                             <p className="font-medium">{player.name}</p>
                           </div>
@@ -630,12 +625,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                     <Card className="hover:border-primary/50 transition-all cursor-pointer">
                       <CardContent className="p-4">
                         <div className="flex items-center gap-3">
-                          <Avatar className="h-10 w-10">
-                            {/* logo lazy-loads via SmartAvatar on /teams detail page */}
-                            <AvatarFallback className="text-sm">
-                              {getInitials(team.name)}
-                            </AvatarFallback>
-                          </Avatar>
+                          <SmartAvatar type="team" id={team.id} name={team.name} className="h-10 w-10" fallbackClassName="text-sm" />
                           <div>
                             <p className="font-medium">{team.name}</p>
                             {team.shortName && (
@@ -668,6 +658,8 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                     : (award as any).team
                     ? `/teams/${(award as any).team.slug}`
                     : null;
+                  const winnerId = (award as any).player?.id ?? (award as any).team?.id;
+                  const winnerType = (award as any).player ? "player" : "team";
                   return (
                     <Card key={award.id}>
                       <CardContent className="p-4">
@@ -684,11 +676,13 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                             )}
                             {winner && (
                               <div className="flex items-center gap-1.5 mt-2">
-                                <Avatar className="h-5 w-5">
-                                  <AvatarFallback className="text-[8px]">
-                                    {getInitials(winner.name)}
-                                  </AvatarFallback>
-                                </Avatar>
+                                {winnerId ? (
+                                  <SmartAvatar type={winnerType as "player" | "team"} id={winnerId} name={winner.name} className="h-5 w-5" fallbackClassName="text-[8px]" />
+                                ) : (
+                                  <Avatar className="h-5 w-5">
+                                    <AvatarFallback className="text-[8px]">{getInitials(winner.name)}</AvatarFallback>
+                                  </Avatar>
+                                )}
                                 {winnerSlug ? (
                                   <Link href={winnerSlug} className="text-xs font-semibold text-primary hover:underline">
                                     {winner.name}
@@ -739,6 +733,12 @@ function MatchCard({
   const awayName = isPlayerMatch
     ? (match.awayPlayer?.name ?? "TBD")
     : (match.awayTeam?.name ?? "TBD");
+  
+  const homeId = isPlayerMatch ? match.homePlayer?.id : match.homeTeam?.id;
+  const awayId = isPlayerMatch ? match.awayPlayer?.id : match.awayTeam?.id;
+  const homeType = isPlayerMatch ? "player" : "team";
+  const awayType = isPlayerMatch ? "player" : "team";
+  
   return (
     <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
       <div className="flex-1">
@@ -754,11 +754,13 @@ function MatchCard({
         </div>
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 flex-1">
-            <Avatar className="h-6 w-6">
-              <AvatarFallback className="text-[10px]">
-                {getInitials(homeName)}
-              </AvatarFallback>
-            </Avatar>
+            {homeId ? (
+              <SmartAvatar type={homeType as "player" | "team"} id={homeId} name={homeName} className="h-6 w-6" fallbackClassName="text-[10px]" />
+            ) : (
+              <Avatar className="h-6 w-6">
+                <AvatarFallback className="text-[10px]">{getInitials(homeName)}</AvatarFallback>
+              </Avatar>
+            )}
             <span className="font-medium">{homeName}</span>
           </div>
           <div className="text-center min-w-[60px]">
@@ -772,11 +774,13 @@ function MatchCard({
           </div>
           <div className="flex items-center gap-2 flex-1 justify-end">
             <span className="font-medium">{awayName}</span>
-            <Avatar className="h-6 w-6">
-              <AvatarFallback className="text-[10px]">
-                {getInitials(awayName)}
-              </AvatarFallback>
-            </Avatar>
+            {awayId ? (
+              <SmartAvatar type={awayType as "player" | "team"} id={awayId} name={awayName} className="h-6 w-6" fallbackClassName="text-[10px]" />
+            ) : (
+              <Avatar className="h-6 w-6">
+                <AvatarFallback className="text-[10px]">{getInitials(awayName)}</AvatarFallback>
+              </Avatar>
+            )}
           </div>
         </div>
       </div>
@@ -1005,6 +1009,12 @@ function BracketMatchCard({
   const awayName = isIndividual
     ? (match.awayPlayer?.name ?? "TBD")
     : (match.awayTeam?.name ?? "TBD");
+  
+  const homeId = isIndividual ? match.homePlayer?.id : match.homeTeam?.id;
+  const awayId = isIndividual ? match.awayPlayer?.id : match.awayTeam?.id;
+  const homeType = isIndividual ? "player" : "team";
+  const awayType = isIndividual ? "player" : "team";
+  
   const homeScore = match.homeScore ?? 0;
   const awayScore = match.awayScore ?? 0;
   const homeWon = isCompleted && homeScore > awayScore;
@@ -1024,11 +1034,13 @@ function BracketMatchCard({
         {/* Home participant */}
         <div className={`px-3 py-2 flex items-center justify-between gap-2 border-b border-border/50 ${homeWon ? 'bg-primary/5' : ''}`}>
           <div className="flex items-center gap-2 min-w-0">
-            <Avatar className="h-5 w-5 shrink-0">
-              <AvatarFallback className="text-[8px]">
-                {getInitials(homeName)}
-              </AvatarFallback>
-            </Avatar>
+            {homeId ? (
+              <SmartAvatar type={homeType} id={homeId} name={homeName} className="h-5 w-5 shrink-0" fallbackClassName="text-[8px]" />
+            ) : (
+              <Avatar className="h-5 w-5 shrink-0">
+                <AvatarFallback className="text-[8px]">{getInitials(homeName)}</AvatarFallback>
+              </Avatar>
+            )}
             <span className={`text-xs truncate ${homeWon ? 'font-semibold' : ''}`}>
               {homeName}
             </span>
@@ -1043,11 +1055,13 @@ function BracketMatchCard({
         {/* Away participant */}
         <div className={`px-3 py-2 flex items-center justify-between gap-2 ${awayWon ? 'bg-primary/5' : ''}`}>
           <div className="flex items-center gap-2 min-w-0">
-            <Avatar className="h-5 w-5 shrink-0">
-              <AvatarFallback className="text-[8px]">
-                {getInitials(awayName)}
-              </AvatarFallback>
-            </Avatar>
+            {awayId ? (
+              <SmartAvatar type={awayType} id={awayId} name={awayName} className="h-5 w-5 shrink-0" fallbackClassName="text-[8px]" />
+            ) : (
+              <Avatar className="h-5 w-5 shrink-0">
+                <AvatarFallback className="text-[8px]">{getInitials(awayName)}</AvatarFallback>
+              </Avatar>
+            )}
             <span className={`text-xs truncate ${awayWon ? 'font-semibold' : ''}`}>
               {awayName}
             </span>
