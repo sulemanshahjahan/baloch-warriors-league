@@ -243,14 +243,6 @@ async function advanceKnockoutWinner(matchId: string, tournamentId: string) {
   const currentRound = completedMatch.roundNumber || 1;
   const nextRound = currentRound + 1;
   
-  // Calculate next round name
-  const roundNames: Record<number, string> = {
-    1: "Final",
-    2: "Semi-finals",
-    3: "Quarter-finals",
-    4: "Round of 16",
-  };
-  
   // Count matches in current round to determine next round name
   const matchesInCurrentRound = await prisma.match.count({
     where: { 
@@ -260,7 +252,27 @@ async function advanceKnockoutWinner(matchId: string, tournamentId: string) {
     },
   });
   
-  const nextRoundName = roundNames[Math.log2(matchesInCurrentRound)] || `Round ${nextRound}`;
+  // Map match count to next round name
+  // 2 matches (semi-finals) -> Final
+  // 4 matches (quarter-finals) -> Semi-finals
+  // 8 matches (round of 16) -> Quarter-finals
+  let nextRoundName: string;
+  switch (matchesInCurrentRound) {
+    case 2:
+      nextRoundName = "Final";
+      break;
+    case 4:
+      nextRoundName = "Semi-finals";
+      break;
+    case 8:
+      nextRoundName = "Quarter-finals";
+      break;
+    case 16:
+      nextRoundName = "Round of 16";
+      break;
+    default:
+      nextRoundName = `Round ${nextRound}`;
+  }
   
   // Find existing next round match for this bracket position
   // Match number determines which next match (1&2 -> 1, 3&4 -> 2, etc.)
