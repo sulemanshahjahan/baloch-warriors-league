@@ -38,6 +38,7 @@ import {
   getInitials,
   getRoundDisplayName,
 } from "@/lib/utils";
+import { SmartAvatar } from "@/components/public/smart-avatar";
 
 type FormResult = "W" | "D" | "L";
 
@@ -855,11 +856,17 @@ function StandingsTable({
               <TableCell className="font-medium text-muted-foreground">{i + 1}</TableCell>
               <TableCell>
                 <Link href={href} className="flex items-center gap-2 hover:text-primary transition-colors">
-                  <Avatar className="h-7 w-7 shrink-0">
-                    <AvatarFallback className="text-[10px]">
-                      {getInitials(name ?? "")}
-                    </AvatarFallback>
-                  </Avatar>
+                  {isIndividual && s.player ? (
+                    <SmartAvatar type="player" id={s.player.id} name={name ?? ""} className="h-7 w-7 shrink-0" fallbackClassName="text-[10px]" />
+                  ) : s.team ? (
+                    <SmartAvatar type="team" id={s.team.id} name={name ?? ""} className="h-7 w-7 shrink-0" fallbackClassName="text-[10px]" />
+                  ) : (
+                    <Avatar className="h-7 w-7 shrink-0">
+                      <AvatarFallback className="text-[10px]">
+                        {getInitials(name ?? "")}
+                      </AvatarFallback>
+                    </Avatar>
+                  )}
                   <span className="font-medium">{name}</span>
                 </Link>
               </TableCell>

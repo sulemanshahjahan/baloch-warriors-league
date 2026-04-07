@@ -1,28 +1,60 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
 import { Download, Trophy, Swords, Users, BarChart3, Newspaper, Shield } from "lucide-react";
+import { useEffect, useState } from "react";
+
+function useIsMobileApp() {
+  const [isMobileApp, setIsMobileApp] = useState(false);
+  
+  useEffect(() => {
+    // Check if running in Capacitor/Cordova
+    const checkMobileApp = () => {
+      if (typeof window !== "undefined") {
+        // Check for Capacitor
+        // @ts-ignore
+        const hasCapacitor = !!(window.Capacitor || window.cordova);
+        // Check URL - Capacitor uses capacitor:// or specific host
+        const isCapacitorUrl = window.location.protocol === "capacitor:";
+        // Check for Android WebView user agent
+        const isWebView = /wv|WebView/.test(navigator.userAgent);
+        
+        setIsMobileApp(hasCapacitor || isCapacitorUrl || isWebView);
+      }
+    };
+    
+    checkMobileApp();
+  }, []);
+  
+  return isMobileApp;
+}
 
 export function PublicFooter() {
+  const isMobileApp = useIsMobileApp();
+  
   return (
     <footer className="border-t border-border/50 bg-card/30 mt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        {/* Download App Section */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-10 p-6 rounded-xl bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 border border-primary/20">
-          <div className="text-center sm:text-left">
-            <h3 className="font-bold text-lg">Get the BWL App</h3>
-            <p className="text-sm text-muted-foreground">
-              Download for Android — tournaments, matches & stats on the go!
-            </p>
+        {/* Download App Section - Hidden in mobile app */}
+        {!isMobileApp && (
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-10 p-6 rounded-xl bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 border border-primary/20">
+            <div className="text-center sm:text-left">
+              <h3 className="font-bold text-lg">Get the BWL App</h3>
+              <p className="text-sm text-muted-foreground">
+                Download for Android — tournaments, matches & stats on the go!
+              </p>
+            </div>
+            <a
+              href="/bwl.apk"
+              download
+              className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-lg font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
+            >
+              <Download className="w-5 h-5" />
+              Download APK
+            </a>
           </div>
-          <a
-            href="/bwl.apk"
-            download
-            className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-lg font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
-          >
-            <Download className="w-5 h-5" />
-            Download APK
-          </a>
-        </div>
+        )}
 
         <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
           {/* Logo */}
