@@ -37,8 +37,55 @@ import {
   getInitials,
 } from "@/lib/utils";
 
+type FormResult = "W" | "D" | "L";
+
+interface MatchForForm {
+  homeScore: number | null;
+  awayScore: number | null;
+  homeTeamId: string | null;
+  awayTeamId: string | null;
+  homePlayerId: string | null;
+  awayPlayerId: string | null;
+}
+
 interface TournamentPageProps {
   params: Promise<{ slug: string }>;
+}
+
+function computeForm(
+  participantId: string,
+  matches: MatchForForm[],
+  isIndividual: boolean
+): FormResult[] {
+  const results: FormResult[] = [];
+  
+  for (const match of matches) {
+    if (results.length >= 5) break;
+    
+    const homeId = isIndividual ? match.homePlayerId : match.homeTeamId;
+    const awayId = isIndividual ? match.awayPlayerId : match.awayTeamId;
+    
+    if (!homeId || !awayId) continue;
+    if (match.homeScore === null || match.awayScore === null) continue;
+    
+    const isHome = homeId === participantId;
+    const isAway = awayId === participantId;
+    
+    if (!isHome && !isAway) continue;
+    
+    const homeScore = match.homeScore;
+    const awayScore = match.awayScore;
+    
+    if (homeScore === awayScore) {
+      results.push("D");
+    } else if (isHome) {
+      results.push(homeScore > awayScore ? "W" : "L");
+    } else {
+      results.push(awayScore > homeScore ? "W" : "L");
+    }
+  }
+  
+  return results;
 }
 
 export async function generateMetadata({ params }: TournamentPageProps): Promise<Metadata> {
@@ -107,6 +154,8 @@ async function getTournamentBySlug(slug: string) {
           goalsAgainst: true,
           goalDiff: true,
           points: true,
+          teamId: true,
+          playerId: true,
           team: { select: { id: true, slug: true, name: true, logoUrl: true } },
           player: { select: { id: true, slug: true, name: true, photoUrl: true } },
         },
@@ -174,8 +223,25 @@ async function getTournamentBySlug(slug: string) {
       goalsAgainst: true,
       goalDiff: true,
       points: true,
+      teamId: true,
+      playerId: true,
       team: { select: { id: true, slug: true, name: true, logoUrl: true } },
       player: { select: { id: true, slug: true, name: true, photoUrl: true } },
+    },
+  });
+
+  // Fetch completed matches for form calculation (last 20 to cover all participants)
+  const formMatches = await prisma.match.findMany({
+    where: { tournamentId: tournament.id, status: "COMPLETED" },
+    orderBy: { completedAt: "desc" },
+    take: 50,
+    select: {
+      homeScore: true,
+      awayScore: true,
+      homeTeamId: true,
+      awayTeamId: true,
+      homePlayerId: true,
+      awayPlayerId: true,
     },
   });
 
@@ -194,6 +260,7 @@ async function getTournamentBySlug(slug: string) {
     teams,
     players,
     standings,
+    formMatches,
   };
 }
 
@@ -348,6 +415,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                         <StandingsTable 
                           standings={group.standings} 
                           participantType={tournament.participantType}
+                          formMatches={tournament.formMatches}
                         />
                       )}
                     </CardContent>
@@ -373,6 +441,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                   <StandingsTable 
                     standings={tournament.standings}
                     participantType={tournament.participantType}
+                    formMatches={tournament.formMatches}
                   />
                 )}
               </CardContent>
@@ -612,13 +681,32 @@ function MatchCard({
 }
 
 
+function FormBadge({ result }: { result: FormResult }) {
+  const colors = {
+    W: "bg-green-500",
+    D: "bg-yellow-500",
+    L: "bg-red-500",
+  };
+  return (
+    <span
+      className={`inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold text-white rounded-full ${colors[result]}`}
+      title={result === "W" ? "Win" : result === "D" ? "Draw" : "Loss"}
+    >
+      {result}
+    </span>
+  );
+}
+
 // Standings Table Component
 function StandingsTable({
   standings,
-  participantType
+  participantType,
+  formMatches,
 }: {
   standings: Array<{
     id: string;
+    teamId: string | null;
+    playerId: string | null;
     played: number;
     won: number;
     drawn: number;
@@ -631,13 +719,15 @@ function StandingsTable({
     player: { id: string; slug: string; name: string; photoUrl?: string | null } | null;
   }>;
   participantType: string;
+  formMatches: MatchForForm[];
 }) {
+  const isIndividual = participantType === "INDIVIDUAL";
   return (
     <Table>
       <TableHeader>
         <TableRow className="bg-muted/50">
           <TableHead className="w-10">#</TableHead>
-          <TableHead>{participantType === "INDIVIDUAL" ? "Player" : "Team"}</TableHead>
+          <TableHead>{isIndividual ? "Player" : "Team"}</TableHead>
           <TableHead className="text-center">P</TableHead>
           <TableHead className="text-center">W</TableHead>
           <TableHead className="text-center">D</TableHead>
@@ -646,15 +736,18 @@ function StandingsTable({
           <TableHead className="text-center hidden sm:table-cell">GA</TableHead>
           <TableHead className="text-center">GD</TableHead>
           <TableHead className="text-center font-bold">Pts</TableHead>
+          <TableHead className="text-center w-[120px]">Form</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {standings.map((s, i) => {
-          const name = participantType === "INDIVIDUAL" ? s.player?.name : s.team?.name;
-          const photo = participantType === "INDIVIDUAL" ? s.player?.photoUrl : s.team?.logoUrl;
-          const href = participantType === "INDIVIDUAL"
+          const name = isIndividual ? s.player?.name : s.team?.name;
+          const photo = isIndividual ? s.player?.photoUrl : s.team?.logoUrl;
+          const href = isIndividual
             ? `/players/${s.player?.slug}`
             : `/teams/${s.team?.slug}`;
+          const participantId = isIndividual ? s.playerId : s.teamId;
+          const form = participantId ? computeForm(participantId, formMatches, isIndividual) : [];
           return (
             <TableRow key={s.id}>
               <TableCell className="font-medium text-muted-foreground">{i + 1}</TableCell>
@@ -679,6 +772,15 @@ function StandingsTable({
                 {s.goalDiff > 0 ? `+${s.goalDiff}` : s.goalDiff}
               </TableCell>
               <TableCell className="text-center font-bold">{s.points}</TableCell>
+              <TableCell className="text-center">
+                <div className="flex items-center justify-center gap-1">
+                  {form.length > 0 ? (
+                    form.map((r, idx) => <FormBadge key={idx} result={r} />)
+                  ) : (
+                    <span className="text-muted-foreground text-xs">-</span>
+                  )}
+                </div>
+              </TableCell>
             </TableRow>
           );
         })}
