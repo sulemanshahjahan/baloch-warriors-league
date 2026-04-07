@@ -1,22 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <!-- Base application theme. -->
-    <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
-        <!-- Customize your theme here. -->
+    <!-- Base application theme - Dark theme matching website -->
+    <style name="AppTheme" parent="Theme.AppCompat.DayNight.DarkActionBar">
         <item name="colorPrimary">@color/colorPrimary</item>
         <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
         <item name="colorAccent">@color/colorAccent</item>
+        <item name="android:windowBackground">@color/splashBackground</item>
     </style>
 
     <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <item name="android:windowBackground">@color/splashBackground</item>
     </style>
 
-
+    <!-- Splash Screen Theme with fade animation -->
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
-        <item name="android:background">@drawable/splash</item>
+        <!-- Window background -->
+        <item name="windowSplashScreenBackground">@color/splashBackground</item>
+        
+        <!-- Animated icon - uses our splash drawable -->
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_logo_animated</item>
+        
+        <!-- Animation duration (max 1000ms for Android 12+) -->
+        <item name="windowSplashScreenAnimationDuration">800</item>
+        
+        <!-- Icon background color -->
+        <item name="windowSplashScreenIconBackgroundColor">@color/splashBackground</item>
+        
+        <!-- Status bar and nav bar -->
+        <item name="android:statusBarColor">@color/splashBackground</item>
+        <item name="android:navigationBarColor">@color/splashBackground</item>
+        
+        <!-- Post splash screen theme -->
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
     </style>
+
 </resources>
