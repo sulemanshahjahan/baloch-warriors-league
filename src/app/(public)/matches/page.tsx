@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 
-export const revalidate = 30;
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Matches",
@@ -27,10 +27,9 @@ import {
 } from "@/lib/utils";
 
 async function getMatches() {
-  // Fetch matches with pagination - limit to recent 50
   const matches = await prisma.match.findMany({
-    orderBy: { scheduledAt: "desc" },
-    take: 50,
+    orderBy: [{ status: "asc" }, { scheduledAt: "desc" }],
+    take: 25,
     select: {
       id: true,
       status: true,
