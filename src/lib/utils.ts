@@ -30,7 +30,7 @@ export type TournamentStatus =
   | "COMPLETED"
   | "CANCELLED";
 
-export type MatchStatus = "SCHEDULED" | "LIVE" | "COMPLETED" | "CANCELLED";
+export type MatchStatus = "SCHEDULED" | "LIVE" | "COMPLETED" | "CANCELLED" | "POSTPONED";
 
 const GAME_LABELS: Record<GameCategory, string> = {
   FOOTBALL: "Football",
@@ -50,6 +50,7 @@ const STATUS_LABELS: Record<TournamentStatus | MatchStatus, string> = {
   CANCELLED: "Cancelled",
   SCHEDULED: "Scheduled",
   LIVE: "Live",
+  POSTPONED: "Postponed",
 };
 
 const GAME_COLORS: Record<GameCategory, string> = {
@@ -70,6 +71,7 @@ const STATUS_COLORS: Record<TournamentStatus | MatchStatus, string> = {
   CANCELLED: "bg-red-500/10 text-red-500",
   SCHEDULED: "bg-yellow-500/10 text-yellow-500",
   LIVE: "bg-red-500/10 text-red-500 animate-pulse",
+  POSTPONED: "bg-orange-500/10 text-orange-500",
 };
 
 export function gameLabel(game: GameCategory): string {
