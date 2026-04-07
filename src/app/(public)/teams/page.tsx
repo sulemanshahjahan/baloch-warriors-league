@@ -19,7 +19,12 @@ async function getTeams() {
   return prisma.team.findMany({
     where: { isActive: true },
     orderBy: { name: "asc" },
-    include: {
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      shortName: true,
+      primaryColor: true,
       _count: {
         select: { players: true, tournaments: true },
       },

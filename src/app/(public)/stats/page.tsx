@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BarChart3, Trophy, Target, TrendingUp, Swords, Users } from "lucide-react";
 import { getInitials, gameLabel } from "@/lib/utils";
+import { SmartAvatar } from "@/components/public/smart-avatar";
 import { StatsGameFilter } from "./stats-game-filter";
 
 export const metadata: Metadata = {
@@ -141,7 +142,7 @@ function LeaderboardCard({
   color,
 }: {
   title: string;
-  data: Array<{ player: { id: string; name: string; slug: string; photoUrl: string | null } | undefined; count: number; matches: number }>;
+  data: Array<{ player: { id: string; name: string; slug: string } | undefined; count: number; matches: number }>;
   icon: React.ComponentType<{ className?: string }>;
   color: string;
 }) {
@@ -169,12 +170,13 @@ function LeaderboardCard({
                     <span className={`text-lg font-bold w-6 ${i < 3 ? color : "text-muted-foreground"}`}>
                       {i + 1}
                     </span>
-                    <Avatar className="h-10 w-10">
-                      <AvatarImage src={item.player.photoUrl ?? undefined} />
-                      <AvatarFallback className="text-sm">
-                        {getInitials(item.player.name)}
-                      </AvatarFallback>
-                    </Avatar>
+                    <SmartAvatar
+                      type="player"
+                      id={item.player.id}
+                      name={item.player.name}
+                      className="h-10 w-10"
+                      fallbackClassName="text-sm"
+                    />
                     <div className="flex flex-col">
                       <span className="font-medium">{item.player.name}</span>
                       <span className="text-xs text-muted-foreground">{item.matches} matches</span>

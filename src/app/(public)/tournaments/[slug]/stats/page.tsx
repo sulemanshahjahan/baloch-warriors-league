@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BarChart3, Trophy, Target, TrendingUp, Swords, ArrowLeft } from "lucide-react";
 import { getInitials, gameLabel, gameColor } from "@/lib/utils";
+import { SmartAvatar } from "@/components/public/smart-avatar";
 
 interface TournamentStatsPageProps {
   params: Promise<{ slug: string }>;
@@ -116,12 +117,13 @@ export default async function TournamentStatsPage({ params }: TournamentStatsPag
                               href={`/players/${stat.player.slug}`}
                               className="flex items-center gap-3 hover:text-primary"
                             >
-                              <Avatar className="h-8 w-8">
-                                <AvatarImage src={stat.player.photoUrl ?? undefined} />
-                                <AvatarFallback className="text-xs">
-                                  {getInitials(stat.player.name)}
-                                </AvatarFallback>
-                              </Avatar>
+                              <SmartAvatar
+                                type="player"
+                                id={stat.player.id}
+                                name={stat.player.name}
+                                className="h-8 w-8"
+                                fallbackClassName="text-xs"
+                              />
                               {stat.player.name}
                             </Link>
                           </TableCell>
@@ -182,7 +184,7 @@ function LeaderboardCard({
   color,
 }: { 
   title: string; 
-  data: Array<{ player: { id: string; name: string; slug: string; photoUrl: string | null } | undefined; count: number }>;
+  data: Array<{ player: { id: string; name: string; slug: string } | undefined; count: number }>;
   icon: React.ComponentType<{ className?: string }>;
   color: string;
 }) {
@@ -210,12 +212,13 @@ function LeaderboardCard({
                     <span className={`text-lg font-bold w-6 ${i < 3 ? color : 'text-muted-foreground'}`}>
                       {i + 1}
                     </span>
-                    <Avatar className="h-10 w-10">
-                      <AvatarImage src={item.player.photoUrl ?? undefined} />
-                      <AvatarFallback className="text-sm">
-                        {getInitials(item.player.name)}
-                      </AvatarFallback>
-                    </Avatar>
+                    <SmartAvatar 
+                      type="player"
+                      id={item.player.id}
+                      name={item.player.name}
+                      className="h-10 w-10"
+                      fallbackClassName="text-sm"
+                    />
                     <span className="font-medium">{item.player.name}</span>
                   </div>
                   <div className="flex items-center gap-2">

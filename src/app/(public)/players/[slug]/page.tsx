@@ -9,6 +9,7 @@ export const dynamicParams = true;
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { SmartAvatar } from "@/components/public/smart-avatar";
 import {
   User,
   Trophy,
@@ -31,7 +32,7 @@ interface PlayerPageProps {
 
 export async function generateMetadata({ params }: PlayerPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const player = await prisma.player.findUnique({ where: { slug }, select: { name: true, bio: true, photoUrl: true } });
+  const player = await prisma.player.findUnique({ where: { slug }, select: { name: true, bio: true } });
   if (!player) return { title: "Player Not Found" };
   return {
     title: player.name,
@@ -39,7 +40,6 @@ export async function generateMetadata({ params }: PlayerPageProps): Promise<Met
     openGraph: {
       title: `${player.name} | BWL`,
       description: player.bio ?? `${player.name}'s profile and statistics in the Baloch Warriors League.`,
-      images: player.photoUrl ? [{ url: player.photoUrl }] : [],
       type: "profile",
     },
   };
@@ -50,7 +50,7 @@ async function getPlayerBySlug(slug: string) {
     where: { slug },
     include: {
       teams: {
-        include: { team: { select: { id: true, name: true, slug: true, logoUrl: true } } },
+        include: { team: { select: { id: true, name: true, slug: true } } },
         orderBy: { joinedAt: "desc" },
       },
       matchEvents: {
@@ -139,10 +139,10 @@ async function getPlayerRecentMatches(playerId: string) {
     take: 5,
     include: {
       tournament: { select: { name: true, slug: true, gameCategory: true } },
-      homePlayer: { select: { name: true, slug: true, photoUrl: true } },
-      awayPlayer: { select: { name: true, slug: true, photoUrl: true } },
-      homeTeam: { select: { name: true, slug: true, logoUrl: true } },
-      awayTeam: { select: { name: true, slug: true, logoUrl: true } },
+      homePlayer: { select: { id: true, name: true, slug: true } },
+      awayPlayer: { select: { id: true, name: true, slug: true } },
+      homeTeam: { select: { id: true, name: true, slug: true } },
+      awayTeam: { select: { id: true, name: true, slug: true } },
     },
   });
 }
@@ -184,12 +184,13 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
           </Link>
 
           <div className="flex items-start gap-6 flex-wrap">
-            <Avatar className="h-24 w-24">
-              <AvatarImage src={player.photoUrl ?? undefined} />
-              <AvatarFallback className="text-3xl">
-                {getInitials(player.name)}
-              </AvatarFallback>
-            </Avatar>
+            <SmartAvatar
+              type="player"
+              id={player.id}
+              name={player.name}
+              className="h-24 w-24"
+              fallbackClassName="text-3xl"
+            />
 
             <div>
               <h1 className="text-3xl sm:text-4xl font-black tracking-tight">
@@ -232,12 +233,13 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                     href={`/teams/${currentTeam.slug}`}
                     className="inline-flex items-center gap-2 text-sm hover:text-primary"
                   >
-                    <Avatar className="h-5 w-5">
-                      <AvatarImage src={currentTeam.logoUrl ?? undefined} />
-                      <AvatarFallback className="text-[10px]">
-                        {getInitials(currentTeam.name)}
-                      </AvatarFallback>
-                    </Avatar>
+                    <SmartAvatar
+                      type="team"
+                      id={currentTeam.id}
+                      name={currentTeam.name}
+                      className="h-5 w-5"
+                      fallbackClassName="text-[10px]"
+                    />
                     {currentTeam.name}
                   </Link>
                 </div>
@@ -314,6 +316,11 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                         resultColor = "bg-red-500/20 text-red-500";
                       }
 
+                      const opponentId = isHome 
+                        ? (match.awayPlayer?.id ?? match.awayTeam?.id)
+                        : (match.homePlayer?.id ?? match.homeTeam?.id);
+                      const opponentType = match.awayPlayer || match.homePlayer ? "player" : "team";
+
                       return (
                         <Link
                           key={match.id}
@@ -321,12 +328,21 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                           className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
                         >
                           <div className="flex items-center gap-3">
-                            <Avatar className="h-8 w-8">
-                              <AvatarImage src={(opponent as any)?.photoUrl ?? (opponent as any)?.logoUrl ?? undefined} />
-                              <AvatarFallback className="text-xs">
-                                {getInitials((opponent as any)?.name ?? "?")}
-                              </AvatarFallback>
-                            </Avatar>
+                            {opponentId ? (
+                              <SmartAvatar
+                                type={opponentType}
+                                id={opponentId}
+                                name={(opponent as any)?.name ?? "?"}
+                                className="h-8 w-8"
+                                fallbackClassName="text-xs"
+                              />
+                            ) : (
+                              <Avatar className="h-8 w-8">
+                                <AvatarFallback className="text-xs">
+                                  {getInitials((opponent as any)?.name ?? "?")}
+                                </AvatarFallback>
+                              </Avatar>
+                            )}
                             <div>
                               <p className="font-medium text-sm">
                                 vs {(opponent as any)?.name ?? "Unknown"}
@@ -374,12 +390,13 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                         className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
                       >
                         <div className="flex items-center gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src={team.logoUrl ?? undefined} />
-                            <AvatarFallback className="text-xs">
-                              {getInitials(team.name)}
-                            </AvatarFallback>
-                          </Avatar>
+                          <SmartAvatar
+                            type="team"
+                            id={team.id}
+                            name={team.name}
+                            className="h-8 w-8"
+                            fallbackClassName="text-xs"
+                          />
                           <div>
                             <p className="font-medium">{team.name}</p>
                             <p className="text-xs text-muted-foreground">

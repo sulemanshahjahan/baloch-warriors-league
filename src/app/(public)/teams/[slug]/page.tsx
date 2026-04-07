@@ -16,6 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { SmartAvatar } from "@/components/public/smart-avatar";
 import {
   Shield,
   Users,
@@ -39,7 +40,7 @@ interface TeamPageProps {
 
 export async function generateMetadata({ params }: TeamPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const team = await prisma.team.findUnique({ where: { slug }, select: { name: true, logoUrl: true } });
+  const team = await prisma.team.findUnique({ where: { slug }, select: { id: true, name: true } });
   if (!team) return { title: "Team Not Found" };
   return {
     title: team.name,
@@ -47,7 +48,6 @@ export async function generateMetadata({ params }: TeamPageProps): Promise<Metad
     openGraph: {
       title: `${team.name} | BWL`,
       description: `${team.name} — roster, results, and stats in the Baloch Warriors League.`,
-      images: team.logoUrl ? [{ url: team.logoUrl }] : [],
       type: "website",
     },
   };
@@ -56,6 +56,13 @@ export async function generateMetadata({ params }: TeamPageProps): Promise<Metad
 async function getTeamBySlug(slug: string) {
   return prisma.team.findUnique({
     where: { slug },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      shortName: true,
+      primaryColor: true,
+    },
     include: {
       players: {
         where: { isActive: true },
@@ -65,7 +72,6 @@ async function getTeamBySlug(slug: string) {
               id: true,
               slug: true,
               name: true,
-              photoUrl: true,
               position: true,
               nationality: true,
             },
@@ -129,19 +135,13 @@ export default async function TeamPage({ params }: TeamPageProps) {
           </Link>
 
           <div className="flex items-start gap-6 flex-wrap">
-            <Avatar className="h-24 w-24">
-              <AvatarImage src={team.logoUrl ?? undefined} />
-              <AvatarFallback
-                className="text-3xl"
-                style={{
-                  backgroundColor: team.primaryColor
-                    ? `${team.primaryColor}33`
-                    : undefined,
-                }}
-              >
-                {getInitials(team.name)}
-              </AvatarFallback>
-            </Avatar>
+            <SmartAvatar
+              type="team"
+              id={team.id}
+              name={team.name}
+              className="h-24 w-24"
+              fallbackClassName="text-3xl"
+            />
 
             <div>
               <h1 className="text-3xl sm:text-4xl font-black tracking-tight">
@@ -204,12 +204,13 @@ export default async function TeamPage({ params }: TeamPageProps) {
                               href={`/players/${player.slug}`}
                               className="flex items-center gap-3 hover:text-primary"
                             >
-                              <Avatar className="h-8 w-8">
-                                <AvatarImage src={player.photoUrl ?? undefined} />
-                                <AvatarFallback className="text-xs">
-                                  {getInitials(player.name)}
-                                </AvatarFallback>
-                              </Avatar>
+                              <SmartAvatar
+                                type="player"
+                                id={player.id}
+                                name={player.name}
+                                className="h-8 w-8"
+                                fallbackClassName="text-xs"
+                              />
                               <span className="font-medium">{player.name}</span>
                             </Link>
                           </TableCell>

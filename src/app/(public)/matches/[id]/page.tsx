@@ -8,6 +8,7 @@ export const revalidate = 60;
 export const dynamicParams = true;
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { SmartAvatar } from "@/components/public/smart-avatar";
 import {
   ArrowLeft,
   Calendar,
@@ -44,16 +45,16 @@ async function getMatch(id: string) {
         select: { id: true, name: true, slug: true, gameCategory: true },
       },
       homeTeam: {
-        select: { id: true, name: true, shortName: true, logoUrl: true, slug: true },
+        select: { id: true, name: true, shortName: true, slug: true },
       },
       awayTeam: {
-        select: { id: true, name: true, shortName: true, logoUrl: true, slug: true },
+        select: { id: true, name: true, shortName: true, slug: true },
       },
       homePlayer: {
-        select: { id: true, name: true, slug: true, photoUrl: true },
+        select: { id: true, name: true, slug: true },
       },
       awayPlayer: {
-        select: { id: true, name: true, slug: true, photoUrl: true },
+        select: { id: true, name: true, slug: true },
       },
       motmPlayer: {
         select: { id: true, name: true, slug: true },
@@ -150,8 +151,10 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
 
   const homeName = match.homePlayer?.name ?? match.homeTeam?.name ?? "TBD";
   const awayName = match.awayPlayer?.name ?? match.awayTeam?.name ?? "TBD";
-  const homeLogo = match.homePlayer?.photoUrl ?? match.homeTeam?.logoUrl;
-  const awayLogo = match.awayPlayer?.photoUrl ?? match.awayTeam?.logoUrl;
+  const homeId = match.homePlayer?.id ?? match.homeTeam?.id;
+  const awayId = match.awayPlayer?.id ?? match.awayTeam?.id;
+  const homeType = match.homePlayer ? "player" : "team";
+  const awayType = match.awayPlayer ? "player" : "team";
   const homeSlug = match.homePlayer
     ? `/players/${match.homePlayer.slug}`
     : match.homeTeam
@@ -235,16 +238,24 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
             <div className="flex-1 flex flex-col items-center gap-3">
               {homeSlug ? (
                 <Link href={homeSlug}>
-                  <Avatar className="h-20 w-20 ring-2 ring-border hover:ring-primary transition-all">
-                    <AvatarImage src={homeLogo ?? undefined} />
-                    <AvatarFallback className="text-lg font-bold">
-                      {getInitials(homeName)}
-                    </AvatarFallback>
-                  </Avatar>
+                  {homeId ? (
+                    <SmartAvatar 
+                      type={homeType as "player" | "team"} 
+                      id={homeId} 
+                      name={homeName}
+                      className="h-20 w-20 ring-2 ring-border hover:ring-primary transition-all"
+                      fallbackClassName="text-lg font-bold"
+                    />
+                  ) : (
+                    <Avatar className="h-20 w-20 ring-2 ring-border hover:ring-primary transition-all">
+                      <AvatarFallback className="text-lg font-bold">
+                        {getInitials(homeName)}
+                      </AvatarFallback>
+                    </Avatar>
+                  )}
                 </Link>
               ) : (
                 <Avatar className="h-20 w-20 ring-2 ring-border">
-                  <AvatarImage src={homeLogo ?? undefined} />
                   <AvatarFallback className="text-lg font-bold">
                     {getInitials(homeName)}
                   </AvatarFallback>
@@ -284,16 +295,24 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
             <div className="flex-1 flex flex-col items-center gap-3">
               {awaySlug ? (
                 <Link href={awaySlug}>
-                  <Avatar className="h-20 w-20 ring-2 ring-border hover:ring-primary transition-all">
-                    <AvatarImage src={awayLogo ?? undefined} />
-                    <AvatarFallback className="text-lg font-bold">
-                      {getInitials(awayName)}
-                    </AvatarFallback>
-                  </Avatar>
+                  {awayId ? (
+                    <SmartAvatar 
+                      type={awayType as "player" | "team"} 
+                      id={awayId} 
+                      name={awayName}
+                      className="h-20 w-20 ring-2 ring-border hover:ring-primary transition-all"
+                      fallbackClassName="text-lg font-bold"
+                    />
+                  ) : (
+                    <Avatar className="h-20 w-20 ring-2 ring-border hover:ring-primary transition-all">
+                      <AvatarFallback className="text-lg font-bold">
+                        {getInitials(awayName)}
+                      </AvatarFallback>
+                    </Avatar>
+                  )}
                 </Link>
               ) : (
                 <Avatar className="h-20 w-20 ring-2 ring-border">
-                  <AvatarImage src={awayLogo ?? undefined} />
                   <AvatarFallback className="text-lg font-bold">
                     {getInitials(awayName)}
                   </AvatarFallback>
@@ -357,8 +376,6 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
                 matchId={match.id}
                 round={match.round}
                 matchNumber={match.matchNumber}
-                homePhoto={match.homePlayer?.photoUrl ?? match.homeTeam?.logoUrl}
-                awayPhoto={match.awayPlayer?.photoUrl ?? match.awayTeam?.logoUrl}
               />
             </div>
           )}

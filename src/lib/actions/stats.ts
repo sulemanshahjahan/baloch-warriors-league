@@ -79,7 +79,7 @@ export async function getOverallStats(gameCategory?: string) {
 
   const players = await prisma.player.findMany({
     where: { id: { in: playerIds } },
-    select: { id: true, name: true, slug: true, photoUrl: true },
+    select: { id: true, name: true, slug: true },
   });
 
   const playerMap = new Map(players.map(p => [p.id, p]));
@@ -190,7 +190,7 @@ export async function getTournamentStats(tournamentId: string) {
 
   const players = await prisma.player.findMany({
     where: { id: { in: playerIds } },
-    select: { id: true, name: true, slug: true, photoUrl: true },
+    select: { id: true, name: true, slug: true },
   });
 
   const playerMap = new Map(players.map(p => [p.id, p]));

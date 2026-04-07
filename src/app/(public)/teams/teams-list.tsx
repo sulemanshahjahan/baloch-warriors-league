@@ -3,17 +3,17 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Users, Trophy, ChevronRight, Search, Shield } from "lucide-react";
 import { getInitials } from "@/lib/utils";
+import { SmartAvatar } from "@/components/public/smart-avatar";
 
 type Team = {
   id: string;
   slug: string;
   name: string;
   shortName: string | null;
-  logoUrl: string | null;
   primaryColor: string | null;
   captain: { name: string } | null;
   _count: { players: number; tournaments: number };
@@ -64,19 +64,13 @@ export function TeamsList({ teams }: { teams: Team[] }) {
               <Card className="hover:border-primary/50 transition-all hover:-translate-y-0.5 cursor-pointer h-full group">
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between">
-                    <Avatar className="h-16 w-16">
-                      <AvatarImage src={team.logoUrl ?? undefined} />
-                      <AvatarFallback
-                        className="text-xl"
-                        style={{
-                          backgroundColor: team.primaryColor
-                            ? `${team.primaryColor}33`
-                            : undefined,
-                        }}
-                      >
-                        {getInitials(team.name)}
-                      </AvatarFallback>
-                    </Avatar>
+                    <SmartAvatar
+                      type="team"
+                      id={team.id}
+                      name={team.name}
+                      className="h-16 w-16"
+                      fallbackClassName="text-xl"
+                    />
                     <ChevronRight className="w-5 h-5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>
 
