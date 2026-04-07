@@ -34,24 +34,38 @@ async function getPlayersWithStats() {
   // Get player IDs for batch queries
   const playerIds = players.map(p => p.id);
 
-  // Get goals and assists counts
-  const goalsAgg = await prisma.matchEvent.groupBy({
-    by: ["playerId"],
-    where: { 
-      playerId: { in: playerIds },
-      type: "GOAL" 
-    },
-    _count: { type: true },
-  });
+  // Handle empty case
+  if (playerIds.length === 0) {
+    return players.map(player => ({
+      ...player,
+      stats: { goals: 0, assists: 0, matches: 0, tournaments: 0 },
+    }));
+  }
 
-  const assistsAgg = await prisma.matchEvent.groupBy({
-    by: ["playerId"],
-    where: { 
-      playerId: { in: playerIds },
-      type: "ASSIST" 
-    },
-    _count: { type: true },
-  });
+  // Get goals and assists counts
+  const [goalsAgg, assistsAgg, tournamentCounts] = await Promise.all([
+    prisma.matchEvent.groupBy({
+      by: ["playerId"],
+      where: { 
+        playerId: { in: playerIds },
+        type: "GOAL" 
+      },
+      _count: { type: true },
+    }),
+    prisma.matchEvent.groupBy({
+      by: ["playerId"],
+      where: { 
+        playerId: { in: playerIds },
+        type: "ASSIST" 
+      },
+      _count: { type: true },
+    }),
+    prisma.tournamentPlayer.groupBy({
+      by: ["playerId"],
+      where: { playerId: { in: playerIds } },
+      _count: { tournamentId: true },
+    }),
+  ]);
 
   // Get matches played (count unique matches per player)
   const playerMatches = await prisma.match.findMany({
@@ -78,13 +92,6 @@ async function getPlayersWithStats() {
       matchesCount.set(match.awayPlayerId, (matchesCount.get(match.awayPlayerId) || 0) + 1);
     }
   }
-
-  // Get tournaments played
-  const tournamentCounts = await prisma.tournamentPlayer.groupBy({
-    by: ["playerId"],
-    where: { playerId: { in: playerIds } },
-    _count: { tournamentId: true },
-  });
 
   // Build stats maps
   const goalsMap = new Map(goalsAgg.map(g => [g.playerId!, g._count.type]));
