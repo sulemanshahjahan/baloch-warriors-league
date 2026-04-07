@@ -3,10 +3,11 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 
+import { Card, CardContent } from "@/components/ui/card";
+
 // Use ISR instead of full SSG to avoid DB connection pool exhaustion
 export const revalidate = 300;
 export const dynamicParams = false;
-import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft, Calendar } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 

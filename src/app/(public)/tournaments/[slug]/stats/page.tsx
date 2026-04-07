@@ -3,10 +3,11 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getTournamentStats } from "@/lib/actions/stats";
 
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
 // Use ISR instead of full SSG to avoid DB connection pool exhaustion
 export const revalidate = 60;
 export const dynamicParams = false;
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
