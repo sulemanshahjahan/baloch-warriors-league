@@ -46,8 +46,9 @@ export function PublicFooter() {
               </p>
             </div>
             <a
-              href="/bwl.apk"
-              download
+              href="https://github.com/sulemanshahjahan/baloch-warriors-league/releases/latest"
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-lg font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
             >
               <Download className="w-5 h-5" />

@@ -17,8 +17,8 @@ export function DownloadAppButton({ variant }: { variant: "navbar-desktop" | "na
   if (variant === "navbar-desktop") {
     return (
       <a
-        href="/bwl.apk"
-        download
+        href="https://github.com/sulemanshahjahan/baloch-warriors-league/releases/latest"
+        target="_blank" rel="noopener noreferrer"
         className="ml-2 inline-flex items-center gap-1.5 bg-primary text-primary-foreground px-3 py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
       >
         <Download className="w-4 h-4" />
@@ -30,8 +30,8 @@ export function DownloadAppButton({ variant }: { variant: "navbar-desktop" | "na
   if (variant === "navbar-mobile") {
     return (
       <a
-        href="/bwl.apk"
-        download
+        href="https://github.com/sulemanshahjahan/baloch-warriors-league/releases/latest"
+        target="_blank" rel="noopener noreferrer"
         className="flex items-center gap-2 px-3 py-2.5 mt-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
       >
         <Download className="w-4 h-4" />
@@ -53,8 +53,8 @@ export function DownloadAppButton({ variant }: { variant: "navbar-desktop" | "na
         </div>
       </div>
       <a
-        href="/bwl.apk"
-        download
+        href="https://github.com/sulemanshahjahan/baloch-warriors-league/releases/latest"
+        target="_blank" rel="noopener noreferrer"
         className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/80 transition-colors sm:ml-auto"
       >
         Download APK
