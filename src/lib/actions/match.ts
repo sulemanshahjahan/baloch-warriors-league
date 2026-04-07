@@ -178,6 +178,9 @@ export async function updateMatchResult(
   // Recompute standings if match is completed
   if (data.status === "COMPLETED") {
     await recomputeStandings(match.tournamentId);
+    
+    // Advance winner to next round for knockout matches
+    await advanceKnockoutWinner(matchId, match.tournamentId);
   }
 
   await logActivity({
@@ -196,6 +199,107 @@ export async function updateMatchResult(
   revalidatePath(`/admin/tournaments/${match.tournamentId}`);
   revalidatePath("/admin/matches");
   return { success: true, data: undefined };
+}
+
+// ─── KNOCKOUT BRACKET PROGRESSION ─────────────────────────────
+
+async function advanceKnockoutWinner(matchId: string, tournamentId: string) {
+  // Get the completed match with its round info
+  const completedMatch = await prisma.match.findUnique({
+    where: { id: matchId },
+    include: { tournament: true },
+  });
+
+  if (!completedMatch || !completedMatch.homeScore || !completedMatch.awayScore) return;
+  
+  // Only process knockout matches (have round numbers > 0 and proper round names)
+  const roundName = completedMatch.round || "";
+  const isKnockoutMatch = completedMatch.roundNumber && completedMatch.roundNumber > 0 && 
+    !roundName.match(/Group\s+[A-Z]/i);
+  
+  if (!isKnockoutMatch) return;
+
+  // Determine winner
+  let winnerId: string | null = null;
+  let isWinnerHomePlayer = false;
+  
+  const homeScore = completedMatch.homeScorePens ?? completedMatch.homeScore;
+  const awayScore = completedMatch.awayScorePens ?? completedMatch.awayScore;
+  
+  if (homeScore > awayScore) {
+    winnerId = completedMatch.homePlayerId || completedMatch.homeTeamId;
+    isWinnerHomePlayer = !!completedMatch.homePlayerId;
+  } else if (awayScore > homeScore) {
+    winnerId = completedMatch.awayPlayerId || completedMatch.awayTeamId;
+    isWinnerHomePlayer = !!completedMatch.awayPlayerId;
+  } else {
+    // Draw - no winner to advance
+    return;
+  }
+  
+  if (!winnerId) return;
+
+  const isIndividual = completedMatch.tournament.participantType === "INDIVIDUAL";
+  const currentRound = completedMatch.roundNumber || 1;
+  const nextRound = currentRound + 1;
+  
+  // Calculate next round name
+  const roundNames: Record<number, string> = {
+    1: "Final",
+    2: "Semi-finals",
+    3: "Quarter-finals",
+    4: "Round of 16",
+  };
+  
+  // Count matches in current round to determine next round name
+  const matchesInCurrentRound = await prisma.match.count({
+    where: { 
+      tournamentId, 
+      roundNumber: currentRound,
+      status: { not: "CANCELLED" }
+    },
+  });
+  
+  const nextRoundName = roundNames[Math.log2(matchesInCurrentRound)] || `Round ${nextRound}`;
+  
+  // Find existing next round match for this bracket position
+  // Match number determines which next match (1&2 -> 1, 3&4 -> 2, etc.)
+  const matchNumber = completedMatch.matchNumber || 1;
+  const nextMatchNumber = Math.ceil(matchNumber / 2);
+  const isHomeSlot = matchNumber % 2 === 1; // Odd matches go to home, even to away
+  
+  const existingNextMatch = await prisma.match.findFirst({
+    where: {
+      tournamentId,
+      roundNumber: nextRound,
+      matchNumber: nextMatchNumber,
+    },
+  });
+  
+  if (existingNextMatch) {
+    // Update existing match with winner
+    await prisma.match.update({
+      where: { id: existingNextMatch.id },
+      data: isIndividual
+        ? (isHomeSlot ? { homePlayerId: winnerId } : { awayPlayerId: winnerId })
+        : (isHomeSlot ? { homeTeamId: winnerId } : { awayTeamId: winnerId }),
+    });
+  } else if (matchesInCurrentRound > 2) {
+    // Create new match (only if not the final)
+    await prisma.match.create({
+      data: {
+        tournamentId,
+        round: nextRoundName,
+        roundNumber: nextRound,
+        matchNumber: nextMatchNumber,
+        status: "SCHEDULED",
+        ...(isIndividual
+          ? (isHomeSlot ? { homePlayerId: winnerId } : { awayPlayerId: winnerId })
+          : (isHomeSlot ? { homeTeamId: winnerId } : { awayTeamId: winnerId })),
+      },
+    });
+  }
+  // If matchesInCurrentRound === 2, this was the semi-final and final already exists or should be created separately
 }
 
 export async function addMatchEvent(formData: FormData) {
