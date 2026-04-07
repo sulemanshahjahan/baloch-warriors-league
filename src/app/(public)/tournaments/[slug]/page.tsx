@@ -167,7 +167,7 @@ async function getTournamentBySlug(slug: string) {
   // Fetch all matches for display and bracket
   const matches = await prisma.match.findMany({
     where: { tournamentId: tournament.id },
-    orderBy: [{ roundNumber: "asc" }, { matchNumber: "asc" }],
+    orderBy: [{ scheduledAt: "desc" }, { roundNumber: "asc" }, { matchNumber: "asc" }],
     select: {
       id: true,
       round: true,
@@ -907,18 +907,19 @@ function BracketView({
   
   // Round name mapping based on number of matches
   const getRoundName = (roundNum: number, matchCount: number) => {
-    // Use the actual round name from the first match if available
-    const firstMatch = matchesByRound[roundNum][0];
-    if (firstMatch?.round && !firstMatch.round.match(/round \d+/i)) {
-      return firstMatch.round;
-    }
-    
-    // Map based on match count
+    // Map based on match count first (most reliable)
     if (matchCount === 1) return "Final";
     if (matchCount === 2) return "Semi-finals";
     if (matchCount === 4) return "Quarter-finals";
     if (matchCount === 8) return "Round of 16";
     if (matchCount === 16) return "Round of 32";
+    
+    // Fall back to stored round name if available and not generic
+    const firstMatch = matchesByRound[roundNum][0];
+    if (firstMatch?.round && !firstMatch.round.match(/^round\s*\d+$/i)) {
+      return firstMatch.round;
+    }
+    
     return `Round ${roundNum}`;
   };
 
@@ -950,6 +951,7 @@ function BracketView({
                     key={match.id} 
                     match={match} 
                     isIndividual={isIndividual}
+                    roundLabel={getRoundName(roundNum, matches.length)}
                   />
                 ))}
               </div>
@@ -964,9 +966,11 @@ function BracketView({
 function BracketMatchCard({
   match,
   isIndividual,
+  roundLabel,
 }: {
   match: BracketMatch;
   isIndividual: boolean;
+  roundLabel: string;
 }) {
   const isCompleted = match.status === "COMPLETED";
   
@@ -993,7 +997,7 @@ function BracketMatchCard({
       <div className="w-48 bg-card border border-border rounded-lg overflow-hidden hover:border-primary/50 transition-colors cursor-pointer">
         {/* Round/Status header */}
         <div className="px-2 py-1 bg-muted/50 text-[10px] text-muted-foreground flex justify-between">
-          <span>{match.round || "Match"}</span>
+          <span>{roundLabel}</span>
           {match.scheduledAt && (
             <span>{formatDate(match.scheduledAt)}</span>
           )}
