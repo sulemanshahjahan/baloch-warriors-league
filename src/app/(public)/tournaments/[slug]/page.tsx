@@ -297,9 +297,10 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
   const knockoutMatches = tournament.matches.filter((m) => {
     // Must have a round number
     if (m.roundNumber === null || m.roundNumber <= 0) return false;
-    // Exclude group stage matches (round contains "Group" but not "Final")
+    // Exclude group stage matches (round contains "Group X" pattern)
     const roundName = (m.round || "").toLowerCase();
-    if (roundName.includes("group") && !roundName.includes("final")) return false;
+    // Exclude if it matches "group a", "group b", etc. pattern
+    if (/group\s+[a-z]/.test(roundName)) return false;
     return true;
   });
   
@@ -315,6 +316,9 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
   const sortedRounds = Object.keys(matchesByRound)
     .map(Number)
     .sort((a, b) => a - b);
+  
+  // Check if we have actual knockout data
+  const hasKnockoutData = sortedRounds.length > 0 && knockoutMatches.length > 0;
 
   return (
     <div className="min-h-screen">
@@ -534,12 +538,23 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {sortedRounds.length === 0 ? (
-                    <div className="text-center py-12">
-                      <GitBranch className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-                      <p className="text-muted-foreground">
-                        Knockout bracket will be available once the group stage is complete.
-                      </p>
+                  {!hasKnockoutData ? (
+                    <div className="text-center py-12 space-y-4">
+                      <GitBranch className="w-12 h-12 text-muted-foreground mx-auto opacity-50" />
+                      <div className="space-y-2">
+                        <p className="text-muted-foreground">
+                          Knockout matches have not been scheduled yet.
+                        </p>
+                        <p className="text-sm text-muted-foreground/70 max-w-md mx-auto">
+                          Once the group stage is complete, knockout matches (Quarter-finals, Semi-finals, Final) 
+                          will be created and displayed here.
+                        </p>
+                      </div>
+                      <div className="pt-4">
+                        <p className="text-xs text-muted-foreground/50">
+                          Group stage: {tournament.matches.filter(m => (m.round || "").match(/Group\s+[A-Z]/i)).length} matches played
+                        </p>
+                      </div>
                     </div>
                   ) : (
                     <BracketView
