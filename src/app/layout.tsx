@@ -6,6 +6,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
 import { OfflineProvider } from "@/lib/offline/provider";
 import { OfflineIndicator } from "@/components/offline/offline-indicator";
+import { RegisterServiceWorker } from "@/components/offline/register-sw";
 
 export const metadata: Metadata = {
   title: {
@@ -49,6 +50,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen bg-background text-foreground antialiased">
         <OfflineProvider>
+          <RegisterServiceWorker />
           <Suspense fallback={null}>
             <LoadingProgress />
           </Suspense>
