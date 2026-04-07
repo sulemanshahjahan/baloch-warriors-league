@@ -40,16 +40,25 @@ export function ShareButtons({
     }
   }
 
-  // Generate share text with WhatsApp bold format (*text*)
-  const shareText = matchInfo
-    ? `*${matchInfo}*\n\n*${homeName} ${homeScore} - ${awayScore} ${awayName}*\n\n${tournamentName}`
-    : `*${homeName} ${homeScore} - ${awayScore} ${awayName}*\n\n${tournamentName}`;
   const shareUrl = `https://bwlleague.com/matches/${matchId}`;
+  const scoreline = `${homeName} ${homeScore}–${awayScore} ${awayName}`;
+
+  // Pre-filled text for all share paths
+  const shareText = [
+    `🏆 ${tournamentName}`,
+    matchInfo ? matchInfo : null,
+    ``,
+    `*FULL-TIME*`,
+    `*${scoreline}*`,
+    ``,
+    `🔗 Match details:`,
+    shareUrl,
+  ]
+    .filter((line) => line !== null)
+    .join("\n");
 
   // WhatsApp share URL
-  const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(
-    `${shareText}\n\n${shareUrl}`
-  )}`;
+  const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
 
 
   // Local assets (same-origin) must NOT use crossOrigin — it causes cache
@@ -221,9 +230,7 @@ export function ShareButtons({
     const fileName = `BWL-${homeName}-vs-${awayName}.png`;
     const file = new File([blob], fileName, { type: "image/png" });
 
-    const imageShareText = matchInfo
-      ? `*${matchInfo}*\n*${homeName} ${homeScore} - ${awayScore} ${awayName}*\n${tournamentName}\n${shareUrl}`
-      : `*${homeName} ${homeScore} - ${awayScore} ${awayName}*\n${tournamentName}\n${shareUrl}`;
+    const imageShareText = shareText;
 
     const title = `${homeName} ${homeScore} - ${awayScore} ${awayName}`;
 
