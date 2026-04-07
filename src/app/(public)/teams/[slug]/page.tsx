@@ -1,9 +1,19 @@
-export const dynamic = "force-dynamic";
-
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+
+// Generate static pages for all teams at build time
+export async function generateStaticParams() {
+  const teams = await prisma.team.findMany({
+    where: { isActive: true },
+    select: { slug: true },
+  });
+  
+  return teams.map((t) => ({
+    slug: t.slug,
+  }));
+}
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,

@@ -1,9 +1,19 @@
-export const dynamic = "force-dynamic";
-
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+
+// Generate static pages for all players at build time
+export async function generateStaticParams() {
+  const players = await prisma.player.findMany({
+    where: { isActive: true },
+    select: { slug: true },
+  });
+  
+  return players.map((p) => ({
+    slug: p.slug,
+  }));
+}
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";

@@ -1,9 +1,19 @@
-export const dynamic = "force-dynamic";
-
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+
+// Generate static pages for all news posts at build time
+export async function generateStaticParams() {
+  const posts = await prisma.newsPost.findMany({
+    where: { isPublished: true },
+    select: { slug: true },
+  });
+  
+  return posts.map((p) => ({
+    slug: p.slug,
+  }));
+}
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft, Calendar } from "lucide-react";
 import { formatDate } from "@/lib/utils";
