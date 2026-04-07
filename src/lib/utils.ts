@@ -132,11 +132,23 @@ export function getInitials(name: string): string {
 /**
  * Get display name for a knockout round based on stored round name and round number.
  * Handles proper labeling for all knockout stages with match numbers.
+ * 
+ * Round number mapping for typical tournaments:
+ * - Round 1: Round of 16 (16 players) OR Quarter-finals (8 players)
+ * - Round 2: Quarter-finals (16 players) OR Semi-finals (8 players) OR Final (4 players)
+ * - Round 3: Semi-finals (16 players) OR Final (8 players)
+ * - Round 4: Final (16 players)
+ * 
+ * For small tournaments (4 players in knockout):
+ * - Round 1: Semi-finals
+ * - Round 2: Final
  */
 export function getRoundDisplayName(
   round: string | null,
   roundNumber: number | null,
-  matchNumber: number | null = null
+  matchNumber: number | null = null,
+  totalRounds: number | null = null,
+  isOnlyMatchInRound: boolean = false
 ): string {
   // If round already has a proper descriptive name, use it and add match number
   if (round) {
@@ -169,6 +181,23 @@ export function getRoundDisplayName(
     const roundMatch = round.match(/^round\s*(\d+)$/i);
     if (roundMatch) {
       const num = parseInt(roundMatch[1], 10);
+      
+      // HEURISTIC: In many tournaments, the Final is incorrectly stored as "Round 2" or "Round 3"
+      // with matchNumber=1, while earlier rounds have matchNumber > 1 or descriptive names.
+      // If we see "Round X" with matchNumber=1 and no descriptive name, and the roundNumber
+      // is reasonably high (2+), it's likely the Final.
+      // This fixes data inconsistency where finals weren't properly labeled.
+      if (matchNumber === 1 && num >= 2) {
+        // Likely a final - this is an educated guess for mislabeled data
+        return "Final";
+      }
+      
+      // Try to infer based on total rounds if available
+      if (totalRounds) {
+        return inferRoundNameFromTotalRounds(num, totalRounds, matchNumber);
+      }
+      
+      // Otherwise use the simple heuristic based on round number alone
       return inferRoundNameFromNumber(num, matchNumber);
     }
     
@@ -178,6 +207,9 @@ export function getRoundDisplayName(
   
   // No round name, try to infer from roundNumber
   if (roundNumber) {
+    if (totalRounds) {
+      return inferRoundNameFromTotalRounds(roundNumber, totalRounds, matchNumber);
+    }
     return inferRoundNameFromNumber(roundNumber, matchNumber);
   }
   
@@ -194,28 +226,54 @@ function formatRoundWithMatchNumber(roundName: string, matchNumber: number | nul
 }
 
 /**
+ * Infer round name from round number when we know the total rounds in tournament.
+ * This gives us accurate names (Final, Semi-final, etc.)
+ */
+function inferRoundNameFromTotalRounds(currentRound: number, totalRounds: number, matchNumber: number | null): string {
+  // The final is always the highest round number
+  const roundsFromFinal = totalRounds - currentRound;
+  
+  switch (roundsFromFinal) {
+    case 0: // Final round
+      return "Final";
+    case 1: // One round before final = Semi-finals
+      return formatRoundWithMatchNumber("Semi Final", matchNumber);
+    case 2: // Two rounds before final = Quarter-finals
+      return formatRoundWithMatchNumber("Quarter Final", matchNumber);
+    case 3: // Three rounds before final = Round of 16
+      return formatRoundWithMatchNumber("Round of 16", matchNumber);
+    default:
+      return formatRoundWithMatchNumber(`Round ${currentRound}`, matchNumber);
+  }
+}
+
+/**
  * Infer round name from round number based on typical tournament structures.
- * This is a best guess when we don't have descriptive round names.
+ * This is a best guess when we don't have total rounds context.
+ * 
+ * Heuristic: Lower round numbers with higher match numbers often indicate earlier rounds.
+ * But this is imperfect - use inferRoundNameFromTotalRounds when possible.
  */
 function inferRoundNameFromNumber(roundNum: number, matchNumber: number | null): string {
-  // The interpretation depends on how many rounds the tournament has
-  // We assume the highest round number is the Final
+  // Simple heuristic: assume common tournament sizes
+  // If we see Round 2 with match numbers 1-4, it's likely Quarter-finals
+  // If we see Round 2 with match numbers 1-2, it's likely Semi-finals
+  // If we see Round 3 with match number 1, it's likely the Final
   
-  // For now, use a common mapping that works for most tournaments:
-  // - Small tournament (4 players): Round 1 = Semi-finals, Round 2 = Final
-  // - Medium tournament (8 players): Round 1 = Quarter-finals, Round 2 = Semi-finals, Round 3 = Final
-  // - Large tournament (16 players): Round 1 = Round of 16, Round 2 = Quarter-finals, Round 3 = Semi-finals, Round 4 = Final
-  
-  // Since we don't know total rounds, we'll use a generic but clear mapping
   switch (roundNum) {
     case 1:
+      // Could be Round of 16 or Quarter-finals
       return formatRoundWithMatchNumber("Round 1", matchNumber);
     case 2:
+      // Most common: Quarter-finals (4 matches) or Semi-finals (2 matches) or Final (1 match)
+      // Without match context, default to generic
       return formatRoundWithMatchNumber("Round 2", matchNumber);
     case 3:
+      // Likely Semi-finals or Final
       return formatRoundWithMatchNumber("Round 3", matchNumber);
     case 4:
-      return formatRoundWithMatchNumber("Round 4", matchNumber);
+      // Almost certainly the Final
+      return "Final";
     default:
       return formatRoundWithMatchNumber(`Round ${roundNum}`, matchNumber);
   }
