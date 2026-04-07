@@ -162,19 +162,15 @@ export function PlayersList({ players }: { players: Player[] }) {
                         {player.name}
                       </h3>
                       
-                      {player.nickname && (
-                        <p className="text-xs text-muted-foreground text-center truncate w-full">
-                          &quot;{player.nickname}&quot;
-                        </p>
-                      )}
+                      <p className="text-xs text-muted-foreground text-center truncate w-full">
+                        &quot;{player.nickname || "Player"}&quot;
+                      </p>
 
                       {/* Position Badge */}
                       <div className="flex items-center gap-1 mt-2">
-                        {player.position && (
-                          <span className="text-[10px] sm:text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                            {player.position}
-                          </span>
-                        )}
+                        <span className="text-[10px] sm:text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                          {player.position || "Midfielder"}
+                        </span>
                         {player._count.awards > 0 && (
                           <span className="text-[10px] sm:text-xs text-yellow-500 bg-yellow-500/10 px-2 py-0.5 rounded-full flex items-center gap-0.5">
                             <Trophy className="w-3 h-3" />
@@ -209,24 +205,20 @@ export function PlayersList({ players }: { players: Player[] }) {
                       </div>
                     </div>
 
-                    {/* Team */}
-                    <div className="flex items-center justify-center gap-1.5 mt-2 pt-2 border-t border-border/50">
-                      {currentTeam ? (
-                        <>
-                          <Avatar className="h-4 w-4 flex-shrink-0">
-                            <AvatarImage src={currentTeam.logoUrl ?? undefined} />
-                            <AvatarFallback className="text-[8px]">
-                              {getInitials(currentTeam.name)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="text-xs text-muted-foreground truncate">
-                            {currentTeam.name}
-                          </span>
-                        </>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">Free Agent</span>
-                      )}
-                    </div>
+                    {/* Team - Only show if assigned */}
+                    {currentTeam && (
+                      <div className="flex items-center justify-center gap-1.5 mt-2 pt-2 border-t border-border/50">
+                        <Avatar className="h-4 w-4 flex-shrink-0">
+                          <AvatarImage src={currentTeam.logoUrl ?? undefined} />
+                          <AvatarFallback className="text-[8px]">
+                            {getInitials(currentTeam.name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="text-xs text-muted-foreground truncate">
+                          {currentTeam.name}
+                        </span>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </Link>
