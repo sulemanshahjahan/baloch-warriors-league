@@ -293,10 +293,15 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
   // Check if tournament has knockout format
   const hasKnockoutFormat = tournament.format === "KNOCKOUT" || tournament.format === "GROUP_KNOCKOUT";
   
-  // Get knockout matches for bracket
-  const knockoutMatches = tournament.matches.filter((m) => 
-    m.roundNumber !== null && m.roundNumber > 0
-  );
+  // Get knockout matches for bracket (exclude group stage matches)
+  const knockoutMatches = tournament.matches.filter((m) => {
+    // Must have a round number
+    if (m.roundNumber === null || m.roundNumber <= 0) return false;
+    // Exclude group stage matches (round contains "Group" but not "Final")
+    const roundName = (m.round || "").toLowerCase();
+    if (roundName.includes("group") && !roundName.includes("final")) return false;
+    return true;
+  });
   
   // Group matches by round
   const matchesByRound = knockoutMatches.reduce((acc, match) => {
@@ -306,7 +311,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
     return acc;
   }, {} as Record<number, typeof knockoutMatches>);
   
-  // Sort rounds
+  // Sort rounds in descending order so Final is rightmost, early rounds leftmost
   const sortedRounds = Object.keys(matchesByRound)
     .map(Number)
     .sort((a, b) => a - b);
@@ -530,9 +535,12 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                 </CardHeader>
                 <CardContent>
                   {sortedRounds.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-8">
-                      Bracket will be available once knockout stage matches are scheduled.
-                    </p>
+                    <div className="text-center py-12">
+                      <GitBranch className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+                      <p className="text-muted-foreground">
+                        Knockout bracket will be available once the group stage is complete.
+                      </p>
+                    </div>
                   ) : (
                     <BracketView
                       rounds={sortedRounds}
@@ -879,78 +887,60 @@ function BracketView({
 }) {
   const isIndividual = participantType === "INDIVIDUAL";
   
-  // Round name mapping
-  const getRoundName = (roundNum: number, totalRounds: number) => {
-    const roundNames: Record<number, string> = {
-      1: "Final",
-      2: "Semi-finals",
-      3: "Quarter-finals",
-      4: "Round of 16",
-      5: "Round of 32",
-      6: "Round of 64",
-    };
-    
-    // Calculate from the end if we know total rounds
-    const fromFinal = totalRounds - roundNum + 1;
-    if (fromFinal <= 6 && roundNames[fromFinal]) {
-      return roundNames[fromFinal];
+  // Find the max number of matches in any round to calculate spacing
+  const maxMatchesInRound = Math.max(...rounds.map(r => matchesByRound[r].length));
+  
+  // Round name mapping based on number of matches
+  const getRoundName = (roundNum: number, matchCount: number) => {
+    // Use the actual round name from the first match if available
+    const firstMatch = matchesByRound[roundNum][0];
+    if (firstMatch?.round && !firstMatch.round.match(/round \d+/i)) {
+      return firstMatch.round;
     }
+    
+    // Map based on match count
+    if (matchCount === 1) return "Final";
+    if (matchCount === 2) return "Semi-finals";
+    if (matchCount === 4) return "Quarter-finals";
+    if (matchCount === 8) return "Round of 16";
+    if (matchCount === 16) return "Round of 32";
     return `Round ${roundNum}`;
   };
 
+  // Calculate gap size based on round position (earlier rounds need more space)
+  const getMatchGap = (roundIndex: number, totalRounds: number) => {
+    // Earlier rounds (lower index when sorted ascending) need larger gaps
+    const reverseIndex = totalRounds - 1 - roundIndex;
+    return 16 + reverseIndex * 48; // 16px, 64px, 112px, etc.
+  };
+
   return (
-    <div className="overflow-x-auto">
-      <div className="flex gap-8 min-w-max px-4">
-        {rounds.map((roundNum, roundIndex) => (
-          <div key={roundNum} className="flex flex-col">
-            <h3 className="text-sm font-semibold text-center mb-4 text-muted-foreground">
-              {getRoundName(roundNum, rounds.length)}
-            </h3>
-            <div 
-              className="flex flex-col justify-center gap-4"
-              style={{ 
-                minHeight: `${Math.max(120, matchesByRound[roundNum].length * 100)}px` 
-              }}
-            >
-              {matchesByRound[roundNum].map((match, matchIndex) => {
-                const isFirstRound = roundIndex === 0;
-                const isLastRound = roundIndex === rounds.length - 1;
-                
-                return (
-                  <div 
+    <div className="overflow-x-auto pb-4">
+      <div className="flex gap-12 min-w-max px-4 items-stretch">
+        {rounds.map((roundNum, roundIndex) => {
+          const matches = matchesByRound[roundNum];
+          const matchGap = getMatchGap(roundIndex, rounds.length);
+          
+          return (
+            <div key={roundNum} className="flex flex-col justify-center">
+              <h3 className="text-sm font-semibold text-center mb-6 text-muted-foreground">
+                {getRoundName(roundNum, matches.length)}
+              </h3>
+              <div 
+                className="flex flex-col justify-center"
+                style={{ gap: `${matchGap}px` }}
+              >
+                {matches.map((match) => (
+                  <BracketMatchCard 
                     key={match.id} 
-                    className="relative"
-                    style={{
-                      marginTop: roundIndex > 0 ? `${Math.pow(2, roundIndex - 1) * 20}px` : 0,
-                      marginBottom: roundIndex > 0 ? `${Math.pow(2, roundIndex - 1) * 20}px` : 0,
-                    }}
-                  >
-                    {/* Connector lines */}
-                    {!isFirstRound && (
-                      <div className="absolute right-full top-1/2 w-4 h-px bg-border" />
-                    )}
-                    {!isLastRound && matchIndex % 2 === 0 && (
-                      <>
-                        <div className="absolute left-full top-1/2 w-4 h-px bg-border" />
-                        <div className="absolute left-[calc(100%+1rem)] top-1/2 w-px bg-border"
-                          style={{
-                            height: `${50 + Math.pow(2, roundIndex) * 20}px`,
-                            transform: 'translateY(-50%)'
-                          }}
-                        />
-                      </>
-                    )}
-                    
-                    <BracketMatchCard 
-                      match={match} 
-                      isIndividual={isIndividual}
-                    />
-                  </div>
-                );
-              })}
+                    match={match} 
+                    isIndividual={isIndividual}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
