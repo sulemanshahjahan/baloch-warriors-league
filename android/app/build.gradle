@@ -3,6 +3,14 @@ apply plugin: 'com.android.application'
 android {
     namespace "com.bwl.league"
     compileSdk rootProject.ext.compileSdkVersion
+    
+    // Fix duplicate Kotlin classes
+    configurations {
+        all {
+            exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk7'
+            exclude group: 'org.jetbrains.kotlin', module: 'kotlin-stdlib-jdk8'
+        }
+    }
     defaultConfig {
         applicationId "com.bwl.league"
         minSdkVersion rootProject.ext.minSdkVersion

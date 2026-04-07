@@ -5,7 +5,8 @@ const config: CapacitorConfig = {
   appName: 'BWL',
   webDir: 'out',
   server: {
-    androidScheme: 'https',
+    url: 'https://www.bwlleague.com',
+    cleartext: false,
   },
 };
 
