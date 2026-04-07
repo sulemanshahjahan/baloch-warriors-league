@@ -284,8 +284,8 @@ async function advanceKnockoutWinner(matchId: string, tournamentId: string) {
         ? (isHomeSlot ? { homePlayerId: winnerId } : { awayPlayerId: winnerId })
         : (isHomeSlot ? { homeTeamId: winnerId } : { awayTeamId: winnerId }),
     });
-  } else if (matchesInCurrentRound > 2) {
-    // Create new match (only if not the final)
+  } else {
+    // Create new match for next round (including Final)
     await prisma.match.create({
       data: {
         tournamentId,
@@ -299,7 +299,6 @@ async function advanceKnockoutWinner(matchId: string, tournamentId: string) {
       },
     });
   }
-  // If matchesInCurrentRound === 2, this was the semi-final and final already exists or should be created separately
 }
 
 export async function addMatchEvent(formData: FormData) {
