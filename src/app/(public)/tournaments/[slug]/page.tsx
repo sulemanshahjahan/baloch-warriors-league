@@ -743,16 +743,12 @@ function MatchCard({
   return (
     <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
       <div className="flex-1">
-        <div className="flex items-center gap-2 mb-2">
-          {match.round && (
-            <span className="text-xs text-muted-foreground">{getRoundDisplayName(match.round, match.roundNumber, match.matchNumber)}</span>
-          )}
-          {match.scheduledAt && (
-            <span className="text-xs text-muted-foreground">
-              {formatDateTime(match.scheduledAt)}
-            </span>
-          )}
-        </div>
+        {/* Round label - centered above score */}
+        {match.round && (
+          <div className="text-center mb-2">
+            <span className="text-sm font-semibold text-primary">{getRoundDisplayName(match.round, match.roundNumber, match.matchNumber)}</span>
+          </div>
+        )}
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 flex-1">
             {homeId ? (
@@ -784,6 +780,14 @@ function MatchCard({
             )}
           </div>
         </div>
+        {/* Date below score */}
+        {match.scheduledAt && (
+          <div className="text-center mt-2">
+            <span className="text-xs text-muted-foreground">
+              {formatDateTime(match.scheduledAt)}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );

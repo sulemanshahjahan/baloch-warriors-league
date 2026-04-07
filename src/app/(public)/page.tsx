@@ -270,9 +270,11 @@ export default async function HomePage() {
                             </span>
                           </div>
                           {match.round && (
-                            <p className="text-xs font-medium text-primary mb-2">
-                              {getRoundDisplayName(match.round, match.roundNumber, match.matchNumber)}
-                            </p>
+                            <div className="text-center mb-2">
+                              <span className="text-sm font-semibold text-primary">
+                                {getRoundDisplayName(match.round, match.roundNumber, match.matchNumber)}
+                              </span>
+                            </div>
                           )}
 
                           <div className="flex items-center justify-between gap-2">
@@ -355,9 +357,11 @@ export default async function HomePage() {
                             </span>
                           </div>
                           {match.round && (
-                            <p className="text-xs font-medium text-primary mb-1">
-                              {getRoundDisplayName(match.round, match.roundNumber, match.matchNumber)}
-                            </p>
+                            <div className="text-center mb-1">
+                              <span className="text-sm font-semibold text-primary">
+                                {getRoundDisplayName(match.round, match.roundNumber, match.matchNumber)}
+                              </span>
+                            </div>
                           )}
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2 flex-1 justify-end">

@@ -67,9 +67,11 @@ function MatchCard({ match }: { match: Match }) {
           </div>
 
           {match.round && (
-            <p className="text-xs text-muted-foreground mb-3">
-              {getRoundDisplayName(match.round, match.roundNumber, match.matchNumber)}
-            </p>
+            <div className="text-center mb-3">
+              <span className="text-sm font-semibold text-primary">
+                {getRoundDisplayName(match.round, match.roundNumber, match.matchNumber)}
+              </span>
+            </div>
           )}
 
           <div className="flex items-center justify-between gap-4">
