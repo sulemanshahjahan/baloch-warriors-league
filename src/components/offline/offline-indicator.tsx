@@ -10,12 +10,6 @@ import { useEffect, useState } from "react";
 import { WifiOff, Cloud, CloudOff, RefreshCw } from "lucide-react";
 import { useOffline } from "@/lib/offline/provider";
 import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 
 export function OfflineIndicator() {
   const {
@@ -43,19 +37,13 @@ export function OfflineIndicator() {
   // Compact indicator for online state with no queued actions
   if (isConnected && queuedCount === 0) {
     return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div className="fixed bottom-4 right-4 z-50 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-500/10 text-green-600 text-xs font-medium border border-green-500/20">
-              <Cloud className="w-3.5 h-3.5" />
-              <span>Online</span>
-            </div>
-          </TooltipTrigger>
-          <TooltipContent side="left">
-            <p>Last sync: {lastSyncTime ? lastSyncTime.toLocaleTimeString() : "Never"}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <div 
+        className="fixed bottom-4 right-4 z-50 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-500/10 text-green-600 text-xs font-medium border border-green-500/20 cursor-help"
+        title={`Last sync: ${lastSyncTime ? lastSyncTime.toLocaleTimeString() : "Never"}`}
+      >
+        <Cloud className="w-3.5 h-3.5" />
+        <span>Online</span>
+      </div>
     );
   }
 
