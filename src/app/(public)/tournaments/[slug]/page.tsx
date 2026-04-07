@@ -3,16 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 
-// Generate static pages for all tournaments at build time
-export async function generateStaticParams() {
-  const tournaments = await prisma.tournament.findMany({
-    select: { slug: true },
-  });
-  
-  return tournaments.map((t) => ({
-    slug: t.slug,
-  }));
-}
+export const revalidate = 30;
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -116,8 +107,8 @@ async function getTournamentBySlug(slug: string) {
           goalsAgainst: true,
           goalDiff: true,
           points: true,
-          team: { select: { id: true, slug: true, name: true } },
-          player: { select: { id: true, slug: true, name: true } },
+          team: { select: { id: true, slug: true, name: true, logoUrl: true } },
+          player: { select: { id: true, slug: true, name: true, photoUrl: true } },
         },
       },
     },
@@ -135,20 +126,21 @@ async function getTournamentBySlug(slug: string) {
       scheduledAt: true,
       homeScore: true,
       awayScore: true,
-      homeTeam: { select: { id: true, name: true, shortName: true } },
-      awayTeam: { select: { id: true, name: true, shortName: true } },
-      homePlayer: { select: { id: true, name: true } },
-      awayPlayer: { select: { id: true, name: true } },
+      homeTeam: { select: { id: true, name: true, shortName: true, logoUrl: true } },
+      awayTeam: { select: { id: true, name: true, shortName: true, logoUrl: true } },
+      homePlayer: { select: { id: true, name: true, photoUrl: true } },
+      awayPlayer: { select: { id: true, name: true, photoUrl: true } },
     },
   });
 
-  // Fetch only award types - no player/team details
   const awards = await prisma.award.findMany({
     where: { tournamentId: tournament.id },
     select: {
       id: true,
       type: true,
       customName: true,
+      player: { select: { id: true, name: true, slug: true, photoUrl: true } },
+      team: { select: { id: true, name: true, slug: true, logoUrl: true } },
     },
   });
 
@@ -156,7 +148,7 @@ async function getTournamentBySlug(slug: string) {
   const teams = await prisma.tournamentTeam.findMany({
     where: { tournamentId: tournament.id },
     select: {
-      team: { select: { id: true, slug: true, name: true, shortName: true } },
+      team: { select: { id: true, slug: true, name: true, shortName: true, logoUrl: true } },
     },
   });
 
@@ -164,7 +156,7 @@ async function getTournamentBySlug(slug: string) {
   const players = await prisma.tournamentPlayer.findMany({
     where: { tournamentId: tournament.id },
     select: {
-      player: { select: { id: true, slug: true, name: true } },
+      player: { select: { id: true, slug: true, name: true, photoUrl: true } },
     },
   });
 
@@ -182,8 +174,8 @@ async function getTournamentBySlug(slug: string) {
       goalsAgainst: true,
       goalDiff: true,
       points: true,
-      team: { select: { id: true, slug: true, name: true } },
-      player: { select: { id: true, slug: true, name: true } },
+      team: { select: { id: true, slug: true, name: true, logoUrl: true } },
+      player: { select: { id: true, slug: true, name: true, photoUrl: true } },
     },
   });
 
@@ -434,6 +426,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                       <CardContent className="p-4">
                         <div className="flex items-center gap-3">
                           <Avatar className="h-10 w-10">
+                            <AvatarImage src={(player as any).photoUrl ?? undefined} />
                             <AvatarFallback className="text-sm">
                               {getInitials(player.name)}
                             </AvatarFallback>
@@ -455,6 +448,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                       <CardContent className="p-4">
                         <div className="flex items-center gap-3">
                           <Avatar className="h-10 w-10">
+                            <AvatarImage src={(team as any).logoUrl ?? undefined} />
                             <AvatarFallback className="text-sm">
                               {getInitials(team.name)}
                             </AvatarFallback>
@@ -484,28 +478,51 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
               </p>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {tournament.awards.map((award) => (
-                  <Card key={award.id}>
-                    <CardContent className="p-4">
-                      <div className="flex items-start gap-3">
-                        <div className="flex items-center justify-center w-10 h-10 rounded-full bg-yellow-500/20 shrink-0">
-                          <Award className="w-5 h-5 text-yellow-400" />
-                        </div>
-                        <div>
-                          <p className="font-medium">
-                            {AWARD_TYPE_LABELS[award.type] ?? award.type}
-                          </p>
-                          {award.customName && (
-                            <p className="text-sm text-muted-foreground">
-                              {award.customName}
+                {tournament.awards.map((award) => {
+                  const winner = (award as any).player ?? (award as any).team ?? null;
+                  const winnerSlug = (award as any).player
+                    ? `/players/${(award as any).player.slug}`
+                    : (award as any).team
+                    ? `/teams/${(award as any).team.slug}`
+                    : null;
+                  const winnerPhoto = (award as any).player?.photoUrl ?? (award as any).team?.logoUrl ?? null;
+                  return (
+                    <Card key={award.id}>
+                      <CardContent className="p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-yellow-500/20 shrink-0">
+                            <Award className="w-5 h-5 text-yellow-400" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-medium text-sm">
+                              {AWARD_TYPE_LABELS[award.type] ?? award.type}
                             </p>
-                          )}
-
+                            {award.customName && (
+                              <p className="text-xs text-muted-foreground">{award.customName}</p>
+                            )}
+                            {winner && (
+                              <div className="flex items-center gap-1.5 mt-2">
+                                <Avatar className="h-5 w-5">
+                                  <AvatarImage src={winnerPhoto ?? undefined} />
+                                  <AvatarFallback className="text-[8px]">
+                                    {getInitials(winner.name)}
+                                  </AvatarFallback>
+                                </Avatar>
+                                {winnerSlug ? (
+                                  <Link href={winnerSlug} className="text-xs font-semibold text-primary hover:underline">
+                                    {winner.name}
+                                  </Link>
+                                ) : (
+                                  <span className="text-xs font-semibold">{winner.name}</span>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             )}
           </TabsContent>
@@ -596,10 +613,10 @@ function MatchCard({
 
 
 // Standings Table Component
-function StandingsTable({ 
-  standings, 
-  participantType 
-}: { 
+function StandingsTable({
+  standings,
+  participantType
+}: {
   standings: Array<{
     id: string;
     played: number;
@@ -610,8 +627,8 @@ function StandingsTable({
     goalsAgainst: number;
     goalDiff: number;
     points: number;
-    team: { id: string; slug: string; name: string } | null;
-    player: { id: string; slug: string; name: string } | null;
+    team: { id: string; slug: string; name: string; logoUrl?: string | null } | null;
+    player: { id: string; slug: string; name: string; photoUrl?: string | null } | null;
   }>;
   participantType: string;
 }) {
@@ -619,49 +636,52 @@ function StandingsTable({
     <Table>
       <TableHeader>
         <TableRow className="bg-muted/50">
-          <TableHead className="w-12">#</TableHead>
+          <TableHead className="w-10">#</TableHead>
           <TableHead>{participantType === "INDIVIDUAL" ? "Player" : "Team"}</TableHead>
           <TableHead className="text-center">P</TableHead>
           <TableHead className="text-center">W</TableHead>
           <TableHead className="text-center">D</TableHead>
           <TableHead className="text-center">L</TableHead>
-          <TableHead className="text-center">GF</TableHead>
-          <TableHead className="text-center">GA</TableHead>
+          <TableHead className="text-center hidden sm:table-cell">GF</TableHead>
+          <TableHead className="text-center hidden sm:table-cell">GA</TableHead>
           <TableHead className="text-center">GD</TableHead>
           <TableHead className="text-center font-bold">Pts</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        {standings.map((s, i) => (
-          <TableRow key={s.id}>
-            <TableCell className="font-medium">{i + 1}</TableCell>
-            <TableCell>
-              {participantType === "INDIVIDUAL" ? (
-                <Link
-                  href={`/players/${s.player?.slug}`}
-                  className="hover:text-primary"
-                >
-                  {s.player?.name}
+        {standings.map((s, i) => {
+          const name = participantType === "INDIVIDUAL" ? s.player?.name : s.team?.name;
+          const photo = participantType === "INDIVIDUAL" ? s.player?.photoUrl : s.team?.logoUrl;
+          const href = participantType === "INDIVIDUAL"
+            ? `/players/${s.player?.slug}`
+            : `/teams/${s.team?.slug}`;
+          return (
+            <TableRow key={s.id}>
+              <TableCell className="font-medium text-muted-foreground">{i + 1}</TableCell>
+              <TableCell>
+                <Link href={href} className="flex items-center gap-2 hover:text-primary transition-colors">
+                  <Avatar className="h-7 w-7 shrink-0">
+                    <AvatarImage src={photo ?? undefined} />
+                    <AvatarFallback className="text-[10px]">
+                      {getInitials(name ?? "")}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="font-medium">{name}</span>
                 </Link>
-              ) : (
-                <Link
-                  href={`/teams/${s.team?.slug}`}
-                  className="hover:text-primary"
-                >
-                  {s.team?.name}
-                </Link>
-              )}
-            </TableCell>
-            <TableCell className="text-center">{s.played}</TableCell>
-            <TableCell className="text-center">{s.won}</TableCell>
-            <TableCell className="text-center">{s.drawn}</TableCell>
-            <TableCell className="text-center">{s.lost}</TableCell>
-            <TableCell className="text-center">{s.goalsFor}</TableCell>
-            <TableCell className="text-center">{s.goalsAgainst}</TableCell>
-            <TableCell className="text-center">{s.goalDiff}</TableCell>
-            <TableCell className="text-center font-bold">{s.points}</TableCell>
-          </TableRow>
-        ))}
+              </TableCell>
+              <TableCell className="text-center">{s.played}</TableCell>
+              <TableCell className="text-center text-green-400">{s.won}</TableCell>
+              <TableCell className="text-center text-muted-foreground">{s.drawn}</TableCell>
+              <TableCell className="text-center text-red-400">{s.lost}</TableCell>
+              <TableCell className="text-center hidden sm:table-cell">{s.goalsFor}</TableCell>
+              <TableCell className="text-center hidden sm:table-cell">{s.goalsAgainst}</TableCell>
+              <TableCell className={`text-center ${s.goalDiff > 0 ? "text-green-400" : s.goalDiff < 0 ? "text-red-400" : ""}`}>
+                {s.goalDiff > 0 ? `+${s.goalDiff}` : s.goalDiff}
+              </TableCell>
+              <TableCell className="text-center font-bold">{s.points}</TableCell>
+            </TableRow>
+          );
+        })}
       </TableBody>
     </Table>
   );

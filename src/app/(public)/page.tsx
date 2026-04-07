@@ -1,4 +1,4 @@
-export const dynamic = "force-dynamic";
+export const revalidate = 30;
 
 import Link from "next/link";
 import Image from "next/image";
@@ -197,11 +197,13 @@ export default async function HomePage() {
                 <Link key={t.id} href={`/tournaments/${t.slug}`}>
                   <Card className="hover:border-border/80 transition-all hover:-translate-y-0.5 cursor-pointer h-full">
                     {t.bannerUrl && (
-                      <div className="h-32 overflow-hidden rounded-t-lg">
-                        <img
+                      <div className="h-32 overflow-hidden rounded-t-lg relative">
+                        <Image
                           src={t.bannerUrl}
                           alt={t.name}
-                          className="w-full h-full object-cover"
+                          fill
+                          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                          className="object-cover"
                         />
                       </div>
                     )}

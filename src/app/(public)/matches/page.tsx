@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 
+export const revalidate = 30;
+
 export const metadata: Metadata = {
   title: "Matches",
   description: "View all BWL match fixtures and results — upcoming, live, and completed.",
@@ -14,7 +16,7 @@ export const metadata: Metadata = {
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Swords, Calendar, ArrowRight, Trophy } from "lucide-react";
+import { Swords, Calendar, ArrowRight } from "lucide-react";
 import {
   getInitials,
   formatDateTime,
@@ -40,16 +42,16 @@ async function getMatches() {
         select: { name: true, slug: true, gameCategory: true },
       },
       homeTeam: {
-        select: { id: true, name: true, shortName: true },
+        select: { id: true, name: true, shortName: true, logoUrl: true },
       },
       awayTeam: {
-        select: { id: true, name: true, shortName: true },
+        select: { id: true, name: true, shortName: true, logoUrl: true },
       },
       homePlayer: {
-        select: { id: true, name: true },
+        select: { id: true, name: true, photoUrl: true },
       },
       awayPlayer: {
-        select: { id: true, name: true },
+        select: { id: true, name: true, photoUrl: true },
       },
     },
   });
@@ -170,12 +172,9 @@ function MatchCard({
         {/* Header */}
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <Link
-              href={`/tournaments/${match.tournament.slug}`}
-              className="text-sm font-medium hover:text-primary"
-            >
+            <span className="text-sm font-medium">
               {match.tournament.name}
-            </Link>
+            </span>
             <span
               className={`text-xs px-2 py-0.5 rounded-full font-medium ${gameColor(
                 match.tournament.gameCategory as never
@@ -257,21 +256,10 @@ function MatchCard({
           ) : (
             <span className="text-sm text-muted-foreground">Date TBD</span>
           )}
-          <div className="flex items-center gap-3">
-            <Link
-              href={`/tournaments/${match.tournament.slug}`}
-              className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
-            >
-              {match.tournament.name}
-            </Link>
-            <Link
-              href={`/matches/${match.id}`}
-              className="text-sm text-primary hover:underline flex items-center gap-1"
-            >
-              Details
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
+          <span className="text-sm text-primary flex items-center gap-1">
+            Details
+            <ArrowRight className="w-4 h-4" />
+          </span>
         </div>
       </CardContent>
     </Card>
