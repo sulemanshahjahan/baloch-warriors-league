@@ -49,6 +49,9 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.3.0",
+    "@capacitor/cli": "^7.6.1",
+    "@capacitor/core": "^8.3.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
