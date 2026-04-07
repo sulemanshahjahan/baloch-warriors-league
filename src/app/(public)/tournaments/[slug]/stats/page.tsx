@@ -3,16 +3,9 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getTournamentStats } from "@/lib/actions/stats";
 
-// Generate static pages for all tournament stats at build time
-export async function generateStaticParams() {
-  const tournaments = await prisma.tournament.findMany({
-    select: { slug: true },
-  });
-  
-  return tournaments.map((t) => ({
-    slug: t.slug,
-  }));
-}
+// Use ISR instead of full SSG to avoid DB connection pool exhaustion
+export const revalidate = 60;
+export const dynamicParams = true;
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
