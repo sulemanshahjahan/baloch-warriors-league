@@ -188,7 +188,11 @@ export async function getTournamentById(id: string) {
         },
       },
       matches: {
-        orderBy: [{ scheduledAt: "desc" }, { roundNumber: "asc" }, { matchNumber: "asc" }],
+        orderBy: [
+          // Knockout matches first (higher round numbers or specific round names)
+          { roundNumber: "desc" },
+          { matchNumber: "asc" }
+        ],
         include: {
           homeTeam: { select: { id: true, name: true, shortName: true } },
           awayTeam: { select: { id: true, name: true, shortName: true } },

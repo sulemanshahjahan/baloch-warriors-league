@@ -166,9 +166,10 @@ async function getTournamentBySlug(slug: string) {
   });
 
   // Fetch all matches for display and bracket
+  // Order: Knockout rounds first (by roundNumber desc), then group rounds (by roundNumber asc)
   const matches = await prisma.match.findMany({
     where: { tournamentId: tournament.id },
-    orderBy: [{ scheduledAt: "desc" }, { roundNumber: "asc" }, { matchNumber: "asc" }],
+    orderBy: [{ roundNumber: "desc" }, { matchNumber: "asc" }],
     select: {
       id: true,
       round: true,
@@ -288,8 +289,29 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
 
   if (!tournament) notFound();
 
-  const upcomingMatches = tournament.matches.filter((m) => m.status === "SCHEDULED");
-  const completedMatches = tournament.matches.filter((m) => m.status === "COMPLETED");
+  // Sort matches properly: Knockout first (Final -> Semi -> etc.), then Group rounds
+  const sortedMatches = [...tournament.matches].sort((a, b) => {
+    const aIsKnockout = a.round && !/Group\s+[A-Z]/i.test(a.round);
+    const bIsKnockout = b.round && !/Group\s+[A-Z]/i.test(b.round);
+    
+    // Knockout matches come first
+    if (aIsKnockout && !bIsKnockout) return -1;
+    if (!aIsKnockout && bIsKnockout) return 1;
+    
+    // Both knockout: sort by roundNumber desc (Final=2 before Semi=1)
+    if (aIsKnockout && bIsKnockout) {
+      return (b.roundNumber || 0) - (a.roundNumber || 0);
+    }
+    
+    // Both group: sort by group name then round number
+    const aGroup = a.round?.match(/Group\s+([A-Z])/i)?.[1] || "";
+    const bGroup = b.round?.match(/Group\s+([A-Z])/i)?.[1] || "";
+    if (aGroup !== bGroup) return aGroup.localeCompare(bGroup);
+    return (a.roundNumber || 0) - (b.roundNumber || 0);
+  });
+
+  const upcomingMatches = sortedMatches.filter((m) => m.status === "SCHEDULED");
+  const completedMatches = sortedMatches.filter((m) => m.status === "COMPLETED");
   
   // Check if tournament has knockout format
   const hasKnockoutFormat = tournament.format === "KNOCKOUT" || tournament.format === "GROUP_KNOCKOUT";
