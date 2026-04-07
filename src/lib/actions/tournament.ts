@@ -188,7 +188,7 @@ export async function getTournamentById(id: string) {
         },
       },
       matches: {
-        orderBy: [{ roundNumber: "asc" }, { matchNumber: "asc" }],
+        orderBy: [{ scheduledAt: "desc" }, { roundNumber: "asc" }, { matchNumber: "asc" }],
         include: {
           homeTeam: { select: { id: true, name: true, shortName: true } },
           awayTeam: { select: { id: true, name: true, shortName: true } },
