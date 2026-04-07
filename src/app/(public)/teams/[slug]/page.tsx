@@ -4,10 +4,6 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
-// Use ISR instead of full SSG to avoid DB connection pool exhaustion
-export const revalidate = 60;
-export const dynamicParams = false;
 import {
   Table,
   TableBody,
@@ -34,6 +30,10 @@ import {
   statusColor,
   statusLabel,
 } from "@/lib/utils";
+
+// Use ISR instead of full SSG to avoid DB connection pool exhaustion
+export const revalidate = 60;
+export const dynamicParams = false;
 
 interface TeamPageProps {
   params: Promise<{ slug: string }>;
