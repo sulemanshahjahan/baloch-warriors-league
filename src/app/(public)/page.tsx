@@ -5,12 +5,14 @@ import Image from "next/image";
 import { prisma } from "@/lib/db";
 import { Trophy, Swords, Users, ChevronRight, Star, Download } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   formatDate,
   gameLabel,
   gameColor,
   statusColor,
   statusLabel,
+  getInitials,
 } from "@/lib/utils";
 
 async function getHomeData() {
@@ -32,9 +34,9 @@ async function getHomeData() {
           tournament: { select: { name: true, gameCategory: true } },
           homeTeam: { select: { name: true, shortName: true, logoUrl: true } },
           awayTeam: { select: { name: true, shortName: true, logoUrl: true } },
-          homePlayer: { select: { name: true } },
-          awayPlayer: { select: { name: true } },
-          motmPlayer: { select: { name: true } },
+          homePlayer: { select: { name: true, photoUrl: true } },
+          awayPlayer: { select: { name: true, photoUrl: true } },
+          motmPlayer: { select: { name: true, photoUrl: true } },
         },
       }),
       prisma.match.findMany({
@@ -43,10 +45,10 @@ async function getHomeData() {
         take: 5,
         include: {
           tournament: { select: { name: true, gameCategory: true } },
-          homeTeam: { select: { name: true } },
-          awayTeam: { select: { name: true } },
-          homePlayer: { select: { name: true } },
-          awayPlayer: { select: { name: true } },
+          homeTeam: { select: { name: true, logoUrl: true } },
+          awayTeam: { select: { name: true, logoUrl: true } },
+          homePlayer: { select: { name: true, photoUrl: true } },
+          awayPlayer: { select: { name: true, photoUrl: true } },
         },
       }),
       Promise.all([
@@ -267,31 +269,45 @@ export default async function HomePage() {
                         </span>
                       </div>
 
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1 text-right">
-                          <p className="font-semibold text-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-1 justify-end">
+                          <p className="font-semibold text-sm text-right truncate">
                             {(match as any).homePlayer?.name ?? match.homeTeam?.shortName ?? match.homeTeam?.name ?? "TBD"}
                           </p>
+                          <Avatar className="h-8 w-8 shrink-0">
+                            <AvatarImage src={(match as any).homePlayer?.photoUrl ?? match.homeTeam?.logoUrl ?? undefined} />
+                            <AvatarFallback className="text-[10px]">
+                              {getInitials((match as any).homePlayer?.name ?? match.homeTeam?.name ?? "?")}
+                            </AvatarFallback>
+                          </Avatar>
                         </div>
-                        <div className="text-center px-4 shrink-0">
+                        <div className="text-center px-2 shrink-0">
                           <span className="text-2xl font-black">
                             {match.homeScore ?? 0}
-                            <span className="text-muted-foreground mx-1 font-light text-lg">
-                              –
-                            </span>
+                            <span className="text-muted-foreground mx-1 font-light text-lg">–</span>
                             {match.awayScore ?? 0}
                           </span>
                         </div>
-                        <div className="flex-1 text-left">
-                          <p className="font-semibold text-sm">
+                        <div className="flex items-center gap-2 flex-1">
+                          <Avatar className="h-8 w-8 shrink-0">
+                            <AvatarImage src={(match as any).awayPlayer?.photoUrl ?? match.awayTeam?.logoUrl ?? undefined} />
+                            <AvatarFallback className="text-[10px]">
+                              {getInitials((match as any).awayPlayer?.name ?? match.awayTeam?.name ?? "?")}
+                            </AvatarFallback>
+                          </Avatar>
+                          <p className="font-semibold text-sm truncate">
                             {(match as any).awayPlayer?.name ?? match.awayTeam?.shortName ?? match.awayTeam?.name ?? "TBD"}
                           </p>
                         </div>
                       </div>
 
                       {match.motmPlayer && (
-                        <div className="mt-2 flex items-center justify-center gap-1 text-xs text-accent">
+                        <div className="mt-2 flex items-center justify-center gap-1.5 text-xs text-accent">
                           <Star className="w-3 h-3 fill-current" />
+                          <Avatar className="h-4 w-4">
+                            <AvatarImage src={(match.motmPlayer as any).photoUrl ?? undefined} />
+                            <AvatarFallback className="text-[8px]">{getInitials(match.motmPlayer.name)}</AvatarFallback>
+                          </Avatar>
                           MOTM: {match.motmPlayer.name}
                         </div>
                       )}
@@ -328,16 +344,30 @@ export default async function HomePage() {
                           {match.tournament.name}
                         </span>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <p className="font-semibold text-sm flex-1 text-right">
-                          {(match as any).homePlayer?.name ?? match.homeTeam?.name ?? "TBD"}
-                        </p>
-                        <span className="text-xs text-muted-foreground px-3 shrink-0">
-                          vs
-                        </span>
-                        <p className="font-semibold text-sm flex-1">
-                          {(match as any).awayPlayer?.name ?? match.awayTeam?.name ?? "TBD"}
-                        </p>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-1 justify-end">
+                          <p className="font-semibold text-sm text-right truncate">
+                            {(match as any).homePlayer?.name ?? match.homeTeam?.name ?? "TBD"}
+                          </p>
+                          <Avatar className="h-7 w-7 shrink-0">
+                            <AvatarImage src={(match as any).homePlayer?.photoUrl ?? (match.homeTeam as any)?.logoUrl ?? undefined} />
+                            <AvatarFallback className="text-[10px]">
+                              {getInitials((match as any).homePlayer?.name ?? match.homeTeam?.name ?? "?")}
+                            </AvatarFallback>
+                          </Avatar>
+                        </div>
+                        <span className="text-xs text-muted-foreground px-2 shrink-0">vs</span>
+                        <div className="flex items-center gap-2 flex-1">
+                          <Avatar className="h-7 w-7 shrink-0">
+                            <AvatarImage src={(match as any).awayPlayer?.photoUrl ?? (match.awayTeam as any)?.logoUrl ?? undefined} />
+                            <AvatarFallback className="text-[10px]">
+                              {getInitials((match as any).awayPlayer?.name ?? match.awayTeam?.name ?? "?")}
+                            </AvatarFallback>
+                          </Avatar>
+                          <p className="font-semibold text-sm truncate">
+                            {(match as any).awayPlayer?.name ?? match.awayTeam?.name ?? "TBD"}
+                          </p>
+                        </div>
                       </div>
                       {match.scheduledAt && (
                         <p className="text-xs text-muted-foreground text-center mt-2">
