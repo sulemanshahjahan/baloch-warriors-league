@@ -167,9 +167,6 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
       : null;
 
   // Split events by side
-  const homeId = match.homeTeam?.id ?? match.homePlayer?.id;
-  const awayId = match.awayTeam?.id ?? match.awayPlayer?.id;
-
   const homeEvents = match.events.filter(
     (e) => e.teamId === homeId || e.playerId === match.homePlayer?.id
   );
