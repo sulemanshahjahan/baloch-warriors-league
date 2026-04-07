@@ -744,7 +744,7 @@ function MatchCard({
       <div className="flex-1">
         <div className="flex items-center gap-2 mb-2">
           {match.round && (
-            <span className="text-xs text-muted-foreground">{getRoundDisplayName(match.round, match.roundNumber)}</span>
+            <span className="text-xs text-muted-foreground">{getRoundDisplayName(match.round, match.roundNumber, match.matchNumber)}</span>
           )}
           {match.scheduledAt && (
             <span className="text-xs text-muted-foreground">

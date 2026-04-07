@@ -228,7 +228,7 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
 
           {match.round && (
             <p className="text-sm text-muted-foreground text-center mb-4">
-              {getRoundDisplayName(match.round, match.roundNumber)}
+              {getRoundDisplayName(match.round, match.roundNumber, match.matchNumber)}
             </p>
           )}
 

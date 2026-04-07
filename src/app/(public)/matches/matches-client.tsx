@@ -21,6 +21,7 @@ type Match = {
   scheduledAt: string | null;
   round: string | null;
   roundNumber: number | null;
+  matchNumber: number | null;
   homeScore: number | null;
   awayScore: number | null;
   tournament: { name: string; slug: string; gameCategory: string };
@@ -67,7 +68,7 @@ function MatchCard({ match }: { match: Match }) {
 
           {match.round && (
             <p className="text-xs text-muted-foreground mb-3">
-              {getRoundDisplayName(match.round, match.roundNumber)}
+              {getRoundDisplayName(match.round, match.roundNumber, match.matchNumber)}
             </p>
           )}
 

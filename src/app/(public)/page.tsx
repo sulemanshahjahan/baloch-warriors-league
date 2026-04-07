@@ -45,6 +45,7 @@ async function getHomeData() {
           id: true,
           round: true,
           roundNumber: true,
+          matchNumber: true,
           homeScore: true,
           awayScore: true,
           tournament: { select: { name: true, gameCategory: true } },
@@ -63,6 +64,7 @@ async function getHomeData() {
           id: true,
           round: true,
           roundNumber: true,
+          matchNumber: true,
           scheduledAt: true,
           tournament: { select: { name: true, gameCategory: true } },
           homeTeam: { select: { id: true, name: true } },
@@ -269,7 +271,7 @@ export default async function HomePage() {
                           </div>
                           {match.round && (
                             <p className="text-xs font-medium text-primary mb-2">
-                              {getRoundDisplayName(match.round, match.roundNumber)}
+                              {getRoundDisplayName(match.round, match.roundNumber, match.matchNumber)}
                             </p>
                           )}
 
@@ -354,7 +356,7 @@ export default async function HomePage() {
                           </div>
                           {match.round && (
                             <p className="text-xs font-medium text-primary mb-1">
-                              {getRoundDisplayName(match.round, match.roundNumber)}
+                              {getRoundDisplayName(match.round, match.roundNumber, match.matchNumber)}
                             </p>
                           )}
                           <div className="flex items-center justify-between gap-2">
