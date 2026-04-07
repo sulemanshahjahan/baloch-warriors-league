@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">BWL</string>
+    <string name="title_activity_main">BWL</string>
+    <string name="package_name">com.bwl.league</string>
+    <string name="custom_url_scheme">com.bwl.league</string>
+</resources>
