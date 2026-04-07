@@ -219,21 +219,22 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs defaultValue="standings" className="space-y-6">
-          <TabsList className="bg-muted/50">
-            <TabsTrigger value="standings">
-              <BarChart3 className="w-4 h-4 mr-2" />
-              Standings
+          <TabsList className="bg-muted/50 w-full grid grid-cols-2 sm:grid-cols-4 h-auto">
+            <TabsTrigger value="standings" className="text-xs sm:text-sm py-2">
+              <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Standings</span>
+              <span className="sm:hidden">Table</span>
             </TabsTrigger>
-            <TabsTrigger value="matches">
-              <Swords className="w-4 h-4 mr-2" />
+            <TabsTrigger value="matches" className="text-xs sm:text-sm py-2">
+              <Swords className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
               Matches
             </TabsTrigger>
-            <TabsTrigger value="participants">
-              <Users className="w-4 h-4 mr-2" />
+            <TabsTrigger value="participants" className="text-xs sm:text-sm py-2">
+              <Users className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
               {tournament.participantType === "INDIVIDUAL" ? "Players" : "Teams"}
             </TabsTrigger>
-            <TabsTrigger value="awards">
-              <Award className="w-4 h-4 mr-2" />
+            <TabsTrigger value="awards" className="text-xs sm:text-sm py-2">
+              <Award className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
               Awards
             </TabsTrigger>
           </TabsList>
