@@ -3,7 +3,8 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
-import { Menu, X, Download, Trophy, Users } from "lucide-react";
+import { Menu, X, Trophy, Users } from "lucide-react";
+import { DownloadAppButton } from "./download-app-button";
 import { cn } from "@/lib/utils";
 
 const navLinks = [
@@ -70,15 +71,7 @@ export function PublicNavbar() {
                 {link.label}
               </Link>
             ))}
-            {/* Download App Button - Desktop */}
-            <a
-              href="/bwl.apk"
-              download
-              className="ml-2 inline-flex items-center gap-1.5 bg-primary text-primary-foreground px-3 py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
-            >
-              <Download className="w-4 h-4" />
-              Get App
-            </a>
+            <DownloadAppButton variant="navbar-desktop" />
           </div>
 
           {/* Mobile toggle */}
@@ -105,16 +98,7 @@ export function PublicNavbar() {
               {link.label}
             </Link>
           ))}
-          {/* Download App Button - Mobile Menu */}
-          <a
-            href="/bwl.apk"
-            download
-            onClick={() => setMobileOpen(false)}
-            className="flex items-center gap-2 px-3 py-2.5 mt-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-          >
-            <Download className="w-4 h-4" />
-            Download Android App
-          </a>
+          <DownloadAppButton variant="navbar-mobile" />
         </div>
       )}
     </nav>

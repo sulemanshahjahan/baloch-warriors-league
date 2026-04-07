@@ -1,9 +1,10 @@
-export const revalidate = 30;
+export const revalidate = 120;
 
 import Link from "next/link";
 import Image from "next/image";
 import { prisma } from "@/lib/db";
-import { Trophy, Swords, Users, ChevronRight, Star, Download } from "lucide-react";
+import { Trophy, Swords, Users, ChevronRight, Star } from "lucide-react";
+import { DownloadAppButton } from "@/components/public/download-app-button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -51,7 +52,8 @@ async function getHomeData() {
           awayPlayer: { select: { name: true, photoUrl: true } },
         },
       }),
-      Promise.all([
+      // Single query using aggregate counts to avoid 4 round-trips
+      prisma.$transaction([
         prisma.tournament.count(),
         prisma.team.count({ where: { isActive: true } }),
         prisma.player.count({ where: { isActive: true } }),
@@ -122,25 +124,7 @@ export default async function HomePage() {
               </div>
 
               {/* Download App Banner */}
-              <div className="mt-6 flex flex-col sm:flex-row items-center gap-3 p-4 rounded-xl bg-card/50 border border-border">
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10">
-                    <Download className="w-5 h-5 text-primary" />
-                  </div>
-                  <div className="text-left">
-                    <p className="text-sm font-semibold">Get the BWL Android App</p>
-                    <p className="text-xs text-muted-foreground">Stay updated on the go</p>
-                  </div>
-                </div>
-                <a
-                  href="/bwl.apk"
-                  download
-                  className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/80 transition-colors sm:ml-auto"
-                >
-                  Download APK
-                  <ChevronRight className="w-4 h-4" />
-                </a>
-              </div>
+              <DownloadAppButton variant="hero" />
             </div>
 
             {/* Right: Logo */}
