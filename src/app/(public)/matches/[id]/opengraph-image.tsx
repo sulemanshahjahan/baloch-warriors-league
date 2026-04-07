@@ -11,15 +11,18 @@ export const size = {
 
 export const contentType = "image/png";
 
+// Cache for 1 hour
+export const revalidate = 3600;
+
 export default async function Image({ params }: { params: { id: string } }) {
   const match = await prisma.match.findUnique({
     where: { id: params.id },
     include: {
       tournament: { select: { name: true, gameCategory: true } },
-      homeTeam: { select: { name: true, shortName: true } },
-      awayTeam: { select: { name: true, shortName: true } },
-      homePlayer: { select: { name: true } },
-      awayPlayer: { select: { name: true } },
+      homeTeam: { select: { name: true, shortName: true, logoUrl: true } },
+      awayTeam: { select: { name: true, shortName: true, logoUrl: true } },
+      homePlayer: { select: { name: true, photoUrl: true } },
+      awayPlayer: { select: { name: true, photoUrl: true } },
     },
   });
 

@@ -92,20 +92,23 @@ export async function generateMetadata({ params }: MatchPageProps): Promise<Meta
       ? ` ${match.homeScore ?? 0}–${match.awayScore ?? 0}`
       : "";
 
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://bwlleague.com";
+  const ogImageUrl = `${baseUrl}/matches/${id}/opengraph-image`;
+
   return {
     title: `${homeName} vs ${awayName}${score} | ${match.tournament.name}`,
     description: `Match result and events from ${match.tournament.name}.`,
     openGraph: {
       title: `${homeName} vs ${awayName}${score} | ${match.tournament.name}`,
       description: `Match result and events from ${match.tournament.name}.`,
-      images: [`/matches/${id}/opengraph-image`],
+      images: [ogImageUrl],
       type: "article",
     },
     twitter: {
       card: "summary_large_image",
       title: `${homeName} vs ${awayName}${score} | ${match.tournament.name}`,
       description: `Match result and events from ${match.tournament.name}.`,
-      images: [`/matches/${id}/opengraph-image`],
+      images: [ogImageUrl],
     },
   };
 }
@@ -360,6 +363,8 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
                 matchId={match.id}
                 round={match.round}
                 matchNumber={match.matchNumber}
+                homePhoto={match.homePlayer?.photoUrl ?? match.homeTeam?.logoUrl}
+                awayPhoto={match.awayPlayer?.photoUrl ?? match.awayTeam?.logoUrl}
               />
             </div>
           )}
