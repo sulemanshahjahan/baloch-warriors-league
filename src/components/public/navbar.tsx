@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Download, Trophy, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navLinks = [
@@ -39,6 +39,25 @@ export function PublicNavbar() {
             </span>
           </Link>
 
+          {/* Mobile Quick Links - Center (only on mobile) */}
+          <div className="flex md:hidden items-center gap-1.5">
+            <Link
+              href="/tournaments"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
+            >
+              <Trophy className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Tournaments</span>
+              <span className="sm:hidden">Tours</span>
+            </Link>
+            <Link
+              href="/players"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
+            >
+              <Users className="w-3.5 h-3.5" />
+              Players
+            </Link>
+          </div>
+
           {/* Desktop nav */}
           <div className="hidden md:flex items-center gap-1">
             {navLinks.map((link) => (
@@ -51,6 +70,15 @@ export function PublicNavbar() {
                 {link.label}
               </Link>
             ))}
+            {/* Download App Button - Desktop */}
+            <a
+              href="/bwl.apk"
+              download
+              className="ml-2 inline-flex items-center gap-1.5 bg-primary text-primary-foreground px-3 py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              Get App
+            </a>
           </div>
 
           {/* Mobile toggle */}
@@ -77,6 +105,16 @@ export function PublicNavbar() {
               {link.label}
             </Link>
           ))}
+          {/* Download App Button - Mobile Menu */}
+          <a
+            href="/bwl.apk"
+            download
+            onClick={() => setMobileOpen(false)}
+            className="flex items-center gap-2 px-3 py-2.5 mt-2 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            Download Android App
+          </a>
         </div>
       )}
     </nav>

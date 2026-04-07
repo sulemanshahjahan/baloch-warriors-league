@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import Image from "next/image";
 import { prisma } from "@/lib/db";
-import { Trophy, Swords, Users, ChevronRight, Star } from "lucide-react";
+import { Trophy, Swords, Users, ChevronRight, Star, Download } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   formatDate,
@@ -117,6 +117,27 @@ export default async function HomePage() {
                   <Swords className="w-4 h-4" />
                   Recent Results
                 </Link>
+              </div>
+
+              {/* Download App Banner */}
+              <div className="mt-6 flex flex-col sm:flex-row items-center gap-3 p-4 rounded-xl bg-card/50 border border-border">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10">
+                    <Download className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-semibold">Get the BWL Android App</p>
+                    <p className="text-xs text-muted-foreground">Stay updated on the go</p>
+                  </div>
+                </div>
+                <a
+                  href="/bwl.apk"
+                  download
+                  className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/80 transition-colors sm:ml-auto"
+                >
+                  Download APK
+                  <ChevronRight className="w-4 h-4" />
+                </a>
               </div>
             </div>
 
