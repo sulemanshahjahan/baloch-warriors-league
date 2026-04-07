@@ -56,13 +56,6 @@ export async function generateMetadata({ params }: TeamPageProps): Promise<Metad
 async function getTeamBySlug(slug: string) {
   return prisma.team.findUnique({
     where: { slug },
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      shortName: true,
-      primaryColor: true,
-    },
     include: {
       players: {
         where: { isActive: true },
