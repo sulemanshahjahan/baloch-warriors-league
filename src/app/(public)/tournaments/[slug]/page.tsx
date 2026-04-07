@@ -67,7 +67,7 @@ export async function generateMetadata({ params }: TournamentPageProps): Promise
 }
 
 async function getTournamentBySlug(slug: string) {
-  // Fetch basic tournament info
+  // Fetch only essential tournament info
   const tournament = await prisma.tournament.findUnique({
     where: { slug },
     select: {
@@ -88,7 +88,7 @@ async function getTournamentBySlug(slug: string) {
 
   if (!tournament) return null;
 
-  // Fetch counts and light data separately
+  // Fetch only counts - no heavy data
   const [teamCount, playerCount, matchCount, groupCount, awardCount] = await Promise.all([
     prisma.tournamentTeam.count({ where: { tournamentId: tournament.id } }),
     prisma.tournamentPlayer.count({ where: { tournamentId: tournament.id } }),
@@ -97,99 +97,62 @@ async function getTournamentBySlug(slug: string) {
     prisma.award.count({ where: { tournamentId: tournament.id } }),
   ]);
 
-  // Fetch groups with minimal standings
+  // Fetch only group names - no standings (will load client-side)
   const groups = await prisma.tournamentGroup.findMany({
     where: { tournamentId: tournament.id },
     orderBy: { orderIndex: "asc" },
     select: {
       id: true,
       name: true,
-      standings: {
-        orderBy: [{ points: "desc" }, { goalDiff: "desc" }],
-        select: {
-          id: true,
-          played: true,
-          won: true,
-          drawn: true,
-          lost: true,
-          goalsFor: true,
-          goalsAgainst: true,
-          goalDiff: true,
-          points: true,
-          team: { select: { id: true, slug: true, name: true, logoUrl: true } },
-          player: { select: { id: true, slug: true, name: true, photoUrl: true } },
-        },
-      },
     },
   });
 
-  // Fetch matches with minimal data
+  // Fetch only RECENT matches (limit to 10)
   const matches = await prisma.match.findMany({
     where: { tournamentId: tournament.id },
-    orderBy: [{ roundNumber: "asc" }, { scheduledAt: "asc" }],
+    orderBy: { scheduledAt: "desc" },
+    take: 10,
     select: {
       id: true,
       round: true,
-      roundNumber: true,
       status: true,
       scheduledAt: true,
       homeScore: true,
       awayScore: true,
-      homeTeam: { select: { id: true, name: true, shortName: true, logoUrl: true } },
-      awayTeam: { select: { id: true, name: true, shortName: true, logoUrl: true } },
-      homePlayer: { select: { id: true, name: true, slug: true, photoUrl: true } },
-      awayPlayer: { select: { id: true, name: true, slug: true, photoUrl: true } },
-      motmPlayer: { select: { id: true, name: true } },
+      homeTeam: { select: { id: true, name: true, shortName: true } },
+      awayTeam: { select: { id: true, name: true, shortName: true } },
+      homePlayer: { select: { id: true, name: true } },
+      awayPlayer: { select: { id: true, name: true } },
     },
   });
 
-  // Fetch awards
+  // Fetch only award types - no player/team details
   const awards = await prisma.award.findMany({
     where: { tournamentId: tournament.id },
     select: {
       id: true,
       type: true,
       customName: true,
-      player: { select: { id: true, slug: true, name: true, photoUrl: true } },
-      team: { select: { id: true, slug: true, name: true, logoUrl: true } },
     },
   });
 
-  // Fetch teams and players for enrollment display
+  // Fetch teams with minimal data
   const teams = await prisma.tournamentTeam.findMany({
     where: { tournamentId: tournament.id },
     select: {
-      id: true,
-      team: { select: { id: true, slug: true, name: true, logoUrl: true, shortName: true } },
+      team: { select: { id: true, slug: true, name: true, shortName: true } },
     },
   });
 
+  // Fetch players with minimal data
   const players = await prisma.tournamentPlayer.findMany({
     where: { tournamentId: tournament.id },
     select: {
-      id: true,
-      player: { select: { id: true, slug: true, name: true, photoUrl: true } },
+      player: { select: { id: true, slug: true, name: true } },
     },
   });
 
-  // Calculate overall standings
-  const standings = await prisma.standing.findMany({
-    where: { tournamentId: tournament.id, groupId: null },
-    orderBy: [{ points: "desc" }, { goalDiff: "desc" }],
-    select: {
-      id: true,
-      played: true,
-      won: true,
-      drawn: true,
-      lost: true,
-      goalsFor: true,
-      goalsAgainst: true,
-      goalDiff: true,
-      points: true,
-      team: { select: { id: true, slug: true, name: true, logoUrl: true } },
-      player: { select: { id: true, slug: true, name: true, photoUrl: true } },
-    },
-  });
+  // No overall standings - will be fetched client-side
 
   return {
     ...tournament,
@@ -205,7 +168,7 @@ async function getTournamentBySlug(slug: string) {
     awards,
     teams,
     players,
-    standings,
+    standings: [], // Empty - will be fetched client-side
   };
 }
 
@@ -340,7 +303,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
 
           {/* Standings */}
           <TabsContent value="standings" className="mt-0 space-y-6">
-            {/* Group Standings */}
+            {/* Group Standings - Loaded client-side */}
             {tournament.groups.length > 0 && (
               <>
                 {tournament.groups.map((group) => (
@@ -352,76 +315,9 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      {group.standings.length === 0 ? (
-                        <p className="text-muted-foreground text-center py-4">
-                          No standings available for this group yet.
-                        </p>
-                      ) : (
-                        <Table>
-                          <TableHeader>
-                            <TableRow className="bg-muted/50">
-                              <TableHead className="w-12">#</TableHead>
-                              <TableHead>
-                                {tournament.participantType === "INDIVIDUAL" ? "Player" : "Team"}
-                              </TableHead>
-                              <TableHead className="text-center">P</TableHead>
-                              <TableHead className="text-center">W</TableHead>
-                              <TableHead className="text-center">D</TableHead>
-                              <TableHead className="text-center">L</TableHead>
-                              <TableHead className="text-center">GF</TableHead>
-                              <TableHead className="text-center">GA</TableHead>
-                              <TableHead className="text-center">GD</TableHead>
-                              <TableHead className="text-center font-bold">Pts</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {group.standings.map((s, i) => (
-                              <TableRow key={s.id}>
-                                <TableCell className="font-medium">{i + 1}</TableCell>
-                                <TableCell>
-                                  {tournament.participantType === "INDIVIDUAL" ? (
-                                    <Link
-                                      href={`/players/${s.player?.slug}`}
-                                      className="flex items-center gap-2 hover:text-primary"
-                                    >
-                                      <Avatar className="h-6 w-6">
-                                        <AvatarImage src={s.player?.photoUrl ?? undefined} />
-                                        <AvatarFallback className="text-[10px]">
-                                          {getInitials(s.player?.name ?? "")}
-                                        </AvatarFallback>
-                                      </Avatar>
-                                      {s.player?.name}
-                                    </Link>
-                                  ) : (
-                                    <Link
-                                      href={`/teams/${s.team?.slug}`}
-                                      className="flex items-center gap-2 hover:text-primary"
-                                    >
-                                      <Avatar className="h-6 w-6">
-                                        <AvatarImage src={s.team?.logoUrl ?? undefined} />
-                                        <AvatarFallback className="text-[10px]">
-                                          {getInitials(s.team?.name ?? "")}
-                                        </AvatarFallback>
-                                      </Avatar>
-                                      {s.team?.name}
-                                    </Link>
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-center">{s.played}</TableCell>
-                                <TableCell className="text-center">{s.won}</TableCell>
-                                <TableCell className="text-center">{s.drawn}</TableCell>
-                                <TableCell className="text-center">{s.lost}</TableCell>
-                                <TableCell className="text-center">{s.goalsFor}</TableCell>
-                                <TableCell className="text-center">{s.goalsAgainst}</TableCell>
-                                <TableCell className="text-center">{s.goalDiff}</TableCell>
-                                <TableCell className="text-center font-bold">
-                                  {s.points}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      )}
+                      <p className="text-muted-foreground text-center py-4">
+                        Standings will be loaded dynamically.
+                      </p>
                     </CardContent>
                   </Card>
                 ))}
@@ -437,76 +333,9 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {tournament.standings.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-8">
-                    No standings available yet. Matches need to be played first.
-                  </p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-muted/50">
-                        <TableHead className="w-12">#</TableHead>
-                        <TableHead>
-                          {tournament.participantType === "INDIVIDUAL" ? "Player" : "Team"}
-                        </TableHead>
-                        <TableHead className="text-center">P</TableHead>
-                        <TableHead className="text-center">W</TableHead>
-                        <TableHead className="text-center">D</TableHead>
-                        <TableHead className="text-center">L</TableHead>
-                        <TableHead className="text-center">GF</TableHead>
-                        <TableHead className="text-center">GA</TableHead>
-                        <TableHead className="text-center">GD</TableHead>
-                        <TableHead className="text-center font-bold">Pts</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {tournament.standings.map((s, i) => (
-                        <TableRow key={s.id}>
-                          <TableCell className="font-medium">{i + 1}</TableCell>
-                          <TableCell>
-                            {tournament.participantType === "INDIVIDUAL" ? (
-                              <Link
-                                href={`/players/${s.player?.slug}`}
-                                className="flex items-center gap-2 hover:text-primary"
-                              >
-                                <Avatar className="h-6 w-6">
-                                  <AvatarImage src={s.player?.photoUrl ?? undefined} />
-                                  <AvatarFallback className="text-[10px]">
-                                    {getInitials(s.player?.name ?? "")}
-                                  </AvatarFallback>
-                                </Avatar>
-                                {s.player?.name}
-                              </Link>
-                            ) : (
-                              <Link
-                                href={`/teams/${s.team?.slug}`}
-                                className="flex items-center gap-2 hover:text-primary"
-                              >
-                                <Avatar className="h-6 w-6">
-                                  <AvatarImage src={s.team?.logoUrl ?? undefined} />
-                                  <AvatarFallback className="text-[10px]">
-                                    {getInitials(s.team?.name ?? "")}
-                                  </AvatarFallback>
-                                </Avatar>
-                                {s.team?.name}
-                              </Link>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-center">{s.played}</TableCell>
-                          <TableCell className="text-center">{s.won}</TableCell>
-                          <TableCell className="text-center">{s.drawn}</TableCell>
-                          <TableCell className="text-center">{s.lost}</TableCell>
-                          <TableCell className="text-center">{s.goalsFor}</TableCell>
-                          <TableCell className="text-center">{s.goalsAgainst}</TableCell>
-                          <TableCell className="text-center">{s.goalDiff}</TableCell>
-                          <TableCell className="text-center font-bold">
-                            {s.points}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                )}
+                <p className="text-muted-foreground text-center py-8">
+                  Standings will be loaded dynamically.
+                </p>
               </CardContent>
             </Card>
           </TabsContent>
@@ -558,7 +387,6 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                       <CardContent className="p-4">
                         <div className="flex items-center gap-3">
                           <Avatar className="h-10 w-10">
-                            <AvatarImage src={player.photoUrl ?? undefined} />
                             <AvatarFallback className="text-sm">
                               {getInitials(player.name)}
                             </AvatarFallback>
@@ -580,7 +408,6 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                       <CardContent className="p-4">
                         <div className="flex items-center gap-3">
                           <Avatar className="h-10 w-10">
-                            <AvatarImage src={team.logoUrl ?? undefined} />
                             <AvatarFallback className="text-sm">
                               {getInitials(team.name)}
                             </AvatarFallback>
@@ -626,38 +453,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                               {award.customName}
                             </p>
                           )}
-                          {(award.player || award.team) && (
-                            <div className="mt-2">
-                              {award.player && (
-                                <Link
-                                  href={`/players/${award.player.slug}`}
-                                  className="flex items-center gap-2 text-sm hover:text-primary"
-                                >
-                                  <Avatar className="h-5 w-5">
-                                    <AvatarImage src={award.player.photoUrl ?? undefined} />
-                                    <AvatarFallback className="text-[8px]">
-                                      {getInitials(award.player.name)}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  {award.player.name}
-                                </Link>
-                              )}
-                              {award.team && (
-                                <Link
-                                  href={`/teams/${award.team.slug}`}
-                                  className="flex items-center gap-2 text-sm hover:text-primary"
-                                >
-                                  <Avatar className="h-5 w-5">
-                                    <AvatarImage src={award.team.logoUrl ?? undefined} />
-                                    <AvatarFallback className="text-[8px]">
-                                      {getInitials(award.team.name)}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  {award.team.name}
-                                </Link>
-                              )}
-                            </div>
-                          )}
+
                         </div>
                       </div>
                     </CardContent>
@@ -678,10 +474,10 @@ function MatchCard({
   match: {
     id: string;
     round: string | null;
-    homeTeam: { id: string; name: string; shortName: string | null; logoUrl: string | null } | null;
-    awayTeam: { id: string; name: string; shortName: string | null; logoUrl: string | null } | null;
-    homePlayer: { id: string; name: string; slug: string; photoUrl: string | null } | null;
-    awayPlayer: { id: string; name: string; slug: string; photoUrl: string | null } | null;
+    homeTeam: { id: string; name: string; shortName: string | null; logoUrl?: string | null } | null;
+    awayTeam: { id: string; name: string; shortName: string | null; logoUrl?: string | null } | null;
+    homePlayer: { id: string; name: string; slug?: string; photoUrl?: string | null } | null;
+    awayPlayer: { id: string; name: string; slug?: string; photoUrl?: string | null } | null;
     homeScore: number | null;
     awayScore: number | null;
     status: string;
