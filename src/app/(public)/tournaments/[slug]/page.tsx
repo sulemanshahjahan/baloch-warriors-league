@@ -24,6 +24,7 @@ import {
   BarChart3,
   MapPin,
   ArrowLeft,
+  GitBranch,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -163,18 +164,23 @@ async function getTournamentBySlug(slug: string) {
     },
   });
 
-  // Fetch only RECENT matches (limit to 10)
+  // Fetch all matches for display and bracket
   const matches = await prisma.match.findMany({
     where: { tournamentId: tournament.id },
-    orderBy: { scheduledAt: "desc" },
-    take: 10,
+    orderBy: [{ roundNumber: "asc" }, { matchNumber: "asc" }],
     select: {
       id: true,
       round: true,
+      roundNumber: true,
+      matchNumber: true,
       status: true,
       scheduledAt: true,
       homeScore: true,
       awayScore: true,
+      homeTeamId: true,
+      awayTeamId: true,
+      homePlayerId: true,
+      awayPlayerId: true,
       homeTeam: { select: { id: true, name: true, shortName: true, logoUrl: true } },
       awayTeam: { select: { id: true, name: true, shortName: true, logoUrl: true } },
       homePlayer: { select: { id: true, name: true, photoUrl: true } },
@@ -283,6 +289,27 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
 
   const upcomingMatches = tournament.matches.filter((m) => m.status === "SCHEDULED");
   const completedMatches = tournament.matches.filter((m) => m.status === "COMPLETED");
+  
+  // Check if tournament has knockout format
+  const hasKnockoutFormat = tournament.format === "KNOCKOUT" || tournament.format === "GROUP_KNOCKOUT";
+  
+  // Get knockout matches for bracket
+  const knockoutMatches = tournament.matches.filter((m) => 
+    m.roundNumber !== null && m.roundNumber > 0
+  );
+  
+  // Group matches by round
+  const matchesByRound = knockoutMatches.reduce((acc, match) => {
+    const round = match.roundNumber ?? 0;
+    if (!acc[round]) acc[round] = [];
+    acc[round].push(match);
+    return acc;
+  }, {} as Record<number, typeof knockoutMatches>);
+  
+  // Sort rounds
+  const sortedRounds = Object.keys(matchesByRound)
+    .map(Number)
+    .sort((a, b) => a - b);
 
   return (
     <div className="min-h-screen">
@@ -373,7 +400,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs defaultValue="standings" className="space-y-6">
-          <TabsList className="bg-muted/50 w-full grid grid-cols-2 sm:grid-cols-4 h-auto">
+          <TabsList className={`bg-muted/50 w-full grid h-auto ${hasKnockoutFormat ? 'grid-cols-2 sm:grid-cols-5' : 'grid-cols-2 sm:grid-cols-4'}`}>
             <TabsTrigger value="standings" className="text-xs sm:text-sm py-2">
               <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
               <span className="hidden sm:inline">Standings</span>
@@ -383,6 +410,12 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
               <Swords className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
               Matches
             </TabsTrigger>
+            {hasKnockoutFormat && (
+              <TabsTrigger value="bracket" className="text-xs sm:text-sm py-2">
+                <GitBranch className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                Bracket
+              </TabsTrigger>
+            )}
             <TabsTrigger value="participants" className="text-xs sm:text-sm py-2">
               <Users className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
               {tournament.participantType === "INDIVIDUAL" ? "Players" : "Teams"}
@@ -484,6 +517,33 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
               )}
             </div>
           </TabsContent>
+
+          {/* Bracket - only for KNOCKOUT and GROUP_KNOCKOUT formats */}
+          {hasKnockoutFormat && (
+            <TabsContent value="bracket" className="mt-0">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <GitBranch className="w-4 h-4 text-primary" />
+                    Knockout Bracket
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {sortedRounds.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-8">
+                      Bracket will be available once knockout stage matches are scheduled.
+                    </p>
+                  ) : (
+                    <BracketView
+                      rounds={sortedRounds}
+                      matchesByRound={matchesByRound}
+                      participantType={tournament.participantType}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
 
           {/* Participants (Teams or Individual Players) */}
           <TabsContent value="participants" className="mt-0">
@@ -786,5 +846,194 @@ function StandingsTable({
         })}
       </TableBody>
     </Table>
+  );
+}
+
+interface BracketMatch {
+  id: string;
+  round: string | null;
+  roundNumber: number | null;
+  matchNumber: number | null;
+  status: string;
+  scheduledAt: Date | null;
+  homeScore: number | null;
+  awayScore: number | null;
+  homeTeamId: string | null;
+  awayTeamId: string | null;
+  homePlayerId: string | null;
+  awayPlayerId: string | null;
+  homeTeam: { id: string; name: string; shortName: string | null; logoUrl: string | null } | null;
+  awayTeam: { id: string; name: string; shortName: string | null; logoUrl: string | null } | null;
+  homePlayer: { id: string; name: string; photoUrl: string | null } | null;
+  awayPlayer: { id: string; name: string; photoUrl: string | null } | null;
+}
+
+function BracketView({
+  rounds,
+  matchesByRound,
+  participantType,
+}: {
+  rounds: number[];
+  matchesByRound: Record<number, BracketMatch[]>;
+  participantType: string;
+}) {
+  const isIndividual = participantType === "INDIVIDUAL";
+  
+  // Round name mapping
+  const getRoundName = (roundNum: number, totalRounds: number) => {
+    const roundNames: Record<number, string> = {
+      1: "Final",
+      2: "Semi-finals",
+      3: "Quarter-finals",
+      4: "Round of 16",
+      5: "Round of 32",
+      6: "Round of 64",
+    };
+    
+    // Calculate from the end if we know total rounds
+    const fromFinal = totalRounds - roundNum + 1;
+    if (fromFinal <= 6 && roundNames[fromFinal]) {
+      return roundNames[fromFinal];
+    }
+    return `Round ${roundNum}`;
+  };
+
+  return (
+    <div className="overflow-x-auto">
+      <div className="flex gap-8 min-w-max px-4">
+        {rounds.map((roundNum, roundIndex) => (
+          <div key={roundNum} className="flex flex-col">
+            <h3 className="text-sm font-semibold text-center mb-4 text-muted-foreground">
+              {getRoundName(roundNum, rounds.length)}
+            </h3>
+            <div 
+              className="flex flex-col justify-center gap-4"
+              style={{ 
+                minHeight: `${Math.max(120, matchesByRound[roundNum].length * 100)}px` 
+              }}
+            >
+              {matchesByRound[roundNum].map((match, matchIndex) => {
+                const isFirstRound = roundIndex === 0;
+                const isLastRound = roundIndex === rounds.length - 1;
+                
+                return (
+                  <div 
+                    key={match.id} 
+                    className="relative"
+                    style={{
+                      marginTop: roundIndex > 0 ? `${Math.pow(2, roundIndex - 1) * 20}px` : 0,
+                      marginBottom: roundIndex > 0 ? `${Math.pow(2, roundIndex - 1) * 20}px` : 0,
+                    }}
+                  >
+                    {/* Connector lines */}
+                    {!isFirstRound && (
+                      <div className="absolute right-full top-1/2 w-4 h-px bg-border" />
+                    )}
+                    {!isLastRound && matchIndex % 2 === 0 && (
+                      <>
+                        <div className="absolute left-full top-1/2 w-4 h-px bg-border" />
+                        <div className="absolute left-[calc(100%+1rem)] top-1/2 w-px bg-border"
+                          style={{
+                            height: `${50 + Math.pow(2, roundIndex) * 20}px`,
+                            transform: 'translateY(-50%)'
+                          }}
+                        />
+                      </>
+                    )}
+                    
+                    <BracketMatchCard 
+                      match={match} 
+                      isIndividual={isIndividual}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function BracketMatchCard({
+  match,
+  isIndividual,
+}: {
+  match: BracketMatch;
+  isIndividual: boolean;
+}) {
+  const isCompleted = match.status === "COMPLETED";
+  
+  const homeName = isIndividual
+    ? (match.homePlayer?.name ?? "TBD")
+    : (match.homeTeam?.name ?? "TBD");
+  const awayName = isIndividual
+    ? (match.awayPlayer?.name ?? "TBD")
+    : (match.awayTeam?.name ?? "TBD");
+  const homeImg = isIndividual
+    ? (match.homePlayer?.photoUrl ?? undefined)
+    : (match.homeTeam?.logoUrl ?? undefined);
+  const awayImg = isIndividual
+    ? (match.awayPlayer?.photoUrl ?? undefined)
+    : (match.awayTeam?.logoUrl ?? undefined);
+  
+  const homeScore = match.homeScore ?? 0;
+  const awayScore = match.awayScore ?? 0;
+  const homeWon = isCompleted && homeScore > awayScore;
+  const awayWon = isCompleted && awayScore > homeScore;
+
+  return (
+    <Link href={`/matches/${match.id}`}>
+      <div className="w-48 bg-card border border-border rounded-lg overflow-hidden hover:border-primary/50 transition-colors cursor-pointer">
+        {/* Round/Status header */}
+        <div className="px-2 py-1 bg-muted/50 text-[10px] text-muted-foreground flex justify-between">
+          <span>{match.round || "Match"}</span>
+          {match.scheduledAt && (
+            <span>{formatDate(match.scheduledAt)}</span>
+          )}
+        </div>
+        
+        {/* Home participant */}
+        <div className={`px-3 py-2 flex items-center justify-between gap-2 border-b border-border/50 ${homeWon ? 'bg-primary/5' : ''}`}>
+          <div className="flex items-center gap-2 min-w-0">
+            <Avatar className="h-5 w-5 shrink-0">
+              <AvatarImage src={homeImg} />
+              <AvatarFallback className="text-[8px]">
+                {getInitials(homeName)}
+              </AvatarFallback>
+            </Avatar>
+            <span className={`text-xs truncate ${homeWon ? 'font-semibold' : ''}`}>
+              {homeName}
+            </span>
+          </div>
+          {isCompleted && (
+            <span className={`text-sm font-bold ${homeWon ? 'text-primary' : 'text-muted-foreground'}`}>
+              {homeScore}
+            </span>
+          )}
+        </div>
+        
+        {/* Away participant */}
+        <div className={`px-3 py-2 flex items-center justify-between gap-2 ${awayWon ? 'bg-primary/5' : ''}`}>
+          <div className="flex items-center gap-2 min-w-0">
+            <Avatar className="h-5 w-5 shrink-0">
+              <AvatarImage src={awayImg} />
+              <AvatarFallback className="text-[8px]">
+                {getInitials(awayName)}
+              </AvatarFallback>
+            </Avatar>
+            <span className={`text-xs truncate ${awayWon ? 'font-semibold' : ''}`}>
+              {awayName}
+            </span>
+          </div>
+          {isCompleted && (
+            <span className={`text-sm font-bold ${awayWon ? 'text-primary' : 'text-muted-foreground'}`}>
+              {awayScore}
+            </span>
+          )}
+        </div>
+      </div>
+    </Link>
   );
 }
