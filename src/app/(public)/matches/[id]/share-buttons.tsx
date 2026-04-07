@@ -58,16 +58,25 @@ export function ShareButtons({
     alert("Copied to clipboard! Paste in Instagram.");
   };
 
-  // Helper to load image
-  const loadImage = (url: string): Promise<HTMLImageElement> => {
-    return new Promise((resolve, reject) => {
+  // Local assets (same-origin) must NOT use crossOrigin — it causes cache
+  // mismatch issues that taint the canvas even for same-origin requests.
+  const loadLocalImage = (path: string): Promise<HTMLImageElement> =>
+    new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = path;
+    });
+
+  // External images (Cloudinary etc.) need crossOrigin to avoid canvas taint.
+  const loadExternalImage = (url: string): Promise<HTMLImageElement> =>
+    new Promise((resolve, reject) => {
       const img = new Image();
       img.crossOrigin = "anonymous";
       img.onload = () => resolve(img);
       img.onerror = reject;
       img.src = url;
     });
-  };
 
   // Generate and download scorecard image
   const generateScorecard = async () => {
@@ -80,37 +89,48 @@ export function ShareButtons({
     canvas.width = size;
     canvas.height = size;
 
-    // Step 1: load ALL images in parallel before touching the canvas
-    const [logoResult, homeResult, awayResult] = await Promise.allSettled([
-      loadImage("https://bwlleague.com/logo.png"),
-      homePhoto ? loadImage(homePhoto) : Promise.reject("none"),
-      awayPhoto ? loadImage(awayPhoto) : Promise.reject("none"),
+    // Step 1: load ALL images in parallel before touching the canvas.
+    // Local assets use loadLocalImage (no crossOrigin).
+    // External player photos use loadExternalImage (crossOrigin = anonymous).
+    const [bgResult, logoResult, homeResult, awayResult] = await Promise.allSettled([
+      loadLocalImage("/scorecard-bg.jpg"),
+      loadLocalImage("/logo.png"),
+      homePhoto ? loadExternalImage(homePhoto) : Promise.reject("none"),
+      awayPhoto ? loadExternalImage(awayPhoto) : Promise.reject("none"),
     ]);
 
+    const bgImg   = bgResult.status   === "fulfilled" ? bgResult.value   : null;
     const logoImg = logoResult.status === "fulfilled" ? logoResult.value : null;
     const homeImg = homeResult.status === "fulfilled" ? homeResult.value : null;
     const awayImg = awayResult.status === "fulfilled" ? awayResult.value : null;
 
     // Step 2: draw everything synchronously — no more awaits after this point
 
-    // Background
-    const gradient = ctx.createLinearGradient(0, 0, size, size);
-    gradient.addColorStop(0, "#0a0a0a");
-    gradient.addColorStop(0.5, "#1a1a1a");
-    gradient.addColorStop(1, "#0f0f0f");
-    ctx.fillStyle = gradient;
+    // Background — stadium photo, cover-fit, then dark overlay for readability
+    if (bgImg) {
+      const aspect = bgImg.width / bgImg.height;
+      const dw = aspect >= 1 ? size * aspect : size;
+      const dh = aspect >= 1 ? size : size / aspect;
+      ctx.drawImage(bgImg, (size - dw) / 2, (size - dh) / 2, dw, dh);
+    }
+    // Dark overlay — gradient from near-opaque top to semi-transparent middle to dark bottom
+    const overlay = ctx.createLinearGradient(0, 0, 0, size);
+    overlay.addColorStop(0,   "rgba(0,0,0,0.82)");
+    overlay.addColorStop(0.4, "rgba(0,0,0,0.55)");
+    overlay.addColorStop(0.7, "rgba(0,0,0,0.65)");
+    overlay.addColorStop(1,   "rgba(0,0,0,0.88)");
+    ctx.fillStyle = overlay;
     ctx.fillRect(0, 0, size, size);
 
-    // Logo
+    // Logo — actual PNG, no red fallback box
     if (logoImg) {
       ctx.drawImage(logoImg, size / 2 - 50, 30, 100, 100);
     } else {
+      // Text-only fallback if logo.png fails
       ctx.fillStyle = "#ef4444";
-      ctx.fillRect(size / 2 - 50, 40, 100, 100);
-      ctx.fillStyle = "#fff";
-      ctx.font = "bold 60px system-ui";
+      ctx.font = "bold 56px system-ui";
       ctx.textAlign = "center";
-      ctx.fillText("BWL", size / 2, 105);
+      ctx.fillText("BWL", size / 2, 115);
     }
 
     // Tournament name
