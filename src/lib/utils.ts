@@ -163,19 +163,19 @@ export function getRoundDisplayName(
     // Check for already descriptive round names
     if (lowerRound.includes("final")) {
       // Could be "Final", "Semi Final", "Quarter Final", etc.
-      return formatRoundWithMatchNumber(round, matchNumber);
+      return formatRoundWithMatchNumber(safeRound, safeMatchNumber);
     }
     
     if (lowerRound.includes("semi")) {
-      return formatRoundWithMatchNumber("Semi Final", matchNumber);
+      return formatRoundWithMatchNumber("Semi Final", safeMatchNumber);
     }
     
     if (lowerRound.includes("quarter")) {
-      return formatRoundWithMatchNumber("Quarter Final", matchNumber);
+      return formatRoundWithMatchNumber("Quarter Final", safeMatchNumber);
     }
     
     if (lowerRound.includes("round of 16") || lowerRound.includes("16")) {
-      return formatRoundWithMatchNumber("Round of 16", matchNumber);
+      return formatRoundWithMatchNumber("Round of 16", safeMatchNumber);
     }
     
     // Group stage matches - keep as is
