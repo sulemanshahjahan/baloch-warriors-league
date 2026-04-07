@@ -127,30 +127,32 @@ export default async function TeamPage({ params }: TeamPageProps) {
             All Teams
           </Link>
 
-          <div className="flex items-start gap-6 flex-wrap">
+          <div className="flex items-start gap-4">
             <SmartAvatar
               type="team"
               id={team.id}
               name={team.name}
-              className="h-24 w-24"
-              fallbackClassName="text-3xl"
+              className="h-20 w-20 sm:h-24 sm:w-24 shrink-0"
+              fallbackClassName="text-2xl sm:text-3xl"
             />
 
-            <div>
-              <h1 className="text-3xl sm:text-4xl font-black tracking-tight">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight leading-tight">
                 {team.name}
               </h1>
               {team.shortName && (
-                <p className="text-xl text-muted-foreground">{team.shortName}</p>
+                <p className="text-base sm:text-lg text-muted-foreground truncate">
+                  {team.shortName}
+                </p>
               )}
-              <div className="flex items-center gap-4 mt-3">
+              <div className="flex items-center gap-3 mt-2">
                 {team.captain && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <User className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Captain:</span>
+                  <div className="flex items-center gap-1.5 text-xs sm:text-sm">
+                    <User className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">C:</span>
                     <Link
                       href={`/players/${team.captain.slug}`}
-                      className="font-medium hover:text-primary"
+                      className="font-medium hover:text-primary truncate"
                     >
                       {team.captain.name}
                     </Link>

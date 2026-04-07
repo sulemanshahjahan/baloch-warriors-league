@@ -183,64 +183,58 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
             All Players
           </Link>
 
-          <div className="flex items-start gap-6 flex-wrap">
+          <div className="flex items-start gap-4">
             <SmartAvatar
               type="player"
               id={player.id}
               name={player.name}
-              className="h-24 w-24"
-              fallbackClassName="text-3xl"
+              className="h-20 w-20 sm:h-24 sm:w-24 shrink-0"
+              fallbackClassName="text-2xl sm:text-3xl"
             />
 
-            <div>
-              <h1 className="text-3xl sm:text-4xl font-black tracking-tight">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight leading-tight">
                 {player.name}
               </h1>
               {player.nickname && (
-                <p className="text-xl text-muted-foreground">
+                <p className="text-base sm:text-lg text-muted-foreground truncate">
                   &quot;{player.nickname}&quot;
                 </p>
               )}
-              <div className="flex items-center gap-4 mt-3 flex-wrap">
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
                 {player.position && (
-                  <span className="text-sm bg-muted px-2 py-1 rounded">
+                  <span className="text-xs sm:text-sm bg-muted px-2 py-0.5 rounded">
                     {player.position}
                   </span>
                 )}
                 {player.skillLevel !== null && player.skillLevel !== undefined && (
-                  <div className="flex items-center gap-1 text-sm">
-                    <BarChart3 className="w-4 h-4 text-primary" />
+                  <div className="flex items-center gap-1 text-xs sm:text-sm">
+                    <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4 text-primary" />
                     <span className="font-medium">{player.skillLevel}</span>
-                    <span className="text-muted-foreground">level</span>
+                    <span className="text-muted-foreground">lvl</span>
                   </div>
                 )}
                 {player.nationality && (
-                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                    <MapPin className="w-4 h-4" />
+                  <div className="flex items-center gap-1 text-xs sm:text-sm text-muted-foreground">
+                    <MapPin className="w-3 h-3 sm:w-4 sm:h-4" />
                     {player.nationality}
-                  </div>
-                )}
-                {player.dateOfBirth && (
-                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                    <Calendar className="w-4 h-4" />
-                    {formatDate(player.dateOfBirth)}
                   </div>
                 )}
               </div>
               {currentTeam && (
-                <div className="mt-3">
+                <div className="mt-2">
                   <Link
                     href={`/teams/${currentTeam.slug}`}
-                    className="inline-flex items-center gap-2 text-sm hover:text-primary"
+                    className="inline-flex items-center gap-1.5 text-xs sm:text-sm hover:text-primary"
                   >
                     <SmartAvatar
                       type="team"
                       id={currentTeam.id}
                       name={currentTeam.name}
-                      className="h-5 w-5"
-                      fallbackClassName="text-[10px]"
+                      className="h-4 w-4 sm:h-5 sm:w-5"
+                      fallbackClassName="text-[8px]"
                     />
-                    {currentTeam.name}
+                    <span className="truncate">{currentTeam.name}</span>
                   </Link>
                 </div>
               )}
