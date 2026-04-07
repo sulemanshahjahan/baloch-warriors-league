@@ -225,21 +225,51 @@ export function ShareButtons({
       ? `*${matchInfo}*\n*${homeName} ${homeScore} - ${awayScore} ${awayName}*\n${tournamentName}\n${shareUrl}`
       : `*${homeName} ${homeScore} - ${awayScore} ${awayName}*\n${tournamentName}\n${shareUrl}`;
 
-    // Step 4: native share sheet on mobile (Android/iOS/Capacitor WebView)
-    // Falls back to download on desktop where Web Share API is unavailable.
-    if (navigator.canShare?.({ files: [file] })) {
+    const title = `${homeName} ${homeScore} - ${awayScore} ${awayName}`;
+
+    // Step 4: choose share path based on environment
+    const isCapacitor =
+      typeof window !== "undefined" && "Capacitor" in window;
+
+    if (isCapacitor) {
+      // Native Capacitor path: write file to device cache then share via OS
+      const { Filesystem, Directory } = await import("@capacitor/filesystem");
+      const { Share } = await import("@capacitor/share");
+
+      // Convert blob → base64 (Filesystem plugin requires base64 string)
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          resolve(result.split(",")[1]); // strip data:image/png;base64, prefix
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+
+      // Write to device cache directory
+      const written = await Filesystem.writeFile({
+        path: "bwl-scorecard.png",
+        data: base64,
+        directory: Directory.Cache,
+      });
+
+      // Open native share sheet — WhatsApp, Telegram, IG, etc. all receive it
+      await Share.share({
+        title,
+        text: imageShareText,
+        url: written.uri,
+        dialogTitle: "Share Scorecard",
+      });
+    } else if (navigator.canShare?.({ files: [file] })) {
+      // Mobile browser Web Share API (Chrome on Android outside the APK)
       try {
-        await navigator.share({
-          files: [file],
-          text: imageShareText,
-          title: `${homeName} ${homeScore} - ${awayScore} ${awayName}`,
-        });
+        await navigator.share({ files: [file], text: imageShareText, title });
       } catch (err) {
-        // User cancelled share — not an error
         if (err instanceof Error && err.name !== "AbortError") throw err;
       }
     } else {
-      // Desktop fallback: download the image
+      // Desktop fallback: download
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.download = fileName;
