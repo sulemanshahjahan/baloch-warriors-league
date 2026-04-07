@@ -15,6 +15,7 @@ import {
   statusLabel,
   getInitials,
 } from "@/lib/utils";
+import { SmartAvatar } from "@/components/public/smart-avatar";
 
 async function getHomeData() {
   const [featuredTournaments, recentResults, upcomingMatches, stats] =
@@ -243,6 +244,10 @@ export default async function HomePage() {
                 {recentResults.map((match) => {
                   const homeName = match.homePlayer?.name ?? match.homeTeam?.shortName ?? match.homeTeam?.name ?? "TBD";
                   const awayName = match.awayPlayer?.name ?? match.awayTeam?.shortName ?? match.awayTeam?.name ?? "TBD";
+                  const homeId = match.homePlayer?.id ?? match.homeTeam?.id;
+                  const awayId = match.awayPlayer?.id ?? match.awayTeam?.id;
+                  const homeType = match.homePlayer ? "player" : "team";
+                  const awayType = match.awayPlayer ? "player" : "team";
                   return (
                     <Link key={match.id} href={`/matches/${match.id}`}>
                       <Card className="overflow-hidden hover:border-border/80 transition-colors">
@@ -261,11 +266,13 @@ export default async function HomePage() {
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2 flex-1 justify-end">
                               <p className="font-semibold text-sm text-right truncate">{homeName}</p>
-                              <Avatar className="h-8 w-8 shrink-0">
-                                <AvatarFallback className="text-[10px]">
-                                  {getInitials(homeName)}
-                                </AvatarFallback>
-                              </Avatar>
+                              {homeId ? (
+                                <SmartAvatar type={homeType as "player" | "team"} id={homeId} name={homeName} className="h-8 w-8 shrink-0" fallbackClassName="text-[10px]" />
+                              ) : (
+                                <Avatar className="h-8 w-8 shrink-0">
+                                  <AvatarFallback className="text-[10px]">{getInitials(homeName)}</AvatarFallback>
+                                </Avatar>
+                              )}
                             </div>
                             <div className="text-center px-2 shrink-0">
                               <span className="text-2xl font-black">
@@ -275,11 +282,13 @@ export default async function HomePage() {
                               </span>
                             </div>
                             <div className="flex items-center gap-2 flex-1">
-                              <Avatar className="h-8 w-8 shrink-0">
-                                <AvatarFallback className="text-[10px]">
-                                  {getInitials(awayName)}
-                                </AvatarFallback>
-                              </Avatar>
+                              {awayId ? (
+                                <SmartAvatar type={awayType as "player" | "team"} id={awayId} name={awayName} className="h-8 w-8 shrink-0" fallbackClassName="text-[10px]" />
+                              ) : (
+                                <Avatar className="h-8 w-8 shrink-0">
+                                  <AvatarFallback className="text-[10px]">{getInitials(awayName)}</AvatarFallback>
+                                </Avatar>
+                              )}
                               <p className="font-semibold text-sm truncate">{awayName}</p>
                             </div>
                           </div>
@@ -315,6 +324,10 @@ export default async function HomePage() {
                 {upcomingMatches.map((match) => {
                   const homeName = match.homePlayer?.name ?? match.homeTeam?.name ?? "TBD";
                   const awayName = match.awayPlayer?.name ?? match.awayTeam?.name ?? "TBD";
+                  const homeId = match.homePlayer?.id ?? match.homeTeam?.id;
+                  const awayId = match.awayPlayer?.id ?? match.awayTeam?.id;
+                  const homeType = match.homePlayer ? "player" : "team";
+                  const awayType = match.awayPlayer ? "player" : "team";
                   return (
                     <Link key={match.id} href={`/matches/${match.id}`}>
                       <Card className="hover:border-border/80 transition-colors">
@@ -332,19 +345,23 @@ export default async function HomePage() {
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2 flex-1 justify-end">
                               <p className="font-semibold text-sm text-right truncate">{homeName}</p>
-                              <Avatar className="h-7 w-7 shrink-0">
-                                <AvatarFallback className="text-[10px]">
-                                  {getInitials(homeName)}
-                                </AvatarFallback>
-                              </Avatar>
+                              {homeId ? (
+                                <SmartAvatar type={homeType as "player" | "team"} id={homeId} name={homeName} className="h-7 w-7 shrink-0" fallbackClassName="text-[10px]" />
+                              ) : (
+                                <Avatar className="h-7 w-7 shrink-0">
+                                  <AvatarFallback className="text-[10px]">{getInitials(homeName)}</AvatarFallback>
+                                </Avatar>
+                              )}
                             </div>
                             <span className="text-xs text-muted-foreground px-2 shrink-0">vs</span>
                             <div className="flex items-center gap-2 flex-1">
-                              <Avatar className="h-7 w-7 shrink-0">
-                                <AvatarFallback className="text-[10px]">
-                                  {getInitials(awayName)}
-                                </AvatarFallback>
-                              </Avatar>
+                              {awayId ? (
+                                <SmartAvatar type={awayType as "player" | "team"} id={awayId} name={awayName} className="h-7 w-7 shrink-0" fallbackClassName="text-[10px]" />
+                              ) : (
+                                <Avatar className="h-7 w-7 shrink-0">
+                                  <AvatarFallback className="text-[10px]">{getInitials(awayName)}</AvatarFallback>
+                                </Avatar>
+                              )}
                               <p className="font-semibold text-sm truncate">{awayName}</p>
                             </div>
                           </div>
