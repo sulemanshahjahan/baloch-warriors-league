@@ -242,6 +242,13 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                     <span className="text-muted-foreground">lvl</span>
                   </div>
                 )}
+                {player.eloRating !== 1500 && (
+                  <Link href="/rankings" className="flex items-center gap-1 text-xs sm:text-sm hover:text-primary transition-colors">
+                    <Trophy className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-400" />
+                    <span className="font-bold">{player.eloRating}</span>
+                    <span className="text-muted-foreground">ELO</span>
+                  </Link>
+                )}
                 {player.nationality && (
                   <div className="flex items-center gap-1 text-xs sm:text-sm text-muted-foreground">
                     <MapPin className="w-3 h-3 sm:w-4 sm:h-4" />

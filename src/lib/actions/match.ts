@@ -220,9 +220,11 @@ export async function updateMatchResult(
   // Recompute standings if match is completed
   if (data.status === "COMPLETED") {
     await recomputeStandings(match.tournamentId);
-
-    // Advance winner to next round for knockout matches
     await advanceKnockoutWinner(matchId, match.tournamentId);
+
+    // Update ELO ratings for 1v1 matches
+    const { updateEloAfterMatch } = await import("@/lib/elo");
+    await updateEloAfterMatch(matchId);
   }
 
   await logActivity({
@@ -914,6 +916,8 @@ export async function bulkUpdateMatchResults(
 
       await recomputeStandings(match.tournamentId);
       await advanceKnockoutWinner(matchId, match.tournamentId);
+      const { updateEloAfterMatch } = await import("@/lib/elo");
+      await updateEloAfterMatch(matchId);
       updated++;
     } catch (e) {
       errors.push(matchId);

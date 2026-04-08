@@ -228,6 +228,7 @@ model Player {
   nationality String?
   position    String?
   skillLevel  Int?      @default(50) // 0-99 rating for seeding
+  eloRating   Int       @default(1500)
   bio              String?   @db.Text
   isActive         Boolean   @default(true)
   suspendedUntil   DateTime?
@@ -245,6 +246,8 @@ model Player {
   homeMatches     Match[]            @relation("HomePlayer")
   awayMatches     Match[]            @relation("AwayPlayer")
   standings       Standing[]
+  eloHistory      EloHistory[]
+  eloAsOpponent   EloHistory[]       @relation("EloOpponent")
 
   @@index([isActive])
   @@map("players")
@@ -399,10 +402,38 @@ model Match {
   participants    MatchParticipant[]
   nextMatch       Match?            @relation("KnockoutProgression", fields: [nextMatchId], references: [id])
   previousMatches Match[]           @relation("KnockoutProgression")
+  eloHistory      EloHistory[]
 
   @@index([tournamentId])
   @@index([status])
   @@map("matches")
+}
+
+// ─────────────────────────────────────────────────────────────
+// ELO HISTORY
+// ─────────────────────────────────────────────────────────────
+
+model EloHistory {
+  id                   String   @id @default(cuid())
+  playerId             String
+  matchId              String
+  ratingBefore         Int
+  ratingAfter          Int
+  change               Int
+  opponentId           String
+  opponentRatingBefore Int
+  result               String   // WIN, LOSS, DRAW
+  kFactor              Int
+  createdAt            DateTime @default(now())
+
+  player   Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  match    Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  opponent Player @relation("EloOpponent", fields: [opponentId], references: [id])
+
+  @@index([playerId])
+  @@index([matchId])
+  @@index([playerId, createdAt])
+  @@map("elo_history")
 }
 
 // ─────────────────────────────────────────────────────────────

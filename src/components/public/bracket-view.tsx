@@ -346,7 +346,7 @@ function DesktopBracket({ rounds, matchesByRound, participantType }: BracketView
 
             return (
               <g key={`conn-${match.id}`}>
-                {/* From feeder 1 right → horizontal → vertical → horizontal → next match left */}
+                {/* From feeder 1 right → horizontal to midpoint → vertical down to merge → horizontal to next match */}
                 <path
                   d={`M ${x1} ${y1} H ${xMid} V ${yEnd} H ${xEnd}`}
                   fill="none"
@@ -354,9 +354,9 @@ function DesktopBracket({ rounds, matchesByRound, participantType }: BracketView
                   strokeWidth={1.5}
                   strokeLinecap="round"
                 />
-                {/* From feeder 2 right → horizontal → vertical → meets at midpoint */}
+                {/* From feeder 2 right → horizontal to midpoint → vertical up to merge point */}
                 <path
-                  d={`M ${x2} ${y2} H ${xMid}`}
+                  d={`M ${x2} ${y2} H ${xMid} V ${yEnd}`}
                   fill="none"
                   stroke="var(--border)"
                   strokeWidth={1.5}
