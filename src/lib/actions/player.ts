@@ -97,6 +97,8 @@ export async function updatePlayer(id: string, formData: FormData) {
       skillLevel: data.skillLevel ? Number(data.skillLevel) : 50,
       bio: data.bio || null,
       dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null,
+      suspendedUntil: raw.suspendedUntil ? new Date(raw.suspendedUntil as string) : null,
+      suspensionReason: (raw.suspensionReason as string) || null,
     },
   });
 

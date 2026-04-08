@@ -115,7 +115,7 @@ export function MatchEventManager({
         (e.target as HTMLFormElement).reset();
         router.refresh();
       } else {
-        setError((result as any).error ?? '');
+        setError(result.error ?? '');
       }
     });
   }

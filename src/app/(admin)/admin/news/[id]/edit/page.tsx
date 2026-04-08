@@ -54,7 +54,7 @@ export default function EditNewsPage({ params }: { params: Promise<{ id: string 
         router.push("/admin/news");
         router.refresh();
       } else {
-        setError((result as any).error ?? "Failed to update post");
+        setError(result.error ?? "Failed to update post");
       }
     });
   }
@@ -66,7 +66,7 @@ export default function EditNewsPage({ params }: { params: Promise<{ id: string 
         router.push("/admin/news");
         router.refresh();
       } else {
-        setError((result as any).error ?? "Failed to delete post");
+        setError(result.error ?? "Failed to delete post");
         setDeleteDialogOpen(false);
       }
     });

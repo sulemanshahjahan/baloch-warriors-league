@@ -112,7 +112,7 @@ export function AwardsManager({
         resetForm();
         router.refresh();
       } else {
-        setError((result as any).error ?? "Failed to create award");
+        setError(result.error ?? "Failed to create award");
       }
     });
   }

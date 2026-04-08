@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Save } from "lucide-react";
 import { updateMatchResult } from "@/lib/actions/match";
 
@@ -27,8 +28,16 @@ interface MatchResultFormProps {
   awayScore: number | null;
   homeScorePens: number | null;
   awayScorePens: number | null;
+  homeClub: string | null;
+  awayClub: string | null;
+  homeFormation: string | null;
+  awayFormation: string | null;
+  isDerby: boolean;
+  rivalNote: string | null;
+  highlights: string | null;
   motmPlayerId: string | null;
   players: Player[];
+  gameCategory: string;
 }
 
 export function MatchResultForm({
@@ -38,8 +47,16 @@ export function MatchResultForm({
   awayScore,
   homeScorePens,
   awayScorePens,
+  homeClub,
+  awayClub,
+  homeFormation,
+  awayFormation,
+  isDerby: initialDerby,
+  rivalNote,
+  highlights,
   motmPlayerId,
   players,
+  gameCategory,
 }: MatchResultFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -63,7 +80,7 @@ export function MatchResultForm({
         setSuccess(true);
         router.refresh();
       } else {
-        setError((result as any).error ?? '');
+        setError(result.error ?? '');
       }
     });
   }
@@ -130,6 +147,49 @@ export function MatchResultForm({
         </div>
       </div>
 
+      {gameCategory === "EFOOTBALL" && (
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="homeClub">Home Club</Label>
+              <Input id="homeClub" name="homeClub" defaultValue={homeClub ?? ""} placeholder="e.g. Man City" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="awayClub">Away Club</Label>
+              <Input id="awayClub" name="awayClub" defaultValue={awayClub ?? ""} placeholder="e.g. Bayern" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="homeFormation">Home Formation</Label>
+              <Input id="homeFormation" name="homeFormation" defaultValue={homeFormation ?? ""} placeholder="e.g. 4-3-3" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="awayFormation">Away Formation</Label>
+              <Input id="awayFormation" name="awayFormation" defaultValue={awayFormation ?? ""} placeholder="e.g. 3-5-2" />
+            </div>
+          </div>
+        </>
+      )}
+
+      <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 border border-border/50">
+        <input type="hidden" name="isDerby" value={initialDerby ? "true" : "false"} />
+        <label className="flex items-center gap-2 cursor-pointer text-sm">
+          <input
+            type="checkbox"
+            name="isDerbyCheck"
+            defaultChecked={initialDerby}
+            className="rounded"
+            onChange={(e) => {
+              const hidden = e.target.form?.querySelector('input[name="isDerby"]') as HTMLInputElement;
+              if (hidden) hidden.value = e.target.checked ? "true" : "false";
+            }}
+          />
+          🔥 Derby / Rivalry Match
+        </label>
+        <Input name="rivalNote" defaultValue={rivalNote ?? ""} placeholder="Rivalry note (optional)" className="flex-1 h-8 text-xs" />
+      </div>
+
       <div className="space-y-2">
         <Label>Status</Label>
         <Select value={status} onValueChange={setStatus}>
@@ -164,6 +224,41 @@ export function MatchResultForm({
           </Select>
         </div>
       )}
+
+      {gameCategory === "EFOOTBALL" && players.length > 0 && (
+        <div className="space-y-2">
+          <Label>Player Ratings (1–10)</Label>
+          <div className="grid grid-cols-2 gap-2">
+            {players.slice(0, 2).map((p) => (
+              <div key={p.id} className="flex items-center gap-2">
+                <span className="text-xs truncate flex-1">{p.name}</span>
+                <Input
+                  name={`rating_${p.id}`}
+                  type="number"
+                  min={1}
+                  max={10}
+                  step={0.5}
+                  placeholder="—"
+                  className="w-16 h-8 text-xs text-center"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        <Label htmlFor="highlights">Match Summary / Highlights</Label>
+        <Textarea
+          id="highlights"
+          name="highlights"
+          defaultValue={highlights ?? ""}
+          placeholder="Write a brief match summary, key moments, talking points..."
+          rows={3}
+          className="text-sm"
+        />
+        <p className="text-xs text-muted-foreground">Shown on the public match detail page.</p>
+      </div>
 
       <Button type="submit" disabled={isPending} className="w-full">
         {isPending && <Loader2 className="w-4 h-4 animate-spin" />}

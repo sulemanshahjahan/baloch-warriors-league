@@ -6,18 +6,19 @@ import { cn } from "@/lib/utils";
 interface StatsGameFilterProps {
   categories: { value: string; label: string }[];
   current: string;
+  paramName?: string;
 }
 
-export function StatsGameFilter({ categories, current }: StatsGameFilterProps) {
+export function StatsGameFilter({ categories, current, paramName = "game" }: StatsGameFilterProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   function handleSelect(value: string) {
     const params = new URLSearchParams(searchParams.toString());
     if (value === "all") {
-      params.delete("game");
+      params.delete(paramName);
     } else {
-      params.set("game", value);
+      params.set(paramName, value);
     }
     router.push(`/stats?${params.toString()}`);
   }

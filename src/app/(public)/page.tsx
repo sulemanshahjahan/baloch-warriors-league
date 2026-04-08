@@ -48,6 +48,8 @@ async function getHomeData() {
           matchNumber: true,
           homeScore: true,
           awayScore: true,
+          homeScorePens: true,
+          awayScorePens: true,
           tournament: { select: { name: true, gameCategory: true } },
           homeTeam: { select: { id: true, name: true, shortName: true } },
           awayTeam: { select: { id: true, name: true, shortName: true } },
@@ -205,14 +207,14 @@ export default async function HomePage() {
                     <CardContent className="p-4">
                       <div className="flex items-center gap-2 mb-2">
                         <span
-                          className={`text-xs px-2 py-0.5 rounded-full font-medium ${gameColor(t.gameCategory as never)}`}
+                          className={`text-xs px-2 py-0.5 rounded-full font-medium ${gameColor(t.gameCategory)}`}
                         >
-                          {gameLabel(t.gameCategory as never)}
+                          {gameLabel(t.gameCategory)}
                         </span>
                         <span
-                          className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(t.status as never)}`}
+                          className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(t.status)}`}
                         >
-                          {statusLabel(t.status as never)}
+                          {statusLabel(t.status)}
                         </span>
                       </div>
                       <h3 className="font-semibold text-sm line-clamp-2 mb-2">
@@ -261,9 +263,9 @@ export default async function HomePage() {
                         <CardContent className="p-4">
                           <div className="flex items-center gap-2 mb-2">
                             <span
-                              className={`text-xs px-2 py-0.5 rounded-full font-medium ${gameColor(match.tournament.gameCategory as never)}`}
+                              className={`text-xs px-2 py-0.5 rounded-full font-medium ${gameColor(match.tournament.gameCategory)}`}
                             >
-                              {gameLabel(match.tournament.gameCategory as never)}
+                              {gameLabel(match.tournament.gameCategory)}
                             </span>
                             <span className="text-xs text-muted-foreground truncate">
                               {match.tournament.name}
@@ -294,6 +296,9 @@ export default async function HomePage() {
                                 <span className="text-muted-foreground mx-1 font-light text-lg">–</span>
                                 {match.awayScore ?? 0}
                               </span>
+                              {match.homeScorePens != null && match.awayScorePens != null && (
+                                <p className="text-[10px] text-muted-foreground">({match.homeScorePens}–{match.awayScorePens} pens)</p>
+                              )}
                             </div>
                             <div className="flex items-center gap-2 flex-1">
                               {awayId ? (
@@ -348,9 +353,9 @@ export default async function HomePage() {
                         <CardContent className="p-4">
                           <div className="flex items-center gap-2 mb-1">
                             <span
-                              className={`text-xs px-2 py-0.5 rounded-full font-medium ${gameColor(match.tournament.gameCategory as never)}`}
+                              className={`text-xs px-2 py-0.5 rounded-full font-medium ${gameColor(match.tournament.gameCategory)}`}
                             >
-                              {gameLabel(match.tournament.gameCategory as never)}
+                              {gameLabel(match.tournament.gameCategory)}
                             </span>
                             <span className="text-xs text-muted-foreground truncate">
                               {match.tournament.name}

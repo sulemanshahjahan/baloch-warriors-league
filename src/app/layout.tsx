@@ -21,8 +21,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className="min-h-screen bg-background text-foreground antialiased">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('bwl-theme');if(t==='light'||(!t&&window.matchMedia('(prefers-color-scheme:light)').matches)){document.documentElement.classList.add('light')}}catch(e){}})()`,
+          }}
+        />
+      </head>
+      <body className="min-h-screen bg-background text-foreground antialiased" suppressHydrationWarning>
         <Suspense fallback={null}>
           <LoadingProgress />
         </Suspense>

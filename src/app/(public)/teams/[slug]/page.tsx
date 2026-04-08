@@ -117,7 +117,10 @@ export default async function TeamPage({ params }: TeamPageProps) {
   return (
     <div className="min-h-screen">
       {/* Hero */}
-      <section className="border-b border-border/50 bg-card/30">
+      <section
+        className="border-b border-border/50 bg-card/30"
+        style={team.primaryColor ? { borderBottomColor: team.primaryColor + "40" } : undefined}
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <Link
             href="/teams"
@@ -128,13 +131,19 @@ export default async function TeamPage({ params }: TeamPageProps) {
           </Link>
 
           <div className="flex items-start gap-4">
-            <SmartAvatar
-              type="team"
-              id={team.id}
-              name={team.name}
-              className="h-20 w-20 sm:h-24 sm:w-24 shrink-0"
-              fallbackClassName="text-2xl sm:text-3xl"
-            />
+            <div
+              className="rounded-full p-0.5 shrink-0"
+              style={team.primaryColor ? { background: `linear-gradient(135deg, ${team.primaryColor}, ${team.primaryColor}88)` } : undefined}
+            >
+              <SmartAvatar
+                type="team"
+                id={team.id}
+                name={team.name}
+                className="h-20 w-20 sm:h-24 sm:w-24"
+                fallbackClassName="text-2xl sm:text-3xl"
+                primaryColor={team.primaryColor}
+              />
+            </div>
 
             <div className="min-w-0 flex-1">
               <h1 className="text-2xl sm:text-3xl font-black tracking-tight leading-tight">

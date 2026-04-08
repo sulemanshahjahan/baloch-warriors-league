@@ -81,17 +81,17 @@ function TournamentCard({
             <div className="flex items-center gap-2">
               <span
                 className={`text-xs px-2 py-0.5 rounded-full font-medium ${gameColor(
-                  tournament.gameCategory as never
+                  tournament.gameCategory
                 )}`}
               >
-                {gameLabel(tournament.gameCategory as never)}
+                {gameLabel(tournament.gameCategory)}
               </span>
               <span
                 className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(
-                  tournament.status as never
+                  tournament.status
                 )}`}
               >
-                {statusLabel(tournament.status as never)}
+                {statusLabel(tournament.status)}
               </span>
             </div>
             {tournament.isFeatured && (
@@ -106,7 +106,7 @@ function TournamentCard({
           </h3>
 
           <p className="text-sm text-muted-foreground mb-4">
-            {formatLabel(tournament.format as never)}
+            {formatLabel(tournament.format)}
           </p>
 
           <div className="flex items-center gap-4 text-sm text-muted-foreground">

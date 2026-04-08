@@ -273,7 +273,12 @@ export default function NewMatchPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="scheduledAt">Date & Time</Label>
-                  <Input id="scheduledAt" name="scheduledAt" type="datetime-local" />
+                  <Input
+                    id="scheduledAt"
+                    name="scheduledAt"
+                    type="datetime-local"
+                    defaultValue={new Date().toISOString().slice(0, 16)}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Status</Label>

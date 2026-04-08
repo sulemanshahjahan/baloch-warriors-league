@@ -686,3 +686,99 @@ export async function randomDrawToGroups(options: RandomDrawOptions) {
     assignments: assignments.map((a) => a.name),
   };
 }
+
+// ─── PUBG BATTLE ROYALE MATCHES ──────────────────────────────
+
+interface PUBGMatchOptions {
+  tournamentId: string;
+  matchCount: number;
+  pointsPerKill: number;
+  placementPoints: { placement: number; points: number }[];
+}
+
+export async function createPUBGMatches(options: PUBGMatchOptions) {
+  const session = await auth();
+  if (!session) return { success: false, error: "Unauthorized" };
+  if (!hasRole(session, "ADMIN")) return { success: false, error: "Forbidden: Admin role required" };
+
+  const { tournamentId, matchCount, pointsPerKill, placementPoints } = options;
+
+  // Get tournament and participants
+  const tournament = await prisma.tournament.findUnique({
+    where: { id: tournamentId },
+    include: {
+      teams: { include: { team: true } },
+      players: { include: { player: true } },
+    },
+  });
+
+  if (!tournament) return { success: false, error: "Tournament not found" };
+  if (tournament.gameCategory !== "PUBG") {
+    return { success: false, error: "This function is only for PUBG tournaments" };
+  }
+
+  const isIndividual = tournament.participantType === "INDIVIDUAL";
+  
+  // Get participants
+  const participants = isIndividual
+    ? tournament.players.map((p) => ({ id: p.playerId, name: p.player.name }))
+    : tournament.teams.map((t) => ({ id: t.teamId, name: t.team.name }));
+
+  if (participants.length < 2) {
+    return { success: false, error: "Need at least 2 participants" };
+  }
+
+  // Delete existing scheduled matches
+  await prisma.match.deleteMany({
+    where: {
+      tournamentId,
+      status: "SCHEDULED" as MatchStatus,
+    },
+  });
+
+  // Create PUBG matches - all participants in each match
+  const createdMatches = [];
+  
+  for (let i = 1; i <= matchCount; i++) {
+    // Create the match
+    const match = await prisma.match.create({
+      data: {
+        tournamentId,
+        round: `Match ${i}`,
+        roundNumber: i,
+        matchNumber: i,
+        status: "SCHEDULED" as MatchStatus,
+        // Store PUBG scoring config in notes field as JSON
+        notes: JSON.stringify({
+          type: "PUBG",
+          pointsPerKill,
+          placementPoints,
+        }),
+      },
+    });
+
+    // Create MatchParticipant records for all participants
+    // Initially all have null scores (to be filled after match is played)
+    for (const participant of participants) {
+      await prisma.matchParticipant.create({
+        data: {
+          matchId: match.id,
+          teamId: isIndividual ? null : participant.id,
+          playerId: isIndividual ? participant.id : null,
+          placement: null,
+          score: 0, // Will be calculated: placementPoints + (kills * pointsPerKill)
+        },
+      });
+    }
+
+    createdMatches.push(match);
+  }
+
+  revalidatePath(`/admin/tournaments/${tournamentId}`);
+  revalidatePath("/admin/matches");
+  
+  return { 
+    success: true, 
+    count: createdMatches.length,
+  };
+}

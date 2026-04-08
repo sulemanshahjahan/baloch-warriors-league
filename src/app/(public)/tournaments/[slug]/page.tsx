@@ -131,6 +131,8 @@ async function getTournamentBySlug(slug: string) {
       // bannerUrl intentionally omitted — base64 stored images bloat ISR payload
       participantType: true,
       isFeatured: true,
+      prizeInfo: true,
+      rules: true,
     },
   });
 
@@ -187,14 +189,27 @@ async function getTournamentBySlug(slug: string) {
       scheduledAt: true,
       homeScore: true,
       awayScore: true,
+      homeScorePens: true,
+      awayScorePens: true,
       homeTeamId: true,
       awayTeamId: true,
       homePlayerId: true,
       awayPlayerId: true,
+      notes: true,
       homeTeam: { select: { id: true, name: true, shortName: true } },
       awayTeam: { select: { id: true, name: true, shortName: true } },
       homePlayer: { select: { id: true, name: true } },
       awayPlayer: { select: { id: true, name: true } },
+      _count: { select: { participants: true } },
+      participants: {
+        select: {
+          id: true,
+          placement: true,
+          score: true,
+          player: { select: { id: true, name: true } },
+          team: { select: { id: true, name: true } },
+        },
+      },
     },
   });
 
@@ -204,6 +219,7 @@ async function getTournamentBySlug(slug: string) {
       id: true,
       type: true,
       customName: true,
+      description: true,
       player: { select: { id: true, name: true, slug: true } },
       team: { select: { id: true, name: true, slug: true } },
     },
@@ -261,6 +277,20 @@ async function getTournamentBySlug(slug: string) {
     },
   });
 
+  // Latest MOTM
+  const latestMOTM = await prisma.match.findFirst({
+    where: { tournamentId: tournament.id, status: "COMPLETED", motmPlayerId: { not: null } },
+    orderBy: { completedAt: "desc" },
+    select: {
+      round: true,
+      motmPlayer: { select: { id: true, name: true, slug: true } },
+      homePlayer: { select: { name: true } },
+      awayPlayer: { select: { name: true } },
+      homeTeam: { select: { name: true } },
+      awayTeam: { select: { name: true } },
+    },
+  });
+
   return {
     ...tournament,
     _count: {
@@ -274,6 +304,7 @@ async function getTournamentBySlug(slug: string) {
     matches,
     awards,
     teams,
+    latestMOTM,
     players,
     standings,
     formMatches,
@@ -369,17 +400,17 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
               <div className="flex items-center gap-2 mb-2">
                 <span
                   className={`text-xs px-2 py-0.5 rounded-full font-medium ${gameColor(
-                    tournament.gameCategory as never
+                    tournament.gameCategory
                   )}`}
                 >
-                  {gameLabel(tournament.gameCategory as never)}
+                  {gameLabel(tournament.gameCategory)}
                 </span>
                 <span
                   className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor(
-                    tournament.status as never
+                    tournament.status
                   )}`}
                 >
-                  {statusLabel(tournament.status as never)}
+                  {statusLabel(tournament.status)}
                 </span>
                 {tournament.isFeatured && (
                   <Badge variant="secondary" className="text-xs">
@@ -391,7 +422,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                 {tournament.name}
               </h1>
               <p className="text-muted-foreground mt-2">
-                {formatLabel(tournament.format as never)} •{" "}
+                {formatLabel(tournament.format)} •{" "}
                 {tournament.startDate
                   ? formatDate(tournament.startDate)
                   : "Date TBD"}
@@ -411,6 +442,14 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
             <p className="text-muted-foreground mt-4 max-w-3xl">
               {tournament.description}
             </p>
+          )}
+
+          {/* Prize Info */}
+          {tournament.prizeInfo && (
+            <div className="flex items-start gap-2 mt-4 px-3 py-2.5 rounded-lg bg-yellow-400/10 border border-yellow-400/20 max-w-2xl">
+              <Trophy className="w-4 h-4 text-yellow-400 shrink-0 mt-0.5" />
+              <p className="text-sm text-yellow-200">{tournament.prizeInfo}</p>
+            </div>
           )}
 
           {/* Stats */}
@@ -439,8 +478,27 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
 
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Latest MOTM highlight */}
+        {tournament.latestMOTM?.motmPlayer && (
+          <Link
+            href={`/players/${tournament.latestMOTM.motmPlayer.slug}`}
+            className="flex items-center gap-3 p-3 mb-6 rounded-lg bg-amber-400/10 border border-amber-400/20 hover:bg-amber-400/15 transition-colors"
+          >
+            <SmartAvatar type="player" id={tournament.latestMOTM.motmPlayer.id} name={tournament.latestMOTM.motmPlayer.name} className="h-10 w-10" fallbackClassName="text-sm" />
+            <div>
+              <p className="text-sm font-semibold">
+                ⭐ {tournament.latestMOTM.motmPlayer.name}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Man of the Match
+                {tournament.latestMOTM.round && ` — ${tournament.latestMOTM.round}`}
+              </p>
+            </div>
+          </Link>
+        )}
+
         <Tabs defaultValue="standings" className="space-y-6">
-          <TabsList className={`bg-muted/50 w-full grid h-auto ${hasKnockoutFormat ? 'grid-cols-2 sm:grid-cols-5' : 'grid-cols-2 sm:grid-cols-4'}`}>
+          <TabsList className={`bg-muted/50 w-full grid h-auto ${hasKnockoutFormat ? (tournament.rules ? 'grid-cols-3 sm:grid-cols-6' : 'grid-cols-2 sm:grid-cols-5') : (tournament.rules ? 'grid-cols-3 sm:grid-cols-5' : 'grid-cols-2 sm:grid-cols-4')}`}>
             <TabsTrigger value="standings" className="text-xs sm:text-sm py-2">
               <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
               <span className="hidden sm:inline">Standings</span>
@@ -464,6 +522,12 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
               <Award className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
               Awards
             </TabsTrigger>
+            {tournament.rules && (
+              <TabsTrigger value="rules" className="text-xs sm:text-sm py-2">
+                <Trophy className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                Rules
+              </TabsTrigger>
+            )}
           </TabsList>
 
           {/* Standings */}
@@ -485,9 +549,10 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                           No standings available for this group yet.
                         </p>
                       ) : (
-                        <StandingsTable 
-                          standings={group.standings} 
+                        <StandingsTable
+                          standings={group.standings}
                           participantType={tournament.participantType}
+                          gameCategory={tournament.gameCategory}
                           formMatches={tournament.formMatches}
                         />
                       )}
@@ -511,9 +576,10 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                     No standings available yet. Matches need to be played first.
                   </p>
                 ) : (
-                  <StandingsTable 
+                  <StandingsTable
                     standings={tournament.standings}
                     participantType={tournament.participantType}
+                    gameCategory={tournament.gameCategory}
                     formMatches={tournament.formMatches}
                   />
                 )}
@@ -652,14 +718,14 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {tournament.awards.map((award) => {
-                  const winner = (award as any).player ?? (award as any).team ?? null;
-                  const winnerSlug = (award as any).player
-                    ? `/players/${(award as any).player.slug}`
-                    : (award as any).team
-                    ? `/teams/${(award as any).team.slug}`
+                  const winner = award.player ?? award.team ?? null;
+                  const winnerSlug = award.player
+                    ? `/players/${award.player.slug}`
+                    : award.team
+                    ? `/teams/${award.team.slug}`
                     : null;
-                  const winnerId = (award as any).player?.id ?? (award as any).team?.id;
-                  const winnerType = (award as any).player ? "player" : "team";
+                  const winnerId = award.player?.id ?? award.team?.id;
+                  const winnerType = award.player ? "player" : "team";
                   return (
                     <Card key={award.id}>
                       <CardContent className="p-4">
@@ -673,6 +739,9 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                             </p>
                             {award.customName && (
                               <p className="text-xs text-muted-foreground">{award.customName}</p>
+                            )}
+                            {award.description && (
+                              <p className="text-xs text-muted-foreground mt-0.5">{award.description}</p>
                             )}
                             {winner && (
                               <div className="flex items-center gap-1.5 mt-2">
@@ -701,6 +770,33 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
               </div>
             )}
           </TabsContent>
+
+          {/* Rules */}
+          {tournament.rules && (
+            <TabsContent value="rules" className="mt-0">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Trophy className="w-4 h-4 text-yellow-400" />
+                    Tournament Rules
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="prose prose-invert prose-sm max-w-none">
+                    {tournament.rules.split("\n").map((line, i) =>
+                      line.trim() === "" ? (
+                        <br key={i} />
+                      ) : (
+                        <p key={i} className="text-sm text-muted-foreground leading-relaxed mb-2">
+                          {line}
+                        </p>
+                      )
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
         </Tabs>
       </div>
     </div>
@@ -715,17 +811,124 @@ function MatchCard({
     round: string | null;
     roundNumber: number | null;
     matchNumber: number | null;
+    notes: string | null;
     homeTeam: { id: string; name: string; shortName: string | null } | null;
     awayTeam: { id: string; name: string; shortName: string | null } | null;
     homePlayer: { id: string; name: string; slug?: string } | null;
     awayPlayer: { id: string; name: string; slug?: string } | null;
     homeScore: number | null;
     awayScore: number | null;
+    homeScorePens: number | null;
+    awayScorePens: number | null;
     status: string;
     scheduledAt: Date | null;
+    _count: { participants: number };
+    participants: Array<{
+      id: string;
+      placement: number | null;
+      score: number | null;
+      player: { id: string; name: string } | null;
+      team: { id: string; name: string } | null;
+    }>;
   };
 }) {
   const isCompleted = match.status === "COMPLETED";
+  const isBattleRoyale =
+    !match.homeTeam && !match.awayTeam && !match.homePlayer && !match.awayPlayer;
+
+  if (isBattleRoyale) {
+    const count = match._count.participants;
+
+    // Parse scoring config for kill back-calculation
+    let ppk = 1;
+    let placementPts: { placement: number; points: number }[] = [];
+    try {
+      const cfg = JSON.parse(match.notes || "{}");
+      ppk = cfg.pointsPerKill || 1;
+      placementPts = cfg.placementPoints || [];
+    } catch { /* defaults */ }
+    const getPlacePts = (pl: number) => placementPts.find((p) => p.placement === pl)?.points ?? 0;
+
+    // Top 3 by score for completed matches
+    const top3 = isCompleted
+      ? [...match.participants]
+          .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+          .slice(0, 3)
+          .map((p) => {
+            const placePts = getPlacePts(p.placement ?? 99);
+            const kills = Math.max(0, Math.round(((p.score ?? 0) - placePts) / ppk));
+            return { ...p, kills };
+          })
+      : [];
+
+    const PODIUM_COLORS = [
+      "text-yellow-400",   // 1st
+      "text-gray-400",     // 2nd
+      "text-orange-400",   // 3rd
+    ];
+
+    return (
+      <div className="p-4 rounded-lg bg-muted/50">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-3">
+          {match.round ? (
+            <span className="text-sm font-semibold text-primary">
+              {getRoundDisplayName(match.round, match.roundNumber, match.matchNumber)}
+            </span>
+          ) : <span />}
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="text-lg">🎮</span>
+            <span>{count > 0 ? `${count} Players` : "Battle Royale"}</span>
+            <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+              isCompleted ? "bg-green-500/20 text-green-400" :
+              match.status === "LIVE" ? "bg-red-500/20 text-red-400 animate-pulse" :
+              "bg-muted text-muted-foreground"
+            }`}>
+              {isCompleted ? "Completed" : match.status === "LIVE" ? "Live" : "Upcoming"}
+            </span>
+          </div>
+        </div>
+
+        {/* Top 3 podium for completed matches */}
+        {isCompleted && top3.length > 0 && (
+          <div className="grid grid-cols-3 gap-2">
+            {top3.map((p, i) => {
+              const name = p.player?.name ?? p.team?.name ?? "?";
+              const id = p.player?.id ?? p.team?.id;
+              const type = p.player ? "player" : "team";
+              return (
+                <div key={p.id} className="flex flex-col items-center gap-1 p-2 rounded-lg bg-card/60 border border-border/40">
+                  {/* Rank */}
+                  <span className={`text-xs font-bold ${PODIUM_COLORS[i]}`}>#{p.placement}</span>
+                  {/* Avatar */}
+                  {id ? (
+                    <SmartAvatar type={type as "player" | "team"} id={id} name={name} className="h-9 w-9" fallbackClassName="text-[10px]" />
+                  ) : (
+                    <Avatar className="h-9 w-9"><AvatarFallback className="text-[10px]">{getInitials(name)}</AvatarFallback></Avatar>
+                  )}
+                  {/* Name */}
+                  <p className="text-[11px] font-medium truncate w-full text-center">{name}</p>
+                  {/* Stats */}
+                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                    <span className="flex items-center gap-0.5">💀 {p.kills}</span>
+                    <span className="flex items-center gap-0.5 font-semibold text-foreground">{p.score ?? 0}pt</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Date */}
+        {match.scheduledAt && (
+          <p className="text-center text-xs text-muted-foreground mt-2">
+            {formatDateTime(match.scheduledAt)}
+          </p>
+        )}
+      </div>
+    );
+  }
+
   const isPlayerMatch = !!match.homePlayer || !!match.awayPlayer;
 
   const homeName = isPlayerMatch
@@ -734,12 +937,12 @@ function MatchCard({
   const awayName = isPlayerMatch
     ? (match.awayPlayer?.name ?? "TBD")
     : (match.awayTeam?.name ?? "TBD");
-  
+
   const homeId = isPlayerMatch ? match.homePlayer?.id : match.homeTeam?.id;
   const awayId = isPlayerMatch ? match.awayPlayer?.id : match.awayTeam?.id;
   const homeType = isPlayerMatch ? "player" : "team";
   const awayType = isPlayerMatch ? "player" : "team";
-  
+
   return (
     <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
       <div className="flex-1">
@@ -762,9 +965,14 @@ function MatchCard({
           </div>
           <div className="text-center min-w-[60px]">
             {isCompleted ? (
-              <span className="text-xl font-bold">
-                {match.homeScore ?? 0} - {match.awayScore ?? 0}
-              </span>
+              <div>
+                <span className="text-xl font-bold">
+                  {match.homeScore ?? 0} - {match.awayScore ?? 0}
+                </span>
+                {match.homeScorePens != null && match.awayScorePens != null && (
+                  <p className="text-[10px] text-muted-foreground">({match.homeScorePens}–{match.awayScorePens} pens)</p>
+                )}
+              </div>
             ) : (
               <span className="text-muted-foreground">vs</span>
             )}
@@ -814,6 +1022,7 @@ function FormBadge({ result }: { result: FormResult }) {
 function StandingsTable({
   standings,
   participantType,
+  gameCategory,
   formMatches,
 }: {
   standings: Array<{
@@ -832,24 +1041,49 @@ function StandingsTable({
     player: { id: string; slug: string; name: string } | null;
   }>;
   participantType: string;
+  gameCategory: string;
   formMatches: MatchForForm[];
 }) {
   const isIndividual = participantType === "INDIVIDUAL";
+  const isPUBG = gameCategory === "PUBG";
+  const isSnookerOrCheckers = gameCategory === "SNOOKER" || gameCategory === "CHECKERS";
+  const frameLabel = gameCategory === "CHECKERS" ? "GW" : "FW";
+  const frameLabelFull = gameCategory === "CHECKERS" ? "Games" : "Frames";
+
   return (
     <Table>
       <TableHeader>
         <TableRow className="bg-muted/50">
           <TableHead className="w-10">#</TableHead>
           <TableHead>{isIndividual ? "Player" : "Team"}</TableHead>
-          <TableHead className="text-center">P</TableHead>
-          <TableHead className="text-center">W</TableHead>
-          <TableHead className="text-center">D</TableHead>
-          <TableHead className="text-center">L</TableHead>
-          <TableHead className="text-center hidden sm:table-cell">GF</TableHead>
-          <TableHead className="text-center hidden sm:table-cell">GA</TableHead>
-          <TableHead className="text-center">GD</TableHead>
-          <TableHead className="text-center font-bold">Pts</TableHead>
-          <TableHead className="text-center w-[120px]">Form</TableHead>
+          <TableHead className="text-center">MP</TableHead>
+          {isPUBG ? (
+            <>
+              <TableHead className="text-center">💀 Kills</TableHead>
+              <TableHead className="text-center">🐔</TableHead>
+              <TableHead className="text-center font-bold">Total Pts</TableHead>
+            </>
+          ) : isSnookerOrCheckers ? (
+            <>
+              <TableHead className="text-center">W</TableHead>
+              <TableHead className="text-center">L</TableHead>
+              <TableHead className="text-center" title={`${frameLabelFull} Won`}>{frameLabel}</TableHead>
+              <TableHead className="text-center" title={`${frameLabelFull} Lost`}>{frameLabel}A</TableHead>
+              <TableHead className="text-center font-bold">Pts</TableHead>
+              <TableHead className="text-center w-[120px]">Form</TableHead>
+            </>
+          ) : (
+            <>
+              <TableHead className="text-center">W</TableHead>
+              <TableHead className="text-center">D</TableHead>
+              <TableHead className="text-center">L</TableHead>
+              <TableHead className="text-center hidden sm:table-cell">GF</TableHead>
+              <TableHead className="text-center hidden sm:table-cell">GA</TableHead>
+              <TableHead className="text-center">GD</TableHead>
+              <TableHead className="text-center font-bold">Pts</TableHead>
+              <TableHead className="text-center w-[120px]">Form</TableHead>
+            </>
+          )}
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -860,9 +1094,30 @@ function StandingsTable({
             : `/teams/${s.team?.slug}`;
           const participantId = isIndividual ? s.playerId : s.teamId;
           const form = participantId ? computeForm(participantId, formMatches, isIndividual) : [];
+
+          // Tiebreaker indicator — show why this row is above the previous with same points
+          let tiebreaker: string | null = null;
+          if (!isPUBG && i > 0) {
+            const prev = standings[i - 1];
+            if (s.points === prev.points && s.goalDiff !== prev.goalDiff) {
+              tiebreaker = "GD";
+            } else if (s.points === prev.points && s.goalDiff === prev.goalDiff && s.goalsFor !== prev.goalsFor) {
+              tiebreaker = "GF";
+            } else if (s.points === prev.points && s.goalDiff === prev.goalDiff && s.goalsFor === prev.goalsFor) {
+              tiebreaker = "=";
+            }
+          }
+
           return (
             <TableRow key={s.id}>
-              <TableCell className="font-medium text-muted-foreground">{i + 1}</TableCell>
+              <TableCell className="font-medium text-muted-foreground">
+                <div className="flex flex-col items-center">
+                  <span>{i + 1}</span>
+                  {tiebreaker && tiebreaker !== "=" && (
+                    <span className="text-[9px] text-muted-foreground/60" title={`Separated by ${tiebreaker === "GD" ? "goal difference" : "goals scored"}`}>{tiebreaker}</span>
+                  )}
+                </div>
+              </TableCell>
               <TableCell>
                 <Link href={href} className="flex items-center gap-2 hover:text-primary transition-colors">
                   {isIndividual && s.player ? (
@@ -880,24 +1135,51 @@ function StandingsTable({
                 </Link>
               </TableCell>
               <TableCell className="text-center">{s.played}</TableCell>
-              <TableCell className="text-center text-green-400">{s.won}</TableCell>
-              <TableCell className="text-center text-muted-foreground">{s.drawn}</TableCell>
-              <TableCell className="text-center text-red-400">{s.lost}</TableCell>
-              <TableCell className="text-center hidden sm:table-cell">{s.goalsFor}</TableCell>
-              <TableCell className="text-center hidden sm:table-cell">{s.goalsAgainst}</TableCell>
-              <TableCell className={`text-center ${s.goalDiff > 0 ? "text-green-400" : s.goalDiff < 0 ? "text-red-400" : ""}`}>
-                {s.goalDiff > 0 ? `+${s.goalDiff}` : s.goalDiff}
-              </TableCell>
-              <TableCell className="text-center font-bold">{s.points}</TableCell>
-              <TableCell className="text-center">
-                <div className="flex items-center justify-center gap-1">
-                  {form.length > 0 ? (
-                    form.map((r, idx) => <FormBadge key={idx} result={r} />)
-                  ) : (
-                    <span className="text-muted-foreground text-xs">-</span>
-                  )}
-                </div>
-              </TableCell>
+              {isPUBG ? (
+                <>
+                  <TableCell className="text-center">{s.goalsFor}</TableCell>
+                  <TableCell className="text-center">{s.won}</TableCell>
+                  <TableCell className="text-center font-bold text-primary">{s.points}</TableCell>
+                </>
+              ) : isSnookerOrCheckers ? (
+                <>
+                  <TableCell className="text-center text-green-400">{s.won}</TableCell>
+                  <TableCell className="text-center text-red-400">{s.lost}</TableCell>
+                  <TableCell className="text-center">{s.goalsFor}</TableCell>
+                  <TableCell className="text-center">{s.goalsAgainst}</TableCell>
+                  <TableCell className="text-center font-bold">{s.points}</TableCell>
+                  <TableCell className="text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      {form.length > 0 ? (
+                        form.map((r, idx) => <FormBadge key={idx} result={r} />)
+                      ) : (
+                        <span className="text-muted-foreground text-xs">-</span>
+                      )}
+                    </div>
+                  </TableCell>
+                </>
+              ) : (
+                <>
+                  <TableCell className="text-center text-green-400">{s.won}</TableCell>
+                  <TableCell className="text-center text-muted-foreground">{s.drawn}</TableCell>
+                  <TableCell className="text-center text-red-400">{s.lost}</TableCell>
+                  <TableCell className="text-center hidden sm:table-cell">{s.goalsFor}</TableCell>
+                  <TableCell className="text-center hidden sm:table-cell">{s.goalsAgainst}</TableCell>
+                  <TableCell className={`text-center ${s.goalDiff > 0 ? "text-green-400" : s.goalDiff < 0 ? "text-red-400" : ""}`}>
+                    {s.goalDiff > 0 ? `+${s.goalDiff}` : s.goalDiff}
+                  </TableCell>
+                  <TableCell className="text-center font-bold">{s.points}</TableCell>
+                  <TableCell className="text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      {form.length > 0 ? (
+                        form.map((r, idx) => <FormBadge key={idx} result={r} />)
+                      ) : (
+                        <span className="text-muted-foreground text-xs">-</span>
+                      )}
+                    </div>
+                  </TableCell>
+                </>
+              )}
             </TableRow>
           );
         })}
@@ -915,6 +1197,8 @@ interface BracketMatch {
   scheduledAt: Date | null;
   homeScore: number | null;
   awayScore: number | null;
+  homeScorePens: number | null;
+  awayScorePens: number | null;
   homeTeamId: string | null;
   awayTeamId: string | null;
   homePlayerId: string | null;
@@ -1022,8 +1306,9 @@ function BracketMatchCard({
   
   const homeScore = match.homeScore ?? 0;
   const awayScore = match.awayScore ?? 0;
-  const homeWon = isCompleted && homeScore > awayScore;
-  const awayWon = isCompleted && awayScore > homeScore;
+  const hasPens = match.homeScorePens != null && match.awayScorePens != null;
+  const homeWon = isCompleted && (hasPens ? match.homeScorePens! > match.awayScorePens! : homeScore > awayScore);
+  const awayWon = isCompleted && (hasPens ? match.awayScorePens! > match.homeScorePens! : awayScore > homeScore);
 
   return (
     <Link href={`/matches/${match.id}`}>
@@ -1057,6 +1342,12 @@ function BracketMatchCard({
           )}
         </div>
         
+        {/* Penalty indicator */}
+        {hasPens && (
+          <div className="text-center text-[9px] text-muted-foreground py-0.5 bg-muted/30">
+            Pens: {match.homeScorePens}–{match.awayScorePens}
+          </div>
+        )}
         {/* Away participant */}
         <div className={`px-3 py-2 flex items-center justify-between gap-2 ${awayWon ? 'bg-primary/5' : ''}`}>
           <div className="flex items-center gap-2 min-w-0">

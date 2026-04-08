@@ -37,7 +37,12 @@ export default async function MatchesPage({ searchParams }: MatchesPageProps) {
       />
 
       <main className="flex-1 p-6 space-y-6">
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" asChild>
+            <Link href="/admin/matches/bulk">
+              Bulk Entry
+            </Link>
+          </Button>
           <Button asChild>
             <Link href="/admin/matches/new">
               <Plus className="w-4 h-4" />

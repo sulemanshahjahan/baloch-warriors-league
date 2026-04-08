@@ -29,6 +29,7 @@ import {
   formatLabel,
 } from "@/lib/utils";
 import { DeleteTournamentButton } from "./delete-button";
+import { CloneTournamentButton } from "./clone-button";
 
 export const metadata = { title: "Tournaments" };
 
@@ -121,7 +122,7 @@ export default async function TournamentsPage() {
                       </div>
                     </TableCell>
                     <TableCell className="text-center text-sm">
-                      {(t as any)._count.teams + (t as any)._count.players}
+                      {t._count.teams + t._count.players}
                     </TableCell>
                     <TableCell className="text-center text-sm">
                       {t._count.matches}
@@ -148,6 +149,7 @@ export default async function TournamentsPage() {
                             <Edit className="w-4 h-4" />
                           </Link>
                         </Button>
+                        <CloneTournamentButton id={t.id} />
                         <DeleteTournamentButton id={t.id} name={t.name} />
                       </div>
                     </TableCell>

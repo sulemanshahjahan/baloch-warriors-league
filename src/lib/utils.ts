@@ -74,20 +74,20 @@ const STATUS_COLORS: Record<TournamentStatus | MatchStatus, string> = {
   POSTPONED: "bg-orange-500/10 text-orange-500",
 };
 
-export function gameLabel(game: GameCategory): string {
-  return GAME_LABELS[game] ?? game;
+export function gameLabel(game: string): string {
+  return GAME_LABELS[game as GameCategory] ?? game;
 }
 
-export function statusLabel(status: TournamentStatus | MatchStatus): string {
-  return STATUS_LABELS[status] ?? status;
+export function statusLabel(status: string): string {
+  return STATUS_LABELS[status as TournamentStatus | MatchStatus] ?? status;
 }
 
-export function gameColor(game: GameCategory): string {
-  return GAME_COLORS[game] ?? "bg-gray-500/10 text-gray-500";
+export function gameColor(game: string): string {
+  return GAME_COLORS[game as GameCategory] ?? "bg-gray-500/10 text-gray-500";
 }
 
-export function statusColor(status: TournamentStatus | MatchStatus): string {
-  return STATUS_COLORS[status] ?? "bg-gray-500/10 text-gray-500";
+export function statusColor(status: string): string {
+  return STATUS_COLORS[status as TournamentStatus | MatchStatus] ?? "bg-gray-500/10 text-gray-500";
 }
 
 export function formatDate(date: Date | string | null | undefined): string {
@@ -207,6 +207,11 @@ export function getRoundDisplayName(
       return inferRoundNameFromNumber(num, safeMatchNumber);
     }
     
+    // "Match X" pattern (PUBG battle royale) — already contains the number
+    if (/^match\s*\d+$/i.test(safeRound)) {
+      return safeRound;
+    }
+
     // Any other round name, return as-is with match number if provided
     return formatRoundWithMatchNumber(safeRound, safeMatchNumber);
   }

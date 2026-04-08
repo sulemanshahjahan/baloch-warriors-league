@@ -54,7 +54,7 @@ export default function NewPlayerPage() {
         router.push("/admin/players");
         router.refresh();
       } else {
-        setError((result as any).error ?? '');
+        setError(result.error ?? '');
       }
     });
   }

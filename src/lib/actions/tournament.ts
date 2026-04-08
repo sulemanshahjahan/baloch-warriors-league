@@ -1,26 +1,37 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { auth } from "@/lib/auth";
+import { auth, getUserRole } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { slugify } from "@/lib/utils";
 import { tournamentSchema } from "@/lib/validations/tournament";
 import type { ActionResult } from "@/lib/utils";
+import type { TournamentStatus, GameCategory } from "@prisma/client";
 import { logActivity } from "./activity-log";
 
-async function requireAdmin() {
+const ROLE_LEVELS: Record<string, number> = {
+  SUPER_ADMIN: 3,
+  ADMIN: 2,
+  EDITOR: 1,
+};
+
+function hasRole(session: { user?: { role?: string } } | null, minRole: string): boolean {
+  const userRole = getUserRole(session);
+  return (ROLE_LEVELS[userRole] ?? 0) >= (ROLE_LEVELS[minRole] ?? 0);
+}
+
+async function checkAdmin(): Promise<ActionResult | null> {
   const session = await auth();
-  if (!session) return null;
-  const role = (session.user as { role?: string })?.role ?? "EDITOR";
-  if (role === "EDITOR") return null;
-  return { session };
+  if (!session) return { success: false, error: "Unauthorized" };
+  if (!hasRole(session, "ADMIN")) return { success: false, error: "Forbidden: Admin role required" };
+  return null;
 }
 
 export async function createTournament(
   formData: FormData
 ): Promise<ActionResult<{ id: string; slug: string }>> {
-  const admin = await requireAdmin();
-  if (!admin) return { success: false, error: "Unauthorized: Admin role required" };
+  const denied = await checkAdmin();
+  if (denied) return denied as ActionResult<{ id: string; slug: string }>;
 
   const raw = Object.fromEntries(formData.entries());
   const parsed = tournamentSchema.safeParse({
@@ -81,7 +92,8 @@ export async function updateTournament(
   id: string,
   formData: FormData
 ): Promise<ActionResult> {
-  await requireAdmin();
+  const denied = await checkAdmin();
+  if (denied) return denied;
 
   const raw = Object.fromEntries(formData.entries());
   const parsed = tournamentSchema.safeParse({
@@ -99,7 +111,13 @@ export async function updateTournament(
 
   const data = parsed.data;
 
-  await prisma.tournament.update({
+  // Get old slug before update for cache invalidation
+  const oldTournament = await prisma.tournament.findUnique({
+    where: { id },
+    select: { slug: true },
+  });
+
+  const updated = await prisma.tournament.update({
     where: { id },
     data: {
       name: data.name,
@@ -130,12 +148,19 @@ export async function updateTournament(
   revalidatePath("/admin/tournaments");
   revalidatePath(`/admin/tournaments/${id}`);
   revalidatePath("/");
+  revalidatePath(`/tournaments/${updated.slug}`);
+  // Invalidate old slug cache if slug changed
+  if (oldTournament && oldTournament.slug !== updated.slug) {
+    revalidatePath(`/tournaments/${oldTournament.slug}`);
+  }
+  revalidatePath("/tournaments");
 
   return { success: true, data: undefined };
 }
 
 export async function deleteTournament(id: string): Promise<ActionResult> {
-  await requireAdmin();
+  const denied = await checkAdmin();
+  if (denied) return denied;
 
   await prisma.tournament.delete({ where: { id } });
 
@@ -157,8 +182,8 @@ export async function getTournaments(params?: {
 }) {
   return prisma.tournament.findMany({
     where: {
-      ...(params?.status && { status: params.status as never }),
-      ...(params?.gameCategory && { gameCategory: params.gameCategory as never }),
+      ...(params?.status && { status: params.status as TournamentStatus }),
+      ...(params?.gameCategory && { gameCategory: params.gameCategory as GameCategory }),
     },
     orderBy: { createdAt: "desc" },
     include: {
@@ -201,6 +226,7 @@ export async function getTournamentById(id: string) {
         },
       },
       standings: {
+        where: { groupId: null },
         orderBy: [{ points: "desc" }, { goalDiff: "desc" }],
         include: {
           team: { select: { id: true, name: true, logoUrl: true } },
@@ -298,7 +324,17 @@ export async function enrollTeamInTournament(
   tournamentId: string,
   teamId: string
 ): Promise<ActionResult> {
-  await requireAdmin();
+  const denied = await checkAdmin();
+  if (denied) return denied;
+
+  // Check maxParticipants
+  const tournament = await prisma.tournament.findUnique({
+    where: { id: tournamentId },
+    select: { maxParticipants: true, _count: { select: { teams: true } } },
+  });
+  if (tournament?.maxParticipants && tournament._count.teams >= tournament.maxParticipants) {
+    return { success: false, error: `Tournament is full (max ${tournament.maxParticipants} teams)` };
+  }
 
   try {
     const enrollment = await prisma.tournamentTeam.create({
@@ -326,7 +362,8 @@ export async function removeTeamFromTournament(
   tournamentId: string,
   tournamentTeamId: string
 ): Promise<ActionResult> {
-  await requireAdmin();
+  const denied = await checkAdmin();
+  if (denied) return denied;
 
   await prisma.tournamentTeam.delete({
     where: { id: tournamentTeamId },
@@ -349,7 +386,17 @@ export async function enrollPlayerInTournament(
   tournamentId: string,
   playerId: string
 ): Promise<ActionResult> {
-  await requireAdmin();
+  const denied = await checkAdmin();
+  if (denied) return denied;
+
+  // Check maxParticipants
+  const tournament = await prisma.tournament.findUnique({
+    where: { id: tournamentId },
+    select: { maxParticipants: true, _count: { select: { players: true } } },
+  });
+  if (tournament?.maxParticipants && tournament._count.players >= tournament.maxParticipants) {
+    return { success: false, error: `Tournament is full (max ${tournament.maxParticipants} players)` };
+  }
 
   try {
     await prisma.tournamentPlayer.create({
@@ -366,7 +413,8 @@ export async function removePlayerFromTournament(
   tournamentId: string,
   tournamentPlayerId: string
 ): Promise<ActionResult> {
-  await requireAdmin();
+  const denied = await checkAdmin();
+  if (denied) return denied;
 
   await prisma.tournamentPlayer.delete({ where: { id: tournamentPlayerId } });
   revalidatePath(`/admin/tournaments/${tournamentId}`);
@@ -377,7 +425,8 @@ export async function bulkEnrollPlayersInTournament(
   tournamentId: string,
   playerIds: string[]
 ): Promise<ActionResult<{ count: number }>> {
-  await requireAdmin();
+  const denied = await checkAdmin();
+  if (denied) return denied as ActionResult<{ count: number }>;
 
   const result = await prisma.tournamentPlayer.createMany({
     data: playerIds.map((playerId) => ({ tournamentId, playerId })),
@@ -392,7 +441,8 @@ export async function bulkRemovePlayersFromTournament(
   tournamentId: string,
   tournamentPlayerIds: string[]
 ): Promise<ActionResult<{ count: number }>> {
-  await requireAdmin();
+  const denied = await checkAdmin();
+  if (denied) return denied as ActionResult<{ count: number }>;
 
   await prisma.tournamentPlayer.deleteMany({
     where: {
@@ -438,4 +488,55 @@ export async function getAvailableTeams(tournamentId: string) {
     orderBy: { name: "asc" },
     select: { id: true, name: true, shortName: true, logoUrl: true },
   });
+}
+
+export async function cloneTournament(tournamentId: string): Promise<ActionResult<{ id: string }>> {
+  const session = await auth();
+  if (!session) return { success: false, error: "Unauthorized" };
+
+  const source = await prisma.tournament.findUnique({
+    where: { id: tournamentId },
+    select: {
+      name: true,
+      description: true,
+      gameCategory: true,
+      format: true,
+      participantType: true,
+      maxParticipants: true,
+      rules: true,
+      prizeInfo: true,
+      seasonId: true,
+    },
+  });
+
+  if (!source) return { success: false, error: "Tournament not found" };
+
+  const newName = `${source.name} (Copy)`;
+  const newSlug = slugify(newName) + "-" + Date.now().toString(36);
+
+  const cloned = await prisma.tournament.create({
+    data: {
+      name: newName,
+      slug: newSlug,
+      description: source.description,
+      gameCategory: source.gameCategory,
+      format: source.format,
+      participantType: source.participantType,
+      maxParticipants: source.maxParticipants,
+      rules: source.rules,
+      prizeInfo: source.prizeInfo,
+      seasonId: source.seasonId,
+      status: "DRAFT",
+    },
+  });
+
+  await logActivity({
+    action: "CREATE",
+    entityType: "TOURNAMENT",
+    entityId: cloned.id,
+    details: { clonedFrom: tournamentId, name: newName },
+  });
+
+  revalidatePath("/admin/tournaments");
+  return { success: true, data: { id: cloned.id } };
 }

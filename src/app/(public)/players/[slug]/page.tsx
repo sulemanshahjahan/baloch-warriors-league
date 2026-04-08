@@ -20,7 +20,10 @@ import {
   Award,
   Swords,
   BarChart3,
+  Share2,
 } from "lucide-react";
+import { ShareLink } from "@/components/public/share-link";
+import { PlayerCard } from "@/components/public/player-card";
 import {
   getInitials,
   formatDate,
@@ -106,7 +109,7 @@ async function getPlayerStats(playerId: string) {
         { awayPlayerId: playerId },
       ],
     },
-    select: { id: true },
+    select: { id: true, homePlayerId: true, homeScore: true, awayScore: true },
   });
 
   // Combine and deduplicate using Set
@@ -115,7 +118,26 @@ async function getPlayerStats(playerId: string) {
     ...individualMatches.map((m) => m.id),
   ]);
 
+  // Average player rating from CUSTOM events with description "PLAYER_RATING"
+  const ratingEvents = await prisma.matchEvent.findMany({
+    where: { playerId, type: "CUSTOM", description: "PLAYER_RATING", value: { not: null } },
+    select: { value: true },
+  });
+  const avgRating = ratingEvents.length > 0
+    ? Math.round((ratingEvents.reduce((sum, e) => sum + (e.value ?? 0), 0) / ratingEvents.length) * 10) / 10
+    : null;
+
+  // Count wins
+  let wins = 0;
+  for (const m of individualMatches) {
+    const isHome = m.homePlayerId === playerId;
+    const myScore = isHome ? (m.homeScore ?? 0) : (m.awayScore ?? 0);
+    const oppScore = isHome ? (m.awayScore ?? 0) : (m.homeScore ?? 0);
+    if (myScore > oppScore) wins++;
+  }
+
   return {
+    wins,
     goals: statsMap["GOAL"] ?? 0,
     assists: statsMap["ASSIST"] ?? 0,
     yellowCards: statsMap["YELLOW_CARD"] ?? 0,
@@ -123,6 +145,8 @@ async function getPlayerStats(playerId: string) {
     motm: statsMap["MOTM"] ?? 0,
     kills: statsMap["KILL"] ?? 0,
     appearances: allMatchIds.size,
+    avgRating,
+    ratingCount: ratingEvents.length,
   };
 }
 
@@ -201,6 +225,12 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                   &quot;{player.nickname}&quot;
                 </p>
               )}
+              {player.suspendedUntil && new Date(player.suspendedUntil) > new Date() && (
+                <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-red-500/20 text-red-400 font-medium mt-1">
+                  🚫 Suspended until {formatDate(player.suspendedUntil)}
+                  {player.suspensionReason && ` — ${player.suspensionReason}`}
+                </span>
+              )}
               <div className="flex items-center gap-2 mt-2 flex-wrap">
                 {player.position && (
                   <span className="text-xs sm:text-sm bg-muted px-2 py-0.5 rounded">
@@ -218,6 +248,12 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                   <div className="flex items-center gap-1 text-xs sm:text-sm text-muted-foreground">
                     <MapPin className="w-3 h-3 sm:w-4 sm:h-4" />
                     {player.nationality}
+                  </div>
+                )}
+                {player.dateOfBirth && (
+                  <div className="flex items-center gap-1 text-xs sm:text-sm text-muted-foreground">
+                    <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
+                    {formatDate(player.dateOfBirth)}
                   </div>
                 )}
               </div>
@@ -239,6 +275,17 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Share */}
+          <div className="flex items-center gap-2 mt-4">
+            <span className="text-xs text-muted-foreground flex items-center gap-1">
+              <Share2 className="w-3 h-3" /> Share:
+            </span>
+            <ShareLink
+              title={`${player.name} — BWL`}
+              text={`Check out ${player.name}'s profile on Baloch Warriors League! ${stats.goals > 0 ? `${stats.goals} goals` : ""}${stats.assists > 0 ? `, ${stats.assists} assists` : ""}${stats.motm > 0 ? `, ${stats.motm} MOTM` : ""}`}
+            />
           </div>
         </div>
       </section>
@@ -265,7 +312,8 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                     { label: "MOTM", value: stats.motm },
                     { label: "Yellow Cards", value: stats.yellowCards },
                     { label: "Red Cards", value: stats.redCards },
-                    { label: "Kills", value: stats.kills },
+                    ...(stats.kills > 0 ? [{ label: "Kills", value: stats.kills }] : []),
+                    ...(stats.avgRating !== null ? [{ label: `Avg Rating (${stats.ratingCount})`, value: stats.avgRating }] : []),
                   ].map((stat) => (
                     <div
                       key={stat.label}
@@ -326,20 +374,20 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                               <SmartAvatar
                                 type={opponentType}
                                 id={opponentId}
-                                name={(opponent as any)?.name ?? "?"}
+                                name={(opponent as { name: string } | null)?.name ?? "?"}
                                 className="h-8 w-8"
                                 fallbackClassName="text-xs"
                               />
                             ) : (
                               <Avatar className="h-8 w-8">
                                 <AvatarFallback className="text-xs">
-                                  {getInitials((opponent as any)?.name ?? "?")}
+                                  {getInitials((opponent as { name: string } | null)?.name ?? "?")}
                                 </AvatarFallback>
                               </Avatar>
                             )}
                             <div>
                               <p className="font-medium text-sm">
-                                vs {(opponent as any)?.name ?? "Unknown"}
+                                vs {(opponent as { name: string } | null)?.name ?? "Unknown"}
                               </p>
                               <p className="text-xs text-muted-foreground">
                                 {match.tournament.name}
@@ -361,6 +409,64 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                 </CardContent>
               </Card>
             )}
+
+            {/* Head to Head links */}
+            {recentMatches.length > 0 && (() => {
+              const opponents = new Map<string, { name: string; slug: string; id: string }>();
+              for (const m of recentMatches) {
+                const isHome = m.homePlayer?.id === player.id;
+                const opp = isHome ? m.awayPlayer : m.homePlayer;
+                if (opp && !opponents.has(opp.id)) {
+                  opponents.set(opp.id, opp);
+                }
+              }
+              if (opponents.size === 0) return null;
+              return (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Swords className="w-4 h-4 text-red-400" />
+                      Head to Head
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* Match History links */}
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-2">Match History</p>
+                      <div className="flex flex-wrap gap-2">
+                        {[...opponents.values()].map((opp) => (
+                          <Link
+                            key={opp.id}
+                            href={`/players/${player.slug}/h2h/${opp.slug}`}
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors text-sm"
+                          >
+                            <SmartAvatar type="player" id={opp.id} name={opp.name} className="h-6 w-6" fallbackClassName="text-[9px]" />
+                            <span className="font-medium">vs {opp.name}</span>
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Compare Stats links */}
+                    <div className="pt-3 border-t border-border/50">
+                      <p className="text-xs text-muted-foreground mb-2">Compare Stats Side-by-Side</p>
+                      <div className="flex flex-wrap gap-2">
+                        {[...opponents.values()].map((opp) => (
+                          <Link
+                            key={opp.id}
+                            href={`/players/compare?p1=${player.slug}&p2=${opp.slug}`}
+                            className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors text-sm text-primary"
+                          >
+                            <span>📊</span>
+                            <span className="font-medium">{opp.name}</span>
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })()}
 
             {/* Team History */}
             <Card>
@@ -413,7 +519,36 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
           </div>
 
           {/* Sidebar */}
-          <div>
+          <div className="space-y-6">
+            {/* Player Card */}
+            <PlayerCard
+              name={player.name}
+              position={player.position ?? ""}
+              rating={player.skillLevel ?? 50}
+              nationality={player.nationality ?? ""}
+              avatarUrl={`/api/image?type=player&id=${player.id}`}
+              playerId={player.id}
+              stats={{
+                goals: stats.goals,
+                wins: stats.wins,
+                matches: stats.appearances,
+                motm: stats.motm,
+              }}
+            />
+
+            {player.bio && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <User className="w-4 h-4 text-blue-400" />
+                    About
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground leading-relaxed">{player.bio}</p>
+                </CardContent>
+              </Card>
+            )}
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
@@ -440,6 +575,9 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                           <p className="font-medium text-sm">
                             {AWARD_TYPE_LABELS[award.type] ?? award.type}
                           </p>
+                          {award.description && (
+                            <p className="text-xs text-muted-foreground">{award.description}</p>
+                          )}
                           {award.tournament && (
                             <Link
                               href={`/tournaments/${award.tournament.slug}`}
@@ -461,3 +599,4 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
     </div>
   );
 }
+

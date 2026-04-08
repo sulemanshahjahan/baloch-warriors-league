@@ -1,11 +1,16 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { auth } from "@/lib/auth";
+import { auth, getUserRole } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
 import type { ActionResult } from "@/lib/utils";
 import { logActivity } from "./activity-log";
+
+const ROLE_LEVELS: Record<string, number> = { SUPER_ADMIN: 3, ADMIN: 2, EDITOR: 1 };
+function hasRole(session: { user?: { role?: string } } | null, minRole: string): boolean {
+  return (ROLE_LEVELS[getUserRole(session)] ?? 0) >= (ROLE_LEVELS[minRole] ?? 0);
+}
 
 const awardSchema = z.object({
   tournamentId: z.string().min(1, "Tournament is required"),
@@ -25,14 +30,10 @@ const awardSchema = z.object({
   description: z.string().optional(),
 });
 
-async function requireAdmin() {
-  const session = await auth();
-  if (!session) throw new Error("Unauthorized");
-  return { session };
-}
-
 export async function createAward(formData: FormData): Promise<ActionResult> {
-  await requireAdmin();
+  const session = await auth();
+  if (!session) return { success: false, error: "Unauthorized" };
+  if (!hasRole(session, "ADMIN")) return { success: false, error: "Forbidden: Admin role required" };
 
   const raw = Object.fromEntries(formData.entries());
   const parsed = awardSchema.safeParse({
@@ -82,7 +83,9 @@ export async function createAward(formData: FormData): Promise<ActionResult> {
 }
 
 export async function deleteAward(id: string, tournamentId: string): Promise<ActionResult> {
-  await requireAdmin();
+  const session = await auth();
+  if (!session) return { success: false, error: "Unauthorized" };
+  if (!hasRole(session, "ADMIN")) return { success: false, error: "Forbidden: Admin role required" };
 
   await prisma.award.delete({ where: { id } });
 

@@ -55,6 +55,7 @@ export async function createVenue(formData: FormData) {
 export async function updateVenue(id: string, formData: FormData) {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };
+  if (!hasRole(session, "ADMIN")) return { success: false, error: "Forbidden: Admin role required" };
 
   const raw = Object.fromEntries(formData.entries());
   const parsed = venueSchema.safeParse(raw);
@@ -83,6 +84,7 @@ export async function updateVenue(id: string, formData: FormData) {
 export async function deleteVenue(id: string) {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };
+  if (!hasRole(session, "ADMIN")) return { success: false, error: "Forbidden: Admin role required" };
 
   // Check if venue is used by matches
   const matchCount = await prisma.match.count({ where: { venueId: id } });

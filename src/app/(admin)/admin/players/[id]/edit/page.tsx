@@ -28,6 +28,8 @@ export default async function EditPlayerPage({ params }: EditPlayerPageProps) {
       bio: true,
       dateOfBirth: true,
       isActive: true,
+      suspendedUntil: true,
+      suspensionReason: true,
     },
   });
 

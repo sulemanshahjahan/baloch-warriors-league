@@ -65,7 +65,7 @@ export function TeamEnrollment({
         setSelectedTeamId("");
         router.refresh();
       } else {
-        setError((result as any).error ?? "Failed to enroll team");
+        setError(result.error ?? "Failed to enroll team");
       }
     });
   }

@@ -38,7 +38,7 @@ export function RescheduleForm({
 
   const scheduledAtValue = currentScheduledAt
     ? new Date(currentScheduledAt).toISOString().slice(0, 16)
-    : "";
+    : new Date().toISOString().slice(0, 16);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();

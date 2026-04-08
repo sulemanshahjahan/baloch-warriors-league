@@ -165,6 +165,27 @@ export async function removePlayerFromTeam(teamPlayerId: string, teamId: string)
   return { success: true, data: undefined };
 }
 
+export async function reactivatePlayerOnTeam(teamPlayerId: string, teamId: string) {
+  const session = await auth();
+  if (!session) return { success: false, error: "Unauthorized" };
+  if (!hasRole(session, "EDITOR")) return { success: false, error: "Forbidden" };
+
+  await prisma.teamPlayer.update({
+    where: { id: teamPlayerId },
+    data: { leftAt: null, isActive: true },
+  });
+
+  await logActivity({
+    action: "ENROLL",
+    entityType: "TEAM",
+    entityId: teamId,
+    details: { teamPlayerId, action: "REACTIVATE" },
+  });
+
+  revalidatePath(`/admin/teams/${teamId}`);
+  return { success: true, data: undefined };
+}
+
 export async function getTeams() {
   return prisma.team.findMany({
     where: { isActive: true },

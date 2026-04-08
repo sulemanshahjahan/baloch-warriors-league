@@ -24,6 +24,8 @@ type Match = {
   matchNumber: number | null;
   homeScore: number | null;
   awayScore: number | null;
+  homeScorePens: number | null;
+  awayScorePens: number | null;
   tournament: { name: string; slug: string; gameCategory: string };
   homeTeam: { id: string; name: string; shortName: string | null } | null;
   awayTeam: { id: string; name: string; shortName: string | null } | null;
@@ -57,12 +59,12 @@ function MatchCard({ match }: { match: Match }) {
               <span className="text-sm font-medium truncate max-w-[160px]">
                 {match.tournament.name}
               </span>
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${gameColor(match.tournament.gameCategory as never)}`}>
-                {gameLabel(match.tournament.gameCategory as never)}
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${gameColor(match.tournament.gameCategory)}`}>
+                {gameLabel(match.tournament.gameCategory)}
               </span>
             </div>
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${statusColor(match.status as never)}`}>
-              {isLive ? "LIVE" : statusLabel(match.status as never)}
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${statusColor(match.status)}`}>
+              {isLive ? "LIVE" : statusLabel(match.status)}
             </span>
           </div>
 
@@ -91,9 +93,14 @@ function MatchCard({ match }: { match: Match }) {
 
             <div className="text-center min-w-[80px] shrink-0">
               {isCompleted || isLive ? (
-                <span className="text-2xl font-black">
-                  {match.homeScore ?? 0} - {match.awayScore ?? 0}
-                </span>
+                <div>
+                  <span className="text-2xl font-black">
+                    {match.homeScore ?? 0} - {match.awayScore ?? 0}
+                  </span>
+                  {match.homeScorePens != null && match.awayScorePens != null && (
+                    <p className="text-xs text-muted-foreground">({match.homeScorePens}–{match.awayScorePens} pens)</p>
+                  )}
+                </div>
               ) : (
                 <span className="text-muted-foreground font-medium">vs</span>
               )}

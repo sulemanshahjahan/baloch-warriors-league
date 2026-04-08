@@ -9,6 +9,7 @@ interface SmartAvatarProps {
   name: string;
   className?: string;
   fallbackClassName?: string;
+  primaryColor?: string | null;
 }
 
 /**
@@ -21,18 +22,18 @@ export function SmartAvatar({
   name,
   className,
   fallbackClassName,
+  primaryColor,
 }: SmartAvatarProps) {
-  // Use the image API endpoint
   const imageUrl = `/api/image?type=${type}&id=${id}`;
 
   return (
     <Avatar className={className}>
-      <AvatarImage 
-        src={imageUrl} 
-        alt={name}
-        loading="lazy"
-      />
-      <AvatarFallback className={fallbackClassName} delayMs={100}>
+      <AvatarImage src={imageUrl} alt={name} loading="lazy" />
+      <AvatarFallback
+        className={fallbackClassName}
+        delayMs={100}
+        style={primaryColor ? { backgroundColor: primaryColor + "33", color: primaryColor, borderColor: primaryColor + "66" } : undefined}
+      >
         {getInitials(name)}
       </AvatarFallback>
     </Avatar>

@@ -210,6 +210,7 @@ model Team {
   awards       Award[]
   standings    Standing[]
 
+  @@index([isActive])
   @@map("teams")
 }
 
@@ -227,10 +228,12 @@ model Player {
   nationality String?
   position    String?
   skillLevel  Int?      @default(50) // 0-99 rating for seeding
-  bio         String?   @db.Text
-  isActive    Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  bio              String?   @db.Text
+  isActive         Boolean   @default(true)
+  suspendedUntil   DateTime?
+  suspensionReason String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   teams           TeamPlayer[]
   tournaments     TournamentPlayer[]
@@ -243,6 +246,7 @@ model Player {
   awayMatches     Match[]            @relation("AwayPlayer")
   standings       Standing[]
 
+  @@index([isActive])
   @@map("players")
 }
 
@@ -354,6 +358,18 @@ model Match {
   homeScorePens Int?
   awayScorePens Int?
 
+  // In-game clubs (eFootball)
+  homeClub String?
+  awayClub String?
+
+  // Formation & tactics (eFootball)
+  homeFormation String?
+  awayFormation String?
+
+  // Derby / rivalry
+  isDerby   Boolean @default(false)
+  rivalNote String?
+
   // Man of the match
   motmPlayerId String?
 
@@ -366,6 +382,7 @@ model Match {
   startedAt   DateTime?
   completedAt DateTime?
   notes       String?
+  highlights  String?     @db.Text
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -407,6 +424,8 @@ model MatchParticipant {
   player Player? @relation(fields: [playerId], references: [id])
 
   @@index([matchId])
+  @@index([playerId])
+  @@index([teamId])
   @@map("match_participants")
 }
 
@@ -469,6 +488,8 @@ model Standing {
   player     Player?           @relation(fields: [playerId], references: [id])
 
   @@index([tournamentId])
+  @@index([tournamentId, playerId])
+  @@index([tournamentId, teamId])
   @@map("standings")
 }
 
@@ -491,6 +512,7 @@ model Award {
   team       Team?      @relation(fields: [teamId], references: [id])
 
   @@index([tournamentId])
+  @@index([tournamentId, type])
   @@map("awards")
 }
 

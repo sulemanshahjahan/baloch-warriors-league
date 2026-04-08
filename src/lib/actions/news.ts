@@ -1,12 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { auth } from "@/lib/auth";
+import { auth, getUserRole } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { slugify } from "@/lib/utils";
 import { z } from "zod";
 import type { ActionResult } from "@/lib/utils";
 import { logActivity } from "./activity-log";
+
+const ROLE_LEVELS: Record<string, number> = { SUPER_ADMIN: 3, ADMIN: 2, EDITOR: 1 };
+function hasRole(session: { user?: { role?: string } } | null, minRole: string): boolean {
+  return (ROLE_LEVELS[getUserRole(session)] ?? 0) >= (ROLE_LEVELS[minRole] ?? 0);
+}
 
 const newsSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters"),
@@ -16,14 +21,10 @@ const newsSchema = z.object({
   isPublished: z.boolean().optional(),
 });
 
-async function requireAdmin() {
-  const session = await auth();
-  if (!session) throw new Error("Unauthorized");
-  return { session };
-}
-
 export async function createNewsPost(formData: FormData): Promise<ActionResult<{ id: string; slug: string }>> {
-  await requireAdmin();
+  const session = await auth();
+  if (!session) return { success: false, error: "Unauthorized" };
+  if (!hasRole(session, "EDITOR")) return { success: false, error: "Forbidden" };
 
   const raw = Object.fromEntries(formData.entries());
   const parsed = newsSchema.safeParse({
@@ -66,7 +67,9 @@ export async function createNewsPost(formData: FormData): Promise<ActionResult<{
 }
 
 export async function updateNewsPost(id: string, formData: FormData): Promise<ActionResult> {
-  await requireAdmin();
+  const session = await auth();
+  if (!session) return { success: false, error: "Unauthorized" };
+  if (!hasRole(session, "EDITOR")) return { success: false, error: "Forbidden" };
 
   const raw = Object.fromEntries(formData.entries());
   const parsed = newsSchema.safeParse({
@@ -109,7 +112,9 @@ export async function updateNewsPost(id: string, formData: FormData): Promise<Ac
 }
 
 export async function deleteNewsPost(id: string): Promise<ActionResult> {
-  await requireAdmin();
+  const session = await auth();
+  if (!session) return { success: false, error: "Unauthorized" };
+  if (!hasRole(session, "ADMIN")) return { success: false, error: "Forbidden: Admin role required" };
 
   await prisma.newsPost.delete({ where: { id } });
 

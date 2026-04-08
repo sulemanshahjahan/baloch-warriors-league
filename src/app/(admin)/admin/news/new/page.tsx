@@ -29,7 +29,7 @@ export default function NewNewsPage() {
         router.push("/admin/news");
         router.refresh();
       } else {
-        setError((result as any).error ?? "Failed to create post");
+        setError(result.error ?? "Failed to create post");
       }
     });
   }

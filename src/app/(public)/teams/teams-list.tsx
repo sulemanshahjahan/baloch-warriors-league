@@ -61,7 +61,10 @@ export function TeamsList({ teams }: { teams: Team[] }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filtered.map((team) => (
             <Link key={team.id} href={`/teams/${team.slug}`}>
-              <Card className="hover:border-primary/50 transition-all hover:-translate-y-0.5 cursor-pointer h-full group">
+              <Card
+                className="hover:border-primary/50 transition-all hover:-translate-y-0.5 cursor-pointer h-full group overflow-hidden"
+                style={team.primaryColor ? { borderTopColor: team.primaryColor, borderTopWidth: 3 } : undefined}
+              >
                 <CardContent className="p-5">
                   <div className="flex items-start justify-between">
                     <SmartAvatar
@@ -70,6 +73,7 @@ export function TeamsList({ teams }: { teams: Team[] }) {
                       name={team.name}
                       className="h-16 w-16"
                       fallbackClassName="text-xl"
+                      primaryColor={team.primaryColor}
                     />
                     <ChevronRight className="w-5 h-5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                   </div>

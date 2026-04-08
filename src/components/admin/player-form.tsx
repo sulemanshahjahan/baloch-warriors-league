@@ -33,6 +33,8 @@ interface PlayerFormProps {
     bio: string | null;
     dateOfBirth: Date | null;
     isActive: boolean;
+    suspendedUntil: Date | null;
+    suspensionReason: string | null;
   };
 }
 
@@ -57,7 +59,7 @@ export function PlayerForm({ player }: PlayerFormProps) {
         router.push(`/admin/players/${player.id}`);
         router.refresh();
       } else {
-        setError((result as any).error ?? "Failed to update player");
+        setError(result.error ?? "Failed to update player");
       }
     });
   }
@@ -70,7 +72,7 @@ export function PlayerForm({ player }: PlayerFormProps) {
         router.push("/admin/players");
         router.refresh();
       } else {
-        setError((result as any).error ?? "Failed to delete player");
+        setError(result.error ?? "Failed to delete player");
         setIsDeleting(false);
         setDeleteDialogOpen(false);
       }
@@ -269,6 +271,37 @@ export function PlayerForm({ player }: PlayerFormProps) {
                 placeholder="Player biography..."
                 rows={4}
               />
+            </div>
+
+            {/* Suspension */}
+            <div className="p-3 rounded-lg border border-border/50 bg-muted/20 space-y-3">
+              <p className="text-sm font-medium flex items-center gap-1.5">
+                🚫 Suspension
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="suspendedUntil">Suspended Until</Label>
+                  <Input
+                    id="suspendedUntil"
+                    name="suspendedUntil"
+                    type="date"
+                    defaultValue={
+                      player.suspendedUntil
+                        ? new Date(player.suspendedUntil).toISOString().split("T")[0]
+                        : ""
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="suspensionReason">Reason</Label>
+                  <Input
+                    id="suspensionReason"
+                    name="suspensionReason"
+                    defaultValue={player.suspensionReason ?? ""}
+                    placeholder="e.g. Red card accumulation"
+                  />
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>

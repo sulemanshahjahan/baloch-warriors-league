@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/table";
 import { Edit, Users, Trophy, UserPlus, User, ArrowLeft } from "lucide-react";
 import { RemovePlayerButton } from "./remove-player-button";
+import { ReactivatePlayerButton } from "./reactivate-player-button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getInitials, gameLabel, statusColor, statusLabel } from "@/lib/utils";
 
@@ -285,6 +286,7 @@ export default async function TeamDetailPage({ params }: TeamDetailPageProps) {
                           <TableHead>Position</TableHead>
                           <TableHead className="text-right">Joined</TableHead>
                           <TableHead className="text-right">Left</TableHead>
+                          <TableHead className="w-10" />
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -314,6 +316,9 @@ export default async function TeamDetailPage({ params }: TeamDetailPageProps) {
                             </TableCell>
                             <TableCell className="text-right text-sm text-muted-foreground">
                               {leftAt ? new Date(leftAt).toLocaleDateString() : "—"}
+                            </TableCell>
+                            <TableCell>
+                              <ReactivatePlayerButton teamPlayerId={teamPlayerId} teamId={id} playerName={player.name} />
                             </TableCell>
                           </TableRow>
                         ))}

@@ -241,11 +241,11 @@ export default async function AdminDashboard({
                       </div>
                       <div className="flex items-center gap-2 text-sm font-medium">
                         <span className="truncate">
-                          {(match as any).homePlayer?.name ?? match.homeTeam?.shortName ?? match.homeTeam?.name ?? "TBD"}
+                          {match.homePlayer?.name ?? match.homeTeam?.shortName ?? match.homeTeam?.name ?? "TBD"}
                         </span>
                         <span className="text-muted-foreground shrink-0">vs</span>
                         <span className="truncate">
-                          {(match as any).awayPlayer?.name ?? match.awayTeam?.shortName ?? match.awayTeam?.name ?? "TBD"}
+                          {match.awayPlayer?.name ?? match.awayTeam?.shortName ?? match.awayTeam?.name ?? "TBD"}
                         </span>
                       </div>
                     </div>

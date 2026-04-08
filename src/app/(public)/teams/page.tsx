@@ -1,4 +1,4 @@
-export const dynamic = "force-dynamic";
+export const revalidate = 300; // Cache for 5 minutes (team rosters change less frequently)
 
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";

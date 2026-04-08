@@ -3,10 +3,15 @@
 import { prisma } from "@/lib/db";
 
 // Overall stats across all tournaments
-export async function getOverallStats(gameCategory?: string) {
-  const gameCategoryFilter = gameCategory && gameCategory !== "all"
-    ? { match: { tournament: { gameCategory: gameCategory as never } } }
-    : {};
+export async function getOverallStats(gameCategory?: string, seasonId?: string) {
+  const tournamentFilter: Record<string, unknown> = {};
+  if (gameCategory && gameCategory !== "all") tournamentFilter.gameCategory = gameCategory;
+  if (seasonId && seasonId !== "all") tournamentFilter.seasonId = seasonId;
+  const hasTournamentFilter = Object.keys(tournamentFilter).length > 0;
+  const gameCategoryFilter = hasTournamentFilter ? { match: { tournament: tournamentFilter } } : {};
+
+  // PUBG filter — kills leaderboard queries PUBG tournaments regardless of game filter
+  const pubgFilter = gameCategory === "all" || gameCategory === "PUBG";
 
   const [
     topScorers,
@@ -14,6 +19,9 @@ export async function getOverallStats(gameCategory?: string) {
     mostMOTM,
     totalStats,
     allMatches,
+    topFrameWinners,
+    clubMatches,
+    pubgKillStandings,
   ] = await Promise.all([
     // Top scorers overall
     prisma.matchEvent.groupBy({
@@ -41,7 +49,7 @@ export async function getOverallStats(gameCategory?: string) {
     }),
     // Total counts
     Promise.all([
-      prisma.match.count({ where: { status: "COMPLETED", ...(gameCategory && gameCategory !== "all" ? { tournament: { gameCategory: gameCategory as never } } : {}) } }),
+      prisma.match.count({ where: { status: "COMPLETED", ...(hasTournamentFilter ? { tournament: tournamentFilter } : {}) } }),
       prisma.matchEvent.count({ where: { type: "GOAL", ...gameCategoryFilter } }),
       prisma.matchEvent.count({ where: { type: "ASSIST", ...gameCategoryFilter } }),
       prisma.matchEvent.count({ where: { type: "YELLOW_CARD", ...gameCategoryFilter } }),
@@ -50,12 +58,41 @@ export async function getOverallStats(gameCategory?: string) {
     ]),
     // All completed individual matches for calculating matches played
     prisma.match.findMany({
-      where: { status: "COMPLETED", homePlayerId: { not: null }, ...(gameCategory && gameCategory !== "all" ? { tournament: { gameCategory: gameCategory as never } } : {}) },
+      where: { status: "COMPLETED", homePlayerId: { not: null }, ...(hasTournamentFilter ? { tournament: tournamentFilter } : {}) },
       select: {
         homePlayerId: true,
         awayPlayerId: true,
       },
     }),
+    // Top frame winners (Snooker/Checkers)
+    prisma.matchEvent.groupBy({
+      by: ["playerId"],
+      where: { type: "FRAME_WIN", playerId: { not: null }, ...gameCategoryFilter },
+      _count: { type: true },
+      orderBy: { _count: { type: "desc" } },
+      take: 20,
+    }),
+    // Most used eFootball clubs
+    prisma.match.findMany({
+      where: {
+        status: "COMPLETED",
+        tournament: { gameCategory: "EFOOTBALL" },
+        OR: [{ homeClub: { not: null } }, { awayClub: { not: null } }],
+      },
+      select: { homeClub: true, awayClub: true },
+    }),
+    // PUBG kill leaders from standings (goalsFor = total kills, won = chicken dinners)
+    pubgFilter
+      ? prisma.standing.findMany({
+          where: {
+            groupId: null,
+            playerId: { not: null },
+            goalsFor: { gt: 0 },
+            tournament: { gameCategory: "PUBG" },
+          },
+          select: { playerId: true, goalsFor: true, won: true, played: true },
+        })
+      : Promise.resolve([]),
   ]);
 
   // Calculate matches played per player
@@ -69,12 +106,41 @@ export async function getOverallStats(gameCategory?: string) {
     }
   }
 
-  // Get player details for top scorers
+  // Aggregate PUBG kills per player
+  const killsMap = new Map<string, { kills: number; dinners: number; matches: number }>();
+  for (const s of pubgKillStandings) {
+    if (!s.playerId) continue;
+    const existing = killsMap.get(s.playerId) ?? { kills: 0, dinners: 0, matches: 0 };
+    existing.kills += s.goalsFor;
+    existing.dinners += s.won;
+    existing.matches += s.played;
+    killsMap.set(s.playerId, existing);
+  }
+  const topKillerIds = [...killsMap.entries()]
+    .sort((a, b) => b[1].kills - a[1].kills)
+    .slice(0, 20);
+
+  // PUBG aggregate totals
+  const pubgTotalKills = [...killsMap.values()].reduce((s, v) => s + v.kills, 0);
+  const pubgTotalDinners = [...killsMap.values()].reduce((s, v) => s + v.dinners, 0);
+  const pubgTotalMatches = pubgFilter
+    ? await prisma.match.count({ where: { status: "COMPLETED", tournament: { gameCategory: "PUBG" } } })
+    : 0;
+  const pubgAvgPlacement = pubgFilter && pubgTotalMatches > 0
+    ? await prisma.matchParticipant.aggregate({
+        where: { placement: { not: null }, match: { status: "COMPLETED", tournament: { gameCategory: "PUBG" } } },
+        _avg: { placement: true },
+      }).then((r) => Math.round((r._avg.placement ?? 0) * 10) / 10)
+    : 0;
+
+  // Get player details for all leaderboards
   const playerIds = [...new Set([
     ...topScorers.map(s => s.playerId!),
     ...topAssists.map(s => s.playerId!),
     ...mostMOTM.map(s => s.playerId!),
     ...matchCounts.keys(),
+    ...topFrameWinners.map(s => s.playerId!),
+    ...killsMap.keys(),
   ])];
 
   const players = await prisma.player.findMany({
@@ -100,6 +166,64 @@ export async function getOverallStats(gameCategory?: string) {
       count: s._count.type,
       matches: matchCounts.get(s.playerId!) || 0,
     })).filter(s => s.player),
+    topFrameWinners: topFrameWinners.map(s => ({
+      player: playerMap.get(s.playerId!),
+      count: s._count.type,
+      matches: matchCounts.get(s.playerId!) || 0,
+    })).filter(s => s.player),
+    seasonMVP: (() => {
+      // Score = (goals * 3) + (assists * 2) + (MOTM * 5)
+      const scoreMap = new Map<string, number>();
+      for (const s of topScorers) {
+        if (s.playerId) scoreMap.set(s.playerId, (scoreMap.get(s.playerId) ?? 0) + s._count.type * 3);
+      }
+      for (const s of topAssists) {
+        if (s.playerId) scoreMap.set(s.playerId, (scoreMap.get(s.playerId) ?? 0) + s._count.type * 2);
+      }
+      for (const s of mostMOTM) {
+        if (s.playerId) scoreMap.set(s.playerId, (scoreMap.get(s.playerId) ?? 0) + s._count.type * 5);
+      }
+      return [...scoreMap.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([playerId, score]) => {
+          const goals = topScorers.find((s) => s.playerId === playerId)?._count.type ?? 0;
+          const assists = topAssists.find((s) => s.playerId === playerId)?._count.type ?? 0;
+          const motm = mostMOTM.find((s) => s.playerId === playerId)?._count.type ?? 0;
+          return {
+            player: playerMap.get(playerId),
+            score,
+            goals,
+            assists,
+            motm,
+            matches: matchCounts.get(playerId) ?? 0,
+          };
+        })
+        .filter((s) => s.player);
+    })(),
+    topClubs: (() => {
+      const clubCounts = new Map<string, number>();
+      for (const m of clubMatches) {
+        if (m.homeClub) clubCounts.set(m.homeClub, (clubCounts.get(m.homeClub) ?? 0) + 1);
+        if (m.awayClub) clubCounts.set(m.awayClub, (clubCounts.get(m.awayClub) ?? 0) + 1);
+      }
+      return [...clubCounts.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 15)
+        .map(([club, count]) => ({ club, count }));
+    })(),
+    topKillers: topKillerIds.map(([playerId, data]) => ({
+      player: playerMap.get(playerId),
+      count: data.kills,
+      dinners: data.dinners,
+      matches: data.matches,
+    })).filter(s => s.player),
+    pubgTotals: {
+      kills: pubgTotalKills,
+      dinners: pubgTotalDinners,
+      matches: pubgTotalMatches,
+      avgPlacement: pubgAvgPlacement,
+    },
     totals: {
       matches: totalStats[0],
       goals: totalStats[1],
@@ -107,6 +231,7 @@ export async function getOverallStats(gameCategory?: string) {
       yellowCards: totalStats[3],
       redCards: totalStats[4],
       motm: totalStats[5],
+      frameWins: topFrameWinners.reduce((s, e) => s + e._count.type, 0),
     },
   };
 }

@@ -5,6 +5,8 @@ import Image from "next/image";
 import { useState } from "react";
 import { Menu, X, Trophy, Users } from "lucide-react";
 import { DownloadAppButton } from "./download-app-button";
+import { SearchDialog } from "./search-dialog";
+import { ThemeToggle } from "./theme-toggle";
 import { cn } from "@/lib/utils";
 
 const navLinks = [
@@ -71,6 +73,8 @@ export function PublicNavbar() {
                 {link.label}
               </Link>
             ))}
+            <SearchDialog />
+            <ThemeToggle />
             <DownloadAppButton variant="navbar-desktop" />
           </div>
 

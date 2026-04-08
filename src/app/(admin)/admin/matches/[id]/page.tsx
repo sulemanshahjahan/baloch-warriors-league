@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { AdminHeader } from "@/components/admin/header";
 import { getMatchById } from "@/lib/actions/match";
 import { MatchResultForm } from "./match-result-form";
+import { PUBGResultForm } from "./pubg-result-form";
 import { MatchEventManager } from "./match-event-manager";
 import { DeleteMatchButton } from "./delete-match-button";
 import { RescheduleForm } from "./reschedule-form";
@@ -29,6 +30,9 @@ export default async function MatchDetailPage({ params }: MatchDetailPageProps) 
 
   if (!match) notFound();
 
+  // Check if this is a PUBG match
+  const isPUBG = match.tournament.gameCategory === "PUBG";
+
   // Handle both team matches and individual player matches
   const homeTeamPlayers =
     match.homeTeam?.players.map((tp) => tp.player) ?? [];
@@ -50,10 +54,15 @@ export default async function MatchDetailPage({ params }: MatchDetailPageProps) 
   const homeName = match.homeTeam?.name ?? match.homePlayer?.name ?? "TBD";
   const awayName = match.awayTeam?.name ?? match.awayPlayer?.name ?? "TBD";
 
+  // For PUBG, show match name instead of TBD vs TBD
+  const pageTitle = isPUBG 
+    ? (match.round || `Match ${match.matchNumber || 1}`)
+    : `${homeName} vs ${awayName}`;
+
   return (
     <div className="flex flex-col flex-1">
       <AdminHeader
-        title={`${homeName} vs ${awayName}`}
+        title={pageTitle}
         description={match.tournament.name}
       />
 
@@ -87,7 +96,8 @@ export default async function MatchDetailPage({ params }: MatchDetailPageProps) 
           />
         </div>
 
-        {/* Score display */}
+        {/* Score display - hide for PUBG */}
+        {!isPUBG && (
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between gap-4">
@@ -125,6 +135,7 @@ export default async function MatchDetailPage({ params }: MatchDetailPageProps) 
             </div>
           </CardContent>
         </Card>
+        )}
 
         {/* Reschedule Form - only shown for non-completed matches */}
         <RescheduleForm
@@ -138,23 +149,53 @@ export default async function MatchDetailPage({ params }: MatchDetailPageProps) 
           {/* Result Entry Form */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Update Result</CardTitle>
+              <CardTitle className="text-base">
+                {isPUBG ? "PUBG Match Results" : "Update Result"}
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <MatchResultForm
-                matchId={match.id}
-                currentStatus={match.status}
-                homeScore={match.homeScore}
-                awayScore={match.awayScore}
-                homeScorePens={match.homeScorePens}
-                awayScorePens={match.awayScorePens}
-                motmPlayerId={match.motmPlayerId}
-                players={allPlayers}
-              />
+              {isPUBG ? (
+                <PUBGResultForm
+                  matchId={match.id}
+                  currentStatus={match.status}
+                  participants={match.participants || []}
+                  pointsPerKill={1}
+                  placementPoints={[
+                    { placement: 1, points: 10 },
+                    { placement: 2, points: 6 },
+                    { placement: 3, points: 5 },
+                    { placement: 4, points: 4 },
+                    { placement: 5, points: 3 },
+                    { placement: 6, points: 2 },
+                    { placement: 7, points: 1 },
+                    { placement: 8, points: 1 },
+                  ]}
+                />
+              ) : (
+                <MatchResultForm
+                  matchId={match.id}
+                  currentStatus={match.status}
+                  homeScore={match.homeScore}
+                  awayScore={match.awayScore}
+                  homeScorePens={match.homeScorePens}
+                  awayScorePens={match.awayScorePens}
+                  homeClub={match.homeClub}
+                  awayClub={match.awayClub}
+                  homeFormation={match.homeFormation}
+                  awayFormation={match.awayFormation}
+                  isDerby={match.isDerby}
+                  rivalNote={match.rivalNote}
+                  highlights={match.highlights}
+                  motmPlayerId={match.motmPlayerId}
+                  players={allPlayers}
+                  gameCategory={match.tournament.gameCategory}
+                />
+              )}
             </CardContent>
           </Card>
 
-          {/* Match Events */}
+          {/* Match Events - hide for PUBG */}
+          {!isPUBG && (
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Match Events</CardTitle>
@@ -178,6 +219,7 @@ export default async function MatchDetailPage({ params }: MatchDetailPageProps) 
               />
             </CardContent>
           </Card>
+          )}
         </div>
       </main>
     </div>

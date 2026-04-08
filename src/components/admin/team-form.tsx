@@ -53,7 +53,7 @@ export function TeamForm({ team }: TeamFormProps) {
         router.push(`/admin/teams/${team.id}`);
         router.refresh();
       } else {
-        setError((result as any).error ?? "Failed to update team");
+        setError(result.error ?? "Failed to update team");
       }
     });
   }
@@ -66,7 +66,7 @@ export function TeamForm({ team }: TeamFormProps) {
         router.push("/admin/teams");
         router.refresh();
       } else {
-        setError((result as any).error ?? "Failed to delete team");
+        setError(result.error ?? "Failed to delete team");
         setIsDeleting(false);
         setDeleteDialogOpen(false);
       }

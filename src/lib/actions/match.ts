@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { auth, getUserRole } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
+import type { MatchStatus } from "@prisma/client";
 import { logActivity } from "./activity-log";
 
 // Role hierarchy levels
@@ -129,6 +130,15 @@ export async function updateMatchResult(
     return { success: false, error: "Match not found" };
   }
 
+  // Extract extra fields (not in zod schema — optional raw fields)
+  const homeClub = (raw.homeClub as string) || null;
+  const awayClub = (raw.awayClub as string) || null;
+  const homeFormation = (raw.homeFormation as string) || null;
+  const awayFormation = (raw.awayFormation as string) || null;
+  const isDerby = raw.isDerby === "true";
+  const rivalNote = (raw.rivalNote as string) || null;
+  const highlights = (raw.highlights as string) || null;
+
   const match = await prisma.match.update({
     where: { id: matchId },
     data: {
@@ -136,6 +146,13 @@ export async function updateMatchResult(
       awayScore: data.awayScore,
       homeScorePens: data.homeScorePens ? Number(data.homeScorePens) : null,
       awayScorePens: data.awayScorePens ? Number(data.awayScorePens) : null,
+      homeClub,
+      awayClub,
+      homeFormation,
+      awayFormation,
+      isDerby,
+      rivalNote,
+      highlights,
       motmPlayerId: data.motmPlayerId || null,
       status: data.status,
       completedAt: data.status === "COMPLETED" ? new Date() : null,
@@ -183,10 +200,27 @@ export async function updateMatchResult(
     }
   }
 
+  // Save player ratings (eFootball) — rating_<playerId> fields
+  for (const [key, val] of Object.entries(raw)) {
+    if (key.startsWith("rating_") && val) {
+      const ratingPlayerId = key.replace("rating_", "");
+      const ratingValue = parseFloat(val as string);
+      if (ratingValue >= 1 && ratingValue <= 10) {
+        // Upsert: delete old rating event then create new
+        await prisma.matchEvent.deleteMany({
+          where: { matchId, playerId: ratingPlayerId, type: "CUSTOM", description: "PLAYER_RATING" },
+        });
+        await prisma.matchEvent.create({
+          data: { matchId, playerId: ratingPlayerId, type: "CUSTOM", value: ratingValue, description: "PLAYER_RATING" },
+        });
+      }
+    }
+  }
+
   // Recompute standings if match is completed
   if (data.status === "COMPLETED") {
     await recomputeStandings(match.tournamentId);
-    
+
     // Advance winner to next round for knockout matches
     await advanceKnockoutWinner(matchId, match.tournamentId);
   }
@@ -251,12 +285,13 @@ async function advanceKnockoutWinner(matchId: string, tournamentId: string) {
   const currentRound = completedMatch.roundNumber || 1;
   const nextRound = currentRound + 1;
   
-  // Count matches in current round to determine next round name
+  // Count KNOCKOUT matches in current round (exclude group stage matches)
   const matchesInCurrentRound = await prisma.match.count({
-    where: { 
-      tournamentId, 
+    where: {
+      tournamentId,
       roundNumber: currentRound,
-      status: { not: "CANCELLED" }
+      status: { not: "CANCELLED" },
+      NOT: { round: { contains: "Group" } },
     },
   });
   
@@ -433,6 +468,15 @@ export async function deleteMatch(matchId: string) {
 
 // ─── STANDINGS ENGINE ───────────────────────────────────────
 
+// Scoring rules per game category
+const SCORING_RULES: Record<string, { win: number; draw: number; loss: number }> = {
+  FOOTBALL: { win: 3, draw: 1, loss: 0 },
+  EFOOTBALL: { win: 3, draw: 1, loss: 0 },
+  PUBG: { win: 0, draw: 0, loss: 0 }, // Uses totalScore from MatchParticipant
+  SNOOKER: { win: 1, draw: 0, loss: 0 }, // Points = frames won
+  CHECKERS: { win: 1, draw: 0, loss: 0 }, // Points = games won
+};
+
 export async function recomputeTournamentStandings(tournamentId: string) {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };
@@ -443,18 +487,18 @@ export async function recomputeTournamentStandings(tournamentId: string) {
     return { success: false, error: "Forbidden" };
   }
 
-  // Get tournament type
+  // Get tournament info
   const tournament = await prisma.tournament.findUnique({
     where: { id: tournamentId },
-    select: { participantType: true, name: true },
+    select: { participantType: true, name: true, gameCategory: true },
   });
 
   if (!tournament) return { success: false, error: "Tournament not found" };
 
   if (tournament.participantType === "INDIVIDUAL") {
-    await recomputeIndividualStandings(tournamentId);
+    await recomputeIndividualStandings(tournamentId, tournament.gameCategory);
   } else {
-    await recomputeTeamStandings(tournamentId);
+    await recomputeTeamStandings(tournamentId, tournament.gameCategory);
   }
 
   await logActivity({
@@ -470,29 +514,43 @@ export async function recomputeTournamentStandings(tournamentId: string) {
 }
 
 async function recomputeStandings(tournamentId: string) {
-  // Get tournament type
+  // Get tournament info
   const tournament = await prisma.tournament.findUnique({
     where: { id: tournamentId },
-    select: { participantType: true },
+    select: { participantType: true, gameCategory: true },
   });
 
   if (!tournament) return;
 
   if (tournament.participantType === "INDIVIDUAL") {
-    await recomputeIndividualStandings(tournamentId);
+    await recomputeIndividualStandings(tournamentId, tournament.gameCategory);
   } else {
-    await recomputeTeamStandings(tournamentId);
+    await recomputeTeamStandings(tournamentId, tournament.gameCategory);
   }
 }
 
-async function recomputeTeamStandings(tournamentId: string) {
-  // Get all completed matches for this tournament
+async function recomputeTeamStandings(tournamentId: string, gameCategory: string) {
+  // Get scoring rules for this game
+  const rules = SCORING_RULES[gameCategory] ?? SCORING_RULES.FOOTBALL;
+  const isPUBG = gameCategory === "PUBG";
+
+  // PUBG: fetch all completed matches (no homeTeam filter — uses MatchParticipant)
+  // Others: only matches with both home/away teams set
   const matches = await prisma.match.findMany({
     where: {
       tournamentId,
       status: "COMPLETED",
-      homeTeamId: { not: null },
-      awayTeamId: { not: null },
+      ...(isPUBG ? {} : { homeTeamId: { not: null }, awayTeamId: { not: null } }),
+    },
+    select: {
+      id: true,
+      notes: true,
+      groupId: true,
+      homeTeamId: true,
+      awayTeamId: true,
+      homeScore: true,
+      awayScore: true,
+      participants: true,
     },
   });
 
@@ -522,15 +580,39 @@ async function recomputeTeamStandings(tournamentId: string) {
     const hg = match.homeScore ?? 0;
     const ag = match.awayScore ?? 0;
 
-    // Add to overall stats
-    addMatchToStats(overallStats, homeId, awayId, hg, ag);
+    // For PUBG, use totalScore from MatchParticipant
+    if (isPUBG && match.participants && match.participants.length > 0) {
+      let matchPpk = 1;
+      let matchPlacementPts: { placement: number; points: number }[] = [];
+      try {
+        const cfg = JSON.parse(match.notes || "{}");
+        matchPpk = cfg.pointsPerKill || 1;
+        matchPlacementPts = cfg.placementPoints || [];
+      } catch { /* use defaults */ }
+      const getPlacePts = (pl: number) => matchPlacementPts.find((p) => p.placement === pl)?.points ?? 0;
 
-    // Add to group stats if match belongs to a group
-    if (match.groupId) {
-      if (!groupStats[match.groupId]) groupStats[match.groupId] = {};
-      if (!groupStats[match.groupId][homeId]) groupStats[match.groupId][homeId] = createEmptyStats();
-      if (!groupStats[match.groupId][awayId]) groupStats[match.groupId][awayId] = createEmptyStats();
-      addMatchToStats(groupStats[match.groupId], homeId, awayId, hg, ag);
+      for (const participant of match.participants) {
+        if (participant.teamId) {
+          if (!overallStats[participant.teamId]) overallStats[participant.teamId] = createEmptyStats();
+          const placePts = getPlacePts(participant.placement ?? 99);
+          const kills = Math.max(0, Math.round(((participant.score ?? 0) - placePts) / matchPpk));
+          overallStats[participant.teamId].points += participant.score ?? 0;
+          overallStats[participant.teamId].goalsFor += kills;           // total kills
+          overallStats[participant.teamId].played++;
+          if (participant.placement === 1) overallStats[participant.teamId].won++; // chicken dinners
+        }
+      }
+    } else {
+      // Add to overall stats with game-specific scoring
+      addMatchToStats(overallStats, homeId, awayId, hg, ag, rules);
+
+      // Add to group stats if match belongs to a group
+      if (match.groupId) {
+        if (!groupStats[match.groupId]) groupStats[match.groupId] = {};
+        if (!groupStats[match.groupId][homeId]) groupStats[match.groupId][homeId] = createEmptyStats();
+        if (!groupStats[match.groupId][awayId]) groupStats[match.groupId][awayId] = createEmptyStats();
+        addMatchToStats(groupStats[match.groupId], homeId, awayId, hg, ag, rules);
+      }
     }
   }
 
@@ -539,6 +621,7 @@ async function recomputeTeamStandings(tournamentId: string) {
 
   // Create overall standings (no groupId)
   for (const [teamId, s] of Object.entries(overallStats)) {
+    if (!teamId) continue; // Skip invalid entries
     s.goalDiff = s.goalsFor - s.goalsAgainst;
     await prisma.standing.create({
       data: { tournamentId, teamId, ...s },
@@ -548,6 +631,7 @@ async function recomputeTeamStandings(tournamentId: string) {
   // Create per-group standings
   for (const [groupId, teams] of Object.entries(groupStats)) {
     for (const [teamId, s] of Object.entries(teams)) {
+      if (!teamId) continue; // Skip invalid entries
       s.goalDiff = s.goalsFor - s.goalsAgainst;
       await prisma.standing.create({
         data: { tournamentId, groupId, teamId, ...s },
@@ -574,7 +658,8 @@ function addMatchToStats(
   homeId: string,
   awayId: string,
   homeScore: number,
-  awayScore: number
+  awayScore: number,
+  rules: { win: number; draw: number; loss: number }
 ) {
   if (!stats[homeId] || !stats[awayId]) return;
 
@@ -591,27 +676,41 @@ function addMatchToStats(
   if (homeScore > awayScore) {
     stats[homeId].won++;
     stats[awayId].lost++;
-    stats[homeId].points += 3;
+    stats[homeId].points += rules.win;
   } else if (homeScore < awayScore) {
     stats[awayId].won++;
     stats[homeId].lost++;
-    stats[awayId].points += 3;
+    stats[awayId].points += rules.win;
   } else {
     stats[homeId].drawn++;
     stats[awayId].drawn++;
-    stats[homeId].points++;
-    stats[awayId].points++;
+    stats[homeId].points += rules.draw;
+    stats[awayId].points += rules.draw;
   }
 }
 
-async function recomputeIndividualStandings(tournamentId: string) {
-  // Get all completed matches for individual players
+async function recomputeIndividualStandings(tournamentId: string, gameCategory: string) {
+  // Get scoring rules for this game
+  const rules = SCORING_RULES[gameCategory] ?? SCORING_RULES.FOOTBALL;
+  const isPUBG = gameCategory === "PUBG";
+
+  // PUBG: fetch all completed matches (no homePlayer filter — uses MatchParticipant)
+  // Others: only matches with both home/away players set
   const matches = await prisma.match.findMany({
     where: {
       tournamentId,
       status: "COMPLETED",
-      homePlayerId: { not: null },
-      awayPlayerId: { not: null },
+      ...(isPUBG ? {} : { homePlayerId: { not: null }, awayPlayerId: { not: null } }),
+    },
+    select: {
+      id: true,
+      notes: true,
+      groupId: true,
+      homePlayerId: true,
+      awayPlayerId: true,
+      homeScore: true,
+      awayScore: true,
+      participants: true,
     },
   });
 
@@ -655,15 +754,39 @@ async function recomputeIndividualStandings(tournamentId: string) {
     const hg = match.homeScore ?? 0;
     const ag = match.awayScore ?? 0;
 
-    // Add to overall stats
-    addMatchToStats(overallStats, homeId, awayId, hg, ag);
+    // For PUBG, use totalScore from MatchParticipant
+    if (isPUBG && match.participants && match.participants.length > 0) {
+      let matchPpk = 1;
+      let matchPlacementPts: { placement: number; points: number }[] = [];
+      try {
+        const cfg = JSON.parse(match.notes || "{}");
+        matchPpk = cfg.pointsPerKill || 1;
+        matchPlacementPts = cfg.placementPoints || [];
+      } catch { /* use defaults */ }
+      const getPlacePts = (pl: number) => matchPlacementPts.find((p) => p.placement === pl)?.points ?? 0;
 
-    // Add to group stats if match belongs to a group
-    if (match.groupId) {
-      if (!groupStats[match.groupId]) groupStats[match.groupId] = {};
-      if (!groupStats[match.groupId][homeId]) groupStats[match.groupId][homeId] = createEmptyStats();
-      if (!groupStats[match.groupId][awayId]) groupStats[match.groupId][awayId] = createEmptyStats();
-      addMatchToStats(groupStats[match.groupId], homeId, awayId, hg, ag);
+      for (const participant of match.participants) {
+        if (participant.playerId) {
+          if (!overallStats[participant.playerId]) overallStats[participant.playerId] = createEmptyStats();
+          const placePts = getPlacePts(participant.placement ?? 99);
+          const kills = Math.max(0, Math.round(((participant.score ?? 0) - placePts) / matchPpk));
+          overallStats[participant.playerId].points += participant.score ?? 0;
+          overallStats[participant.playerId].goalsFor += kills;           // total kills
+          overallStats[participant.playerId].played++;
+          if (participant.placement === 1) overallStats[participant.playerId].won++; // chicken dinners
+        }
+      }
+    } else {
+      // Add to overall stats with game-specific scoring
+      addMatchToStats(overallStats, homeId, awayId, hg, ag, rules);
+
+      // Add to group stats if match belongs to a group
+      if (match.groupId) {
+        if (!groupStats[match.groupId]) groupStats[match.groupId] = {};
+        if (!groupStats[match.groupId][homeId]) groupStats[match.groupId][homeId] = createEmptyStats();
+        if (!groupStats[match.groupId][awayId]) groupStats[match.groupId][awayId] = createEmptyStats();
+        addMatchToStats(groupStats[match.groupId], homeId, awayId, hg, ag, rules);
+      }
     }
   }
 
@@ -672,6 +795,7 @@ async function recomputeIndividualStandings(tournamentId: string) {
 
   // Create overall standings (no groupId)
   for (const [playerId, s] of Object.entries(overallStats)) {
+    if (!playerId || playerId === "null" || playerId === "undefined") continue;
     s.goalDiff = s.goalsFor - s.goalsAgainst;
     await prisma.standing.create({
       data: { tournamentId, playerId, ...s },
@@ -681,6 +805,7 @@ async function recomputeIndividualStandings(tournamentId: string) {
   // Create per-group standings
   for (const [groupId, players] of Object.entries(groupStats)) {
     for (const [playerId, s] of Object.entries(players)) {
+      if (!playerId || playerId === "null" || playerId === "undefined") continue;
       s.goalDiff = s.goalsFor - s.goalsAgainst;
       await prisma.standing.create({
         data: { tournamentId, groupId, playerId, ...s },
@@ -706,7 +831,7 @@ export async function rescheduleMatch(matchId: string, formData: FormData) {
     where: { id: matchId },
     data: {
       scheduledAt: scheduledAt ? new Date(scheduledAt) : undefined,
-      status: (status as never) || undefined,
+      status: (status as MatchStatus) || undefined,
       notes: notes || null,
     },
   });
@@ -726,7 +851,7 @@ export async function rescheduleMatch(matchId: string, formData: FormData) {
 export async function getMatches(params?: { status?: string; tournamentId?: string }) {
   return prisma.match.findMany({
     where: {
-      ...(params?.status && { status: params.status as never }),
+      ...(params?.status && { status: params.status as MatchStatus }),
       ...(params?.tournamentId && { tournamentId: params.tournamentId }),
     },
     orderBy: [{ scheduledAt: "desc" }],
@@ -741,6 +866,69 @@ export async function getMatches(params?: { status?: string; tournamentId?: stri
   });
 }
 
+export async function bulkUpdateMatchResults(
+  results: Array<{ matchId: string; homeScore: number; awayScore: number }>
+) {
+  const session = await auth();
+  if (!session) return { success: false, error: "Unauthorized" };
+  if (!hasRole(session, "EDITOR")) return { success: false, error: "Forbidden" };
+
+  let updated = 0;
+  const errors: string[] = [];
+
+  for (const { matchId, homeScore, awayScore } of results) {
+    try {
+      const match = await prisma.match.update({
+        where: { id: matchId },
+        data: {
+          homeScore,
+          awayScore,
+          status: "COMPLETED" as MatchStatus,
+          completedAt: new Date(),
+        },
+        include: { tournament: true },
+      });
+
+      // Auto-create goal events for individual tournaments
+      if (match.tournament.participantType === "INDIVIDUAL") {
+        await prisma.matchEvent.deleteMany({
+          where: { matchId, type: "GOAL", description: "Auto-generated from match result" },
+        });
+        if (match.homePlayerId && homeScore > 0) {
+          await prisma.matchEvent.createMany({
+            data: Array.from({ length: homeScore }, () => ({
+              matchId, playerId: match.homePlayerId!, type: "GOAL" as const,
+              description: "Auto-generated from match result",
+            })),
+          });
+        }
+        if (match.awayPlayerId && awayScore > 0) {
+          await prisma.matchEvent.createMany({
+            data: Array.from({ length: awayScore }, () => ({
+              matchId, playerId: match.awayPlayerId!, type: "GOAL" as const,
+              description: "Auto-generated from match result",
+            })),
+          });
+        }
+      }
+
+      await recomputeStandings(match.tournamentId);
+      await advanceKnockoutWinner(matchId, match.tournamentId);
+      updated++;
+    } catch (e) {
+      errors.push(matchId);
+    }
+  }
+
+  revalidatePath("/admin/matches");
+  revalidatePath("/admin/tournaments");
+
+  return {
+    success: true,
+    data: { updated, errors: errors.length, total: results.length },
+  };
+}
+
 export async function getMatchesPaginated(options?: {
   status?: string;
   tournamentId?: string;
@@ -752,7 +940,7 @@ export async function getMatchesPaginated(options?: {
   const skip = (page - 1) * limit;
 
   const where = {
-    ...(options?.status && { status: options.status as never }),
+    ...(options?.status && { status: options.status as MatchStatus }),
     ...(options?.tournamentId && { tournamentId: options.tournamentId }),
   };
 
@@ -769,6 +957,7 @@ export async function getMatchesPaginated(options?: {
         homePlayer: { select: { id: true, name: true, slug: true, photoUrl: true } },
         awayPlayer: { select: { id: true, name: true, slug: true, photoUrl: true } },
         motmPlayer: { select: { id: true, name: true } },
+        _count: { select: { participants: true } },
       },
     }),
     prisma.match.count({ where }),
@@ -801,6 +990,12 @@ export async function getMatchById(id: string) {
       homePlayer: { select: { id: true, name: true, slug: true, photoUrl: true } },
       awayPlayer: { select: { id: true, name: true, slug: true, photoUrl: true } },
       motmPlayer: { select: { id: true, name: true } },
+      participants: {
+        include: {
+          team: { select: { id: true, name: true } },
+          player: { select: { id: true, name: true } },
+        },
+      },
       events: {
         orderBy: { minute: "asc" },
         include: {
@@ -810,4 +1005,86 @@ export async function getMatchById(id: string) {
       },
     },
   });
+}
+
+// ─── PUBG BATTLE ROYALE RESULTS ──────────────────────────────
+
+export async function updatePUBGMatchResult(matchId: string, formData: FormData) {
+  const session = await auth();
+  if (!session) return { success: false, error: "Unauthorized" };
+  if (!hasRole(session, "EDITOR")) return { success: false, error: "Forbidden" };
+
+  const status = formData.get("status") as string;
+  const participantsData = JSON.parse(formData.get("participants") as string) as Record<
+    string,
+    { placement: number; kills: number }
+  >;
+
+  // Get match with tournament info
+  const match = await prisma.match.findUnique({
+    where: { id: matchId },
+    include: { tournament: { select: { id: true, slug: true, gameCategory: true } } },
+  });
+
+  if (!match) return { success: false, error: "Match not found" };
+  if (match.tournament.gameCategory !== "PUBG") {
+    return { success: false, error: "This function is only for PUBG matches" };
+  }
+
+  // Parse scoring config from match notes
+  let pointsPerKill = 1;
+  let placementPoints: { placement: number; points: number }[] = [];
+  try {
+    const config = JSON.parse(match.notes || "{}");
+    pointsPerKill = config.pointsPerKill || 1;
+    placementPoints = config.placementPoints || [];
+  } catch {
+    // Use defaults
+  }
+
+  // Get placement points helper
+  const getPlacementPoints = (placement: number) => {
+    const pp = placementPoints.find((p) => p.placement === placement);
+    return pp?.points || 0;
+  };
+
+  // Wrap participant updates + match status in a transaction
+  const totalParticipants = Object.keys(participantsData).length;
+  await prisma.$transaction(async (tx) => {
+    for (const [participantId, data] of Object.entries(participantsData)) {
+      const totalScore = getPlacementPoints(data.placement) + data.kills * pointsPerKill;
+      await tx.matchParticipant.update({
+        where: { id: participantId },
+        data: {
+          placement: data.placement,
+          score: totalScore,
+          result: data.placement === 1 ? "WIN" : data.placement <= Math.ceil(totalParticipants / 2) ? "DRAW" : "LOSS",
+        },
+      });
+    }
+
+    await tx.match.update({
+      where: { id: matchId },
+      data: {
+        status: status as MatchStatus,
+        completedAt: status === "COMPLETED" ? new Date() : null,
+      },
+    });
+  });
+
+  // Recompute standings (outside transaction — uses own queries)
+  await recomputeStandings(match.tournamentId);
+
+  await logActivity({
+    action: "UPDATE",
+    entityType: "MATCH",
+    entityId: matchId,
+    details: { status, type: "PUBG_RESULT" },
+  });
+
+  revalidatePath(`/admin/matches/${matchId}`);
+  revalidatePath(`/admin/tournaments/${match.tournamentId}`);
+  revalidatePath("/admin/matches");
+  revalidatePath(`/tournaments/${match.tournament.slug}`);
+  return { success: true, data: undefined };
 }

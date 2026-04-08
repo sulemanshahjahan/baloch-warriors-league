@@ -26,7 +26,7 @@ export default function NewTeamPage() {
         router.push("/admin/teams");
         router.refresh();
       } else {
-        setError((result as any).error ?? '');
+        setError(result.error ?? '');
       }
     });
   }

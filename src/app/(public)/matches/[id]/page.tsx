@@ -61,6 +61,13 @@ async function getMatch(id: string) {
         select: { id: true, name: true, slug: true },
       },
       venue: true,
+      participants: {
+        orderBy: { placement: "asc" },
+        include: {
+          player: { select: { id: true, name: true, slug: true } },
+          team: { select: { id: true, name: true, slug: true } },
+        },
+      },
       events: {
         where: {
           description: { not: "Auto-generated from match result" },
@@ -268,6 +275,9 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
                     {match.homeTeam.shortName}
                   </p>
                 )}
+                {match.homeClub && (
+                  <p className="text-xs text-primary/80 mt-0.5">{match.homeClub}</p>
+                )}
               </div>
             </div>
 
@@ -325,12 +335,32 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
                     {match.awayTeam.shortName}
                   </p>
                 )}
+                {match.awayClub && (
+                  <p className="text-xs text-primary/80 mt-0.5">{match.awayClub}</p>
+                )}
               </div>
             </div>
           </div>
 
+          {/* Derby badge */}
+          {match.isDerby && (
+            <div className="flex items-center justify-center gap-2 mt-4">
+              <span className="text-xs px-3 py-1 rounded-full bg-red-500/20 text-red-400 font-semibold">
+                🔥 {match.rivalNote || "Derby Match"}
+              </span>
+            </div>
+          )}
+
+          {/* Formation */}
+          {(match.homeFormation || match.awayFormation) && (
+            <div className="flex items-center justify-center gap-6 mt-4 text-xs text-muted-foreground">
+              {match.homeFormation && <span>{homeName}: <strong className="text-foreground">{match.homeFormation}</strong></span>}
+              {match.awayFormation && <span>{awayName}: <strong className="text-foreground">{match.awayFormation}</strong></span>}
+            </div>
+          )}
+
           {/* Match meta */}
-          <div className="flex flex-wrap items-center justify-center gap-4 mt-6 text-sm text-muted-foreground">
+          <div className="flex flex-wrap items-center justify-center gap-4 mt-4 text-sm text-muted-foreground">
             {match.scheduledAt && (
               <div className="flex items-center gap-1.5">
                 <Calendar className="w-4 h-4" />
@@ -381,6 +411,29 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
           )}
         </div>
       </section>
+
+      {/* Match Highlights */}
+      {match.highlights && (
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Star className="w-4 h-4 text-yellow-400" />
+                Match Summary
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="prose prose-invert prose-sm max-w-none">
+                {match.highlights.split("\n").map((line, i) =>
+                  line.trim() === "" ? <br key={i} /> : (
+                    <p key={i} className="text-sm text-muted-foreground leading-relaxed mb-2">{line}</p>
+                  )
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Match Events */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
@@ -455,10 +508,57 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
           </Card>
         )}
 
-        {allEventsChronological.length === 0 && isCompleted && (
+        {allEventsChronological.length === 0 && isCompleted && match.participants.length === 0 && (
           <div className="text-center py-10 text-muted-foreground text-sm">
             No detailed events recorded for this match.
           </div>
+        )}
+
+        {/* PUBG Participants / Results */}
+        {match.participants.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                🎮 {isCompleted ? "Final Standings" : "Participants"} ({match.participants.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1.5">
+                {[...match.participants]
+                  .sort((a, b) => (a.placement ?? 99) - (b.placement ?? 99))
+                  .map((p, i) => {
+                    const name = p.player?.name ?? p.team?.name ?? "Unknown";
+                    const slug = p.player?.slug ?? p.team?.slug;
+                    const id = p.player?.id ?? p.team?.id;
+                    const type = p.player ? "player" : "team";
+                    const MEDAL = ["text-yellow-400", "text-gray-400", "text-orange-400"];
+
+                    return (
+                      <div key={p.id} className="flex items-center justify-between p-2.5 rounded-lg bg-muted/50">
+                        <div className="flex items-center gap-3">
+                          <span className={`text-sm font-bold w-6 text-center ${MEDAL[i] ?? "text-muted-foreground"}`}>
+                            {p.placement ?? "—"}
+                          </span>
+                          {id && (
+                            <SmartAvatar type={type} id={id} name={name} className="h-7 w-7" fallbackClassName="text-[10px]" />
+                          )}
+                          {slug ? (
+                            <Link href={`/${type === "player" ? "players" : "teams"}/${slug}`} className="text-sm font-medium hover:text-primary">
+                              {name}
+                            </Link>
+                          ) : (
+                            <span className="text-sm font-medium">{name}</span>
+                          )}
+                        </div>
+                        {p.score != null && (
+                          <span className="text-sm font-bold text-primary tabular-nums">{p.score}pts</span>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+            </CardContent>
+          </Card>
         )}
 
         {/* Back to tournament */}

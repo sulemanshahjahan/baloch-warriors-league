@@ -1,14 +1,19 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const { searchParams } = new URL(req.url);
+    const status = searchParams.get("status");
+    const limit = parseInt(searchParams.get("limit") ?? "30", 10);
+
     const matches = await prisma.match.findMany({
+      where: status ? { status: status as any } : undefined,
       orderBy: [{ status: "asc" }, { scheduledAt: "desc" }],
-      take: 30,
+      take: Math.min(limit, 100),
       select: {
         id: true,
         status: true,
@@ -18,6 +23,8 @@ export async function GET() {
         matchNumber: true,
         homeScore: true,
         awayScore: true,
+        homeScorePens: true,
+        awayScorePens: true,
         tournament: {
           select: { name: true, slug: true, gameCategory: true },
         },
