@@ -4,6 +4,9 @@ import { useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { BulkDeleteBar } from "@/components/admin/bulk-delete-bar";
+import { bulkDeleteMatches } from "@/lib/actions/match";
 import {
   Select,
   SelectContent,
@@ -69,7 +72,7 @@ function getMatchLabel(match: Match): string {
   return `${home} vs ${away}`;
 }
 
-function MatchRow({ match }: { match: Match }) {
+function MatchRow({ match, isSelected, onToggle }: { match: Match; isSelected?: boolean; onToggle?: () => void }) {
   const isBattleRoyale =
     !match.homeTeam && !match.awayTeam && !match.homePlayer && !match.awayPlayer;
   const count = match._count.participants;
@@ -79,7 +82,12 @@ function MatchRow({ match }: { match: Match }) {
   const label = getMatchLabel(match);
 
   return (
-    <TableRow>
+    <TableRow className={isSelected ? "bg-primary/5" : ""}>
+      {onToggle && (
+        <TableCell className="w-10">
+          <Checkbox checked={isSelected} onCheckedChange={onToggle} />
+        </TableCell>
+      )}
       <TableCell>
         <div className="text-sm">
           {isBattleRoyale ? (
@@ -133,7 +141,7 @@ function MatchRow({ match }: { match: Match }) {
   );
 }
 
-function GameSection({ gameCategory, matches }: { gameCategory: string; matches: Match[] }) {
+function GameSection({ gameCategory, matches, selected, onToggle }: { gameCategory: string; matches: Match[]; selected?: Set<string>; onToggle?: (id: string) => void }) {
   const [collapsed, setCollapsed] = useState(false);
   const icon = GAME_ICONS[gameCategory] ?? "🏆";
   const label = gameLabel(gameCategory);
@@ -176,7 +184,7 @@ function GameSection({ gameCategory, matches }: { gameCategory: string; matches:
           </TableHeader>
           <TableBody>
             {matches.map((match) => (
-              <MatchRow key={match.id} match={match} />
+              <MatchRow key={match.id} match={match} isSelected={selected?.has(match.id)} onToggle={onToggle ? () => onToggle(match.id) : undefined} />
             ))}
           </TableBody>
         </Table>
@@ -196,6 +204,19 @@ export function MatchesFilter({
   const searchParams = useSearchParams();
 
   const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  function toggleMatch(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAllMatches(allIds: string[]) {
+    setSelected(selected.size === allIds.length ? new Set() : new Set(allIds));
+  }
 
   const statusFilter = searchParams.get("status") ?? "all";
   const tournamentFilter = searchParams.get("tournamentId") ?? "all";
@@ -312,10 +333,17 @@ export function MatchesFilter({
         )}
       </div>
 
-      <p className="text-sm text-muted-foreground">
-        Showing {filteredMatches.length} of {total} matches
-        {totalPages > 1 && ` (page ${currentPage} of ${totalPages})`}
-      </p>
+      <div className="flex items-center gap-3">
+        <Checkbox
+          checked={selected.size === filteredMatches.length && filteredMatches.length > 0}
+          onCheckedChange={() => toggleAllMatches(filteredMatches.map((m) => m.id))}
+        />
+        <p className="text-sm text-muted-foreground">
+          {selected.size > 0 ? `${selected.size} selected · ` : ""}
+          Showing {filteredMatches.length} of {total} matches
+          {totalPages > 1 && ` (page ${currentPage} of ${totalPages})`}
+        </p>
+      </div>
 
       {filteredMatches.length === 0 ? (
         <div className="rounded-lg border border-border py-8 text-center text-muted-foreground text-sm">
@@ -324,7 +352,7 @@ export function MatchesFilter({
       ) : (
         <div className="space-y-4">
           {groupedMatches.map(({ gameCategory, matches: groupMatches }) => (
-            <GameSection key={gameCategory} gameCategory={gameCategory} matches={groupMatches} />
+            <GameSection key={gameCategory} gameCategory={gameCategory} matches={groupMatches} selected={selected} onToggle={toggleMatch} />
           ))}
         </div>
       )}
@@ -338,6 +366,16 @@ export function MatchesFilter({
         searchParams={{
           ...(statusFilter !== "all" && { status: statusFilter }),
           ...(tournamentFilter !== "all" && { tournamentId: tournamentFilter }),
+        }}
+      />
+
+      <BulkDeleteBar
+        selectedIds={[...selected]}
+        entityName="match"
+        onClear={() => setSelected(new Set())}
+        onDelete={async (ids) => {
+          const result = await bulkDeleteMatches(ids);
+          return { success: result.success, error: result.success ? undefined : result.error };
         }}
       />
     </div>

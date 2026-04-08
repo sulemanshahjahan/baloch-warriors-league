@@ -468,6 +468,41 @@ export async function deleteMatch(matchId: string) {
   return { success: true, data: undefined };
 }
 
+export async function bulkDeleteMatches(matchIds: string[]) {
+  const session = await auth();
+  if (!session) return { success: false, error: "Unauthorized" };
+  if (!hasRole(session, "ADMIN")) return { success: false, error: "Forbidden" };
+
+  // Collect tournament IDs for revalidation
+  const matches = await prisma.match.findMany({
+    where: { id: { in: matchIds } },
+    select: { id: true, tournamentId: true, status: true },
+  });
+
+  // Delete related data
+  await prisma.eloHistory.deleteMany({ where: { matchId: { in: matchIds } } });
+  await prisma.matchEvent.deleteMany({ where: { matchId: { in: matchIds } } });
+  await prisma.matchParticipant.deleteMany({ where: { matchId: { in: matchIds } } });
+  await prisma.match.deleteMany({ where: { id: { in: matchIds } } });
+
+  // Recompute standings for affected tournaments
+  const tournamentIds = [...new Set(matches.map((m) => m.tournamentId))];
+  for (const tid of tournamentIds) {
+    await recomputeStandings(tid);
+  }
+
+  await logActivity({
+    action: "BULK_DELETE",
+    entityType: "MATCH",
+    entityId: matchIds.join(","),
+    details: { count: matchIds.length },
+  });
+
+  revalidatePath("/admin/matches");
+  revalidatePath("/admin/tournaments");
+  return { success: true, data: { count: matchIds.length } };
+}
+
 // ─── STANDINGS ENGINE ───────────────────────────────────────
 
 // Scoring rules per game category

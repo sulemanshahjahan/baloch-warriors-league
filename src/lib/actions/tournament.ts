@@ -176,6 +176,40 @@ export async function deleteTournament(id: string): Promise<ActionResult> {
   return { success: true, data: undefined };
 }
 
+export async function bulkDeleteTournaments(ids: string[]): Promise<ActionResult<{ count: number }>> {
+  const denied = await checkAdmin();
+  if (denied) return denied as ActionResult<{ count: number }>;
+
+  // Delete in order: matches (with events/participants) → standings → awards → groups → enrollments → tournament
+  for (const id of ids) {
+    const matches = await prisma.match.findMany({ where: { tournamentId: id }, select: { id: true } });
+    const matchIds = matches.map((m) => m.id);
+    if (matchIds.length > 0) {
+      await prisma.eloHistory.deleteMany({ where: { matchId: { in: matchIds } } });
+      await prisma.matchEvent.deleteMany({ where: { matchId: { in: matchIds } } });
+      await prisma.matchParticipant.deleteMany({ where: { matchId: { in: matchIds } } });
+    }
+    await prisma.match.deleteMany({ where: { tournamentId: id } });
+    await prisma.standing.deleteMany({ where: { tournamentId: id } });
+    await prisma.award.deleteMany({ where: { tournamentId: id } });
+    await prisma.tournamentPlayer.deleteMany({ where: { tournamentId: id } });
+    await prisma.tournamentTeam.deleteMany({ where: { tournamentId: id } });
+    await prisma.tournamentGroup.deleteMany({ where: { tournamentId: id } });
+    await prisma.tournament.delete({ where: { id } });
+  }
+
+  await logActivity({
+    action: "BULK_DELETE",
+    entityType: "TOURNAMENT",
+    entityId: ids.join(","),
+    details: { count: ids.length },
+  });
+
+  revalidatePath("/admin/tournaments");
+  revalidatePath("/");
+  return { success: true, data: { count: ids.length } };
+}
+
 export async function getTournaments(params?: {
   status?: string;
   gameCategory?: string;

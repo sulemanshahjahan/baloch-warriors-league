@@ -26,7 +26,8 @@ export type ActivityLogAction =
   | "ADD_EVENT"
   | "REMOVE_EVENT"
   | "ACTIVATE"
-  | "DEACTIVATE";
+  | "DEACTIVATE"
+  | "BULK_DELETE";
 
 export type EntityType =
   | "TOURNAMENT"
