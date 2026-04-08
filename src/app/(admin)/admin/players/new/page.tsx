@@ -153,8 +153,8 @@ export default function NewPlayerPage() {
                           return;
                         }
                         
-                        if (file.size > 5 * 1024 * 1024) {
-                          setError("File too large. Max 5MB.");
+                        if (file.size > 10 * 1024 * 1024) {
+                          setError("File too large. Max 10MB.");
                           if (fileInputRef.current) fileInputRef.current.value = "";
                           return;
                         }
@@ -187,7 +187,7 @@ export default function NewPlayerPage() {
                       }}
                     />
                     <p className="text-xs text-muted-foreground">
-                      JPG, PNG, WebP, or GIF. Max 5MB.
+                      JPG, PNG, WebP, or GIF. Max 10MB.
                     </p>
                   </div>
                 </div>

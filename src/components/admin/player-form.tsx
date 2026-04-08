@@ -220,8 +220,8 @@ export function PlayerForm({ player }: PlayerFormProps) {
                         return;
                       }
                       
-                      if (file.size > 2 * 1024 * 1024) {
-                        setError("File too large. Max 2MB for avatar images.");
+                      if (file.size > 10 * 1024 * 1024) {
+                        setError("File too large. Max 10MB for avatar images.");
                         if (fileInputRef.current) fileInputRef.current.value = "";
                         return;
                       }
