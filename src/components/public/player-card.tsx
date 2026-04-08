@@ -54,15 +54,30 @@ export function PlayerCard({ name, position, rating, nationality, avatarUrl, pla
     canvas.height = H;
     const tier = getTier(rating);
 
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => render(ctx, img, W, H, tier);
-    img.onerror = () => render(ctx, null, W, H, tier);
-    img.src = avatarUrl;
+    // Load avatar + custom background in parallel
+    const loadImg = (src: string): Promise<HTMLImageElement | null> =>
+      new Promise((resolve) => {
+        const i = new Image();
+        i.crossOrigin = "anonymous";
+        i.onload = () => resolve(i);
+        i.onerror = () => resolve(null);
+        i.src = src;
+      });
+
+    // Custom BG per tier (add more as needed)
+    const BG_MAP: Record<string, string> = {
+      LEGENDARY: "/legendary-card-bg.jpg",
+    };
+    const bgSrc = BG_MAP[tier.label];
+
+    Promise.all([loadImg(avatarUrl), bgSrc ? loadImg(bgSrc) : Promise.resolve(null)]).then(
+      ([avatar, bgImg]) => render(ctx, avatar, bgImg, W, H, tier)
+    );
 
     function render(
       ctx: CanvasRenderingContext2D,
       avatar: HTMLImageElement | null,
+      bgImg: HTMLImageElement | null,
       W: number,
       H: number,
       tier: ReturnType<typeof getTier>
@@ -72,69 +87,83 @@ export function PlayerCard({ name, position, rating, nationality, avatarUrl, pla
       const darkBase = rgb([bc[0] * 0.25, bc[1] * 0.25, bc[2] * 0.25]);
 
       // ═══════════════════════════════════════
-      // BACKGROUND — rich, layered, deep
+      // BACKGROUND
       // ═══════════════════════════════════════
 
-      ctx.fillStyle = darkBase;
-      ctx.fillRect(0, 0, W, H);
+      if (bgImg) {
+        // Custom background image — cover-fit
+        const aspect = bgImg.width / bgImg.height;
+        const cardAspect = W / H;
+        let dw = W, dh = H;
+        if (aspect > cardAspect) { dh = W / aspect; } else { dw = H * aspect; }
+        ctx.drawImage(bgImg, (W - dw) / 2, (H - dh) / 2, dw, dh);
 
-      // Large radial glow behind player (warm center)
-      const centerGlow = ctx.createRadialGradient(W / 2, H * 0.33, 12, W / 2, H * 0.33, W * 0.65);
-      centerGlow.addColorStop(0, rgba(ac, 0.18));
-      centerGlow.addColorStop(0.5, rgba(ac, 0.06));
-      centerGlow.addColorStop(1, "transparent");
-      ctx.fillStyle = centerGlow;
-      ctx.fillRect(0, 0, W, H);
+        // Slight darkening overlay for text readability
+        ctx.fillStyle = rgba([0, 0, 0], 0.25);
+        ctx.fillRect(0, 0, W, H);
+      } else {
+        // Generated background (non-legendary tiers)
+        ctx.fillStyle = darkBase;
+        ctx.fillRect(0, 0, W, H);
 
-      // Top-left accent wash
-      const tlGlow = ctx.createRadialGradient(40, 40, 0, 40, 40, 200);
-      tlGlow.addColorStop(0, rgba(ac, 0.12));
-      tlGlow.addColorStop(1, "transparent");
-      ctx.fillStyle = tlGlow;
-      ctx.fillRect(0, 0, W, H);
+        // Large radial glow behind player (warm center)
+        const centerGlow = ctx.createRadialGradient(W / 2, H * 0.33, 12, W / 2, H * 0.33, W * 0.65);
+        centerGlow.addColorStop(0, rgba(ac, 0.18));
+        centerGlow.addColorStop(0.5, rgba(ac, 0.06));
+        centerGlow.addColorStop(1, "transparent");
+        ctx.fillStyle = centerGlow;
+        ctx.fillRect(0, 0, W, H);
 
-      // Edge vignette
-      const vig = ctx.createRadialGradient(W / 2, H / 2, H * 0.25, W / 2, H / 2, H * 0.7);
-      vig.addColorStop(0, "transparent");
-      vig.addColorStop(1, rgba([0, 0, 0], 0.5));
-      ctx.fillStyle = vig;
-      ctx.fillRect(0, 0, W, H);
+        // Top-left accent wash
+        const tlGlow = ctx.createRadialGradient(40, 40, 0, 40, 40, 200);
+        tlGlow.addColorStop(0, rgba(ac, 0.12));
+        tlGlow.addColorStop(1, "transparent");
+        ctx.fillStyle = tlGlow;
+        ctx.fillRect(0, 0, W, H);
 
-      // Diagonal light beams
-      ctx.save();
-      ctx.globalAlpha = 0.025;
-      for (let i = 0; i < 3; i++) {
+        // Edge vignette
+        const vig = ctx.createRadialGradient(W / 2, H / 2, H * 0.25, W / 2, H / 2, H * 0.7);
+        vig.addColorStop(0, "transparent");
+        vig.addColorStop(1, rgba([0, 0, 0], 0.5));
+        ctx.fillStyle = vig;
+        ctx.fillRect(0, 0, W, H);
+
+        // Diagonal light beams
         ctx.save();
-        ctx.translate(W * (0.3 + i * 0.25), -H * 0.15);
-        ctx.rotate(Math.PI / 4.5);
-        const beam = ctx.createLinearGradient(0, 0, 0, W * 0.08);
-        beam.addColorStop(0, "transparent");
-        beam.addColorStop(0.5, rgb(ac));
-        beam.addColorStop(1, "transparent");
-        ctx.fillStyle = beam;
-        ctx.fillRect(-W, 0, W * 3, W * 0.06);
+        ctx.globalAlpha = 0.025;
+        for (let i = 0; i < 3; i++) {
+          ctx.save();
+          ctx.translate(W * (0.3 + i * 0.25), -H * 0.15);
+          ctx.rotate(Math.PI / 4.5);
+          const beam = ctx.createLinearGradient(0, 0, 0, W * 0.08);
+          beam.addColorStop(0, "transparent");
+          beam.addColorStop(0.5, rgb(ac));
+          beam.addColorStop(1, "transparent");
+          ctx.fillStyle = beam;
+          ctx.fillRect(-W, 0, W * 3, W * 0.06);
+          ctx.restore();
+        }
+        ctx.restore();
+
+        // Noise texture
+        ctx.save();
+        ctx.globalAlpha = 0.025;
+        for (let i = 0; i < 12000; i++) {
+          const v = Math.random() * 200;
+          ctx.fillStyle = `rgb(${v},${v},${v})`;
+          ctx.fillRect(Math.random() * W, Math.random() * H, 1, 1);
+        }
+        ctx.restore();
+
+        // Faint abstract crest watermark
+        ctx.save();
+        ctx.globalAlpha = 0.02;
+        ctx.font = "bold 350px system-ui";
+        ctx.textAlign = "center";
+        ctx.fillStyle = rgb(ac);
+        ctx.fillText("B", W / 2, H * 0.55);
         ctx.restore();
       }
-      ctx.restore();
-
-      // Noise texture
-      ctx.save();
-      ctx.globalAlpha = 0.025;
-      for (let i = 0; i < 12000; i++) {
-        const v = Math.random() * 200;
-        ctx.fillStyle = `rgb(${v},${v},${v})`;
-        ctx.fillRect(Math.random() * W, Math.random() * H, 1, 1);
-      }
-      ctx.restore();
-
-      // Faint abstract crest watermark
-      ctx.save();
-      ctx.globalAlpha = 0.02;
-      ctx.font = "bold 350px system-ui";
-      ctx.textAlign = "center";
-      ctx.fillStyle = rgb(ac);
-      ctx.fillText("B", W / 2, H * 0.55);
-      ctx.restore();
 
       // ═══════════════════════════════════════
       // CARD BORDER — glowing, layered
