@@ -27,6 +27,7 @@ import {
   GitBranch,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { BracketVisualization } from "@/components/public/bracket-view";
 import {
   formatDate,
   formatDateTime,
@@ -654,7 +655,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                       </div>
                     </div>
                   ) : (
-                    <BracketView
+                    <BracketVisualization
                       rounds={sortedRounds}
                       matchesByRound={matchesByRound}
                       participantType={tournament.participantType}
@@ -1188,7 +1189,11 @@ function StandingsTable({
   );
 }
 
-interface BracketMatch {
+// BracketMatch interface, BracketView, and BracketMatchCard moved to
+// src/components/public/bracket-view.tsx as BracketVisualization
+
+// Keep this for backward compat — the type is now in the component
+type BracketMatch = {
   id: string;
   round: string | null;
   roundNumber: number | null;
@@ -1207,195 +1212,4 @@ interface BracketMatch {
   awayTeam: { id: string; name: string; shortName: string | null } | null;
   homePlayer: { id: string; name: string } | null;
   awayPlayer: { id: string; name: string } | null;
-}
-
-function BracketView({
-  rounds,
-  matchesByRound,
-  participantType,
-}: {
-  rounds: number[];
-  matchesByRound: Record<number, BracketMatch[]>;
-  participantType: string;
-}) {
-  const isIndividual = participantType === "INDIVIDUAL";
-  
-  // Find the max number of matches in any round to calculate spacing
-  const maxMatchesInRound = Math.max(...rounds.map(r => matchesByRound[r].length));
-  
-  // Round name mapping based on number of matches
-  const getRoundName = (roundNum: number, matchCount: number) => {
-    // Map based on match count first (most reliable)
-    if (matchCount === 1) return "Final";
-    if (matchCount === 2) return "Semi-finals";
-    if (matchCount === 4) return "Quarter-finals";
-    if (matchCount === 8) return "Round of 16";
-    if (matchCount === 16) return "Round of 32";
-    
-    // Fall back to stored round name if available and not generic
-    const firstMatch = matchesByRound[roundNum][0];
-    if (firstMatch?.round && !firstMatch.round.match(/^round\s*\d+$/i)) {
-      return firstMatch.round;
-    }
-    
-    return `Round ${roundNum}`;
-  };
-
-  // Calculate gap size based on round position (earlier rounds need more space)
-  const getMatchGap = (roundIndex: number, totalRounds: number) => {
-    // Earlier rounds (lower index when sorted ascending) need larger gaps
-    const reverseIndex = totalRounds - 1 - roundIndex;
-    return 16 + reverseIndex * 48; // 16px, 64px, 112px, etc.
-  };
-
-  return (
-    <>
-      {/* Mobile: stacked rounds */}
-      <div className="sm:hidden space-y-6">
-        {[...rounds].reverse().map((roundNum) => {
-          const matches = matchesByRound[roundNum];
-          return (
-            <div key={roundNum}>
-              <h3 className="text-sm font-semibold mb-3 text-muted-foreground px-1">
-                {getRoundName(roundNum, matches.length)}
-              </h3>
-              <div className="space-y-2">
-                {matches.map((match) => (
-                  <BracketMatchCard
-                    key={match.id}
-                    match={match}
-                    isIndividual={isIndividual}
-                    roundLabel={getRoundName(roundNum, matches.length)}
-                  />
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Desktop: horizontal bracket */}
-      <div className="hidden sm:block overflow-x-auto pb-4">
-        <div className="flex gap-12 min-w-max px-4 items-stretch">
-          {rounds.map((roundNum, roundIndex) => {
-            const matches = matchesByRound[roundNum];
-            const matchGap = getMatchGap(roundIndex, rounds.length);
-
-            return (
-              <div key={roundNum} className="flex flex-col justify-center">
-                <h3 className="text-sm font-semibold text-center mb-6 text-muted-foreground">
-                  {getRoundName(roundNum, matches.length)}
-                </h3>
-                <div
-                  className="flex flex-col justify-center"
-                  style={{ gap: `${matchGap}px` }}
-                >
-                  {matches.map((match) => (
-                    <BracketMatchCard
-                      key={match.id}
-                      match={match}
-                      isIndividual={isIndividual}
-                      roundLabel={getRoundName(roundNum, matches.length)}
-                    />
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </>
-  );
-}
-
-function BracketMatchCard({
-  match,
-  isIndividual,
-  roundLabel,
-}: {
-  match: BracketMatch;
-  isIndividual: boolean;
-  roundLabel: string;
-}) {
-  const isCompleted = match.status === "COMPLETED";
-  
-  const homeName = isIndividual
-    ? (match.homePlayer?.name ?? "TBD")
-    : (match.homeTeam?.name ?? "TBD");
-  const awayName = isIndividual
-    ? (match.awayPlayer?.name ?? "TBD")
-    : (match.awayTeam?.name ?? "TBD");
-  
-  const homeId = isIndividual ? match.homePlayer?.id : match.homeTeam?.id;
-  const awayId = isIndividual ? match.awayPlayer?.id : match.awayTeam?.id;
-  const homeType = isIndividual ? "player" : "team";
-  const awayType = isIndividual ? "player" : "team";
-  
-  const homeScore = match.homeScore ?? 0;
-  const awayScore = match.awayScore ?? 0;
-  const hasPens = match.homeScorePens != null && match.awayScorePens != null;
-  const homeWon = isCompleted && (hasPens ? match.homeScorePens! > match.awayScorePens! : homeScore > awayScore);
-  const awayWon = isCompleted && (hasPens ? match.awayScorePens! > match.homeScorePens! : awayScore > homeScore);
-
-  return (
-    <Link href={`/matches/${match.id}`}>
-      <div className="w-full sm:w-48 bg-card border border-border rounded-lg overflow-hidden hover:border-primary/50 transition-colors cursor-pointer">
-        {/* Round/Status header */}
-        <div className="px-2 py-1 bg-muted/50 text-[10px] text-muted-foreground flex justify-between">
-          <span>{roundLabel}</span>
-          {match.scheduledAt && (
-            <span>{formatDate(match.scheduledAt)}</span>
-          )}
-        </div>
-        
-        {/* Home participant */}
-        <div className={`px-3 py-2 flex items-center justify-between gap-2 border-b border-border/50 ${homeWon ? 'bg-primary/5' : ''}`}>
-          <div className="flex items-center gap-2 min-w-0">
-            {homeId ? (
-              <SmartAvatar type={homeType} id={homeId} name={homeName} className="h-5 w-5 shrink-0" fallbackClassName="text-[8px]" />
-            ) : (
-              <Avatar className="h-5 w-5 shrink-0">
-                <AvatarFallback className="text-[8px]">{getInitials(homeName)}</AvatarFallback>
-              </Avatar>
-            )}
-            <span className={`text-xs truncate ${homeWon ? 'font-semibold' : ''}`}>
-              {homeName}
-            </span>
-          </div>
-          {isCompleted && (
-            <span className={`text-sm font-bold ${homeWon ? 'text-primary' : 'text-muted-foreground'}`}>
-              {homeScore}
-            </span>
-          )}
-        </div>
-        
-        {/* Penalty indicator */}
-        {hasPens && (
-          <div className="text-center text-[9px] text-muted-foreground py-0.5 bg-muted/30">
-            Pens: {match.homeScorePens}–{match.awayScorePens}
-          </div>
-        )}
-        {/* Away participant */}
-        <div className={`px-3 py-2 flex items-center justify-between gap-2 ${awayWon ? 'bg-primary/5' : ''}`}>
-          <div className="flex items-center gap-2 min-w-0">
-            {awayId ? (
-              <SmartAvatar type={awayType} id={awayId} name={awayName} className="h-5 w-5 shrink-0" fallbackClassName="text-[8px]" />
-            ) : (
-              <Avatar className="h-5 w-5 shrink-0">
-                <AvatarFallback className="text-[8px]">{getInitials(awayName)}</AvatarFallback>
-              </Avatar>
-            )}
-            <span className={`text-xs truncate ${awayWon ? 'font-semibold' : ''}`}>
-              {awayName}
-            </span>
-          </div>
-          {isCompleted && (
-            <span className={`text-sm font-bold ${awayWon ? 'text-primary' : 'text-muted-foreground'}`}>
-              {awayScore}
-            </span>
-          )}
-        </div>
-      </div>
-    </Link>
-  );
-}
+};
