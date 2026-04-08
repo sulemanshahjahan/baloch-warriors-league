@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 
+import { requireRole } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { AdminHeader } from "@/components/admin/header";
@@ -18,14 +19,13 @@ import { Edit, Users, Trophy, UserPlus, User, ArrowLeft } from "lucide-react";
 import { RemovePlayerButton } from "./remove-player-button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getInitials, gameLabel, statusColor, statusLabel } from "@/lib/utils";
-import { requireRole } from "@/lib/auth";
 
 interface TeamDetailPageProps {
   params: Promise<{ id: string }>;
 }
 
 export default async function TeamDetailPage({ params }: TeamDetailPageProps) {
-  await requireRole("ADMIN");
+  await requireRole("EDITOR");
   const { id } = await params;
   const team = await getTeamById(id);
 

@@ -1,10 +1,22 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { auth } from "@/lib/auth";
+import { auth, getUserRole } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
 import { logActivity } from "./activity-log";
+
+// Role hierarchy levels
+const ROLE_LEVELS: Record<string, number> = {
+  SUPER_ADMIN: 3,
+  ADMIN: 2,
+  EDITOR: 1,
+};
+
+function hasRole(session: { user?: { role?: string } } | null, minRole: string): boolean {
+  const userRole = getUserRole(session);
+  return (ROLE_LEVELS[userRole] ?? 0) >= (ROLE_LEVELS[minRole] ?? 0);
+}
 
 const matchSchema = z.object({
   tournamentId: z.string().min(1, "Tournament is required"),
@@ -44,14 +56,10 @@ const matchEventSchema = z.object({
   description: z.string().optional(),
 });
 
-function isEditor(session: { user?: { role?: string } } | null) {
-  return (session?.user as { role?: string })?.role === "EDITOR";
-}
-
 export async function createMatch(formData: FormData) {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };
-  if (isEditor(session)) return { success: false, error: "Unauthorized: Admin role required" };
+  if (!hasRole(session, "EDITOR")) return { success: false, error: "Forbidden: Insufficient permissions" };
 
   const raw = Object.fromEntries(formData.entries());
   const parsed = matchSchema.safeParse(raw);

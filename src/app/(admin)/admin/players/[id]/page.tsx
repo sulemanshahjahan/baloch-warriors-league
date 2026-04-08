@@ -1,10 +1,10 @@
 export const dynamic = "force-dynamic";
 
+import { requireRole } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { AdminHeader } from "@/components/admin/header";
 import { getPlayerById, getPlayerStats } from "@/lib/actions/player";
-import { requireRole } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -25,7 +25,7 @@ interface PlayerDetailPageProps {
 }
 
 export default async function PlayerDetailPage({ params }: PlayerDetailPageProps) {
-  await requireRole("ADMIN");
+  await requireRole("EDITOR");
   const { id } = await params;
   const player = await getPlayerById(id);
 

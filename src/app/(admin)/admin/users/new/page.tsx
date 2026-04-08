@@ -1,7 +1,4 @@
-"use client";
-
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { redirect } from "next/navigation";
 import Link from "next/link";
 import { AdminHeader } from "@/components/admin/header";
 import { Button } from "@/components/ui/button";
@@ -17,26 +14,18 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
 import { createAdminUser } from "@/lib/actions/admin-user";
+import { requireRole } from "@/lib/auth";
 
-export default function NewAdminUserPage() {
-  const router = useRouter();
-  const [role, setRole] = useState("EDITOR");
-  const [error, setError] = useState<string | undefined>(undefined);
-  const [loading, setLoading] = useState(false);
+export default async function NewAdminUserPage() {
+  await requireRole("SUPER_ADMIN");
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setLoading(true);
-    setError(undefined);
-    const fd = new FormData(e.currentTarget);
-    fd.set("role", role);
-    const result = await createAdminUser(fd);
-    setLoading(false);
+  async function handleSubmit(formData: FormData) {
+    "use server";
+    const result = await createAdminUser(formData);
     if (!result.success) {
-      setError(result.error);
-      return;
+      throw new Error(result.error);
     }
-    router.push("/admin/users");
+    redirect("/admin/users");
   }
 
   return (
@@ -54,7 +43,7 @@ export default function NewAdminUserPage() {
 
           <Card>
             <CardContent className="pt-6">
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form action={handleSubmit} className="space-y-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="name">Full Name *</Label>
                   <Input id="name" name="name" placeholder="e.g. Ahmed Khan" required />
@@ -78,8 +67,8 @@ export default function NewAdminUserPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label>Role *</Label>
-                  <Select value={role} onValueChange={setRole}>
+                  <Label htmlFor="role">Role *</Label>
+                  <Select name="role" defaultValue="EDITOR">
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -91,14 +80,10 @@ export default function NewAdminUserPage() {
                   </Select>
                 </div>
 
-                {error && <p className="text-sm text-destructive">{error}</p>}
-
                 <div className="flex gap-3 pt-2">
-                  <Button type="submit" disabled={loading}>
-                    {loading ? "Creating…" : "Create Account"}
-                  </Button>
-                  <Button type="button" variant="outline" onClick={() => router.back()}>
-                    Cancel
+                  <Button type="submit">Create Account</Button>
+                  <Button type="button" variant="outline" asChild>
+                    <Link href="/admin/users">Cancel</Link>
                   </Button>
                 </div>
               </form>

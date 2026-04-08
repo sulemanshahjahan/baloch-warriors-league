@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 
+import { requireRole } from "@/lib/auth";
 import Link from "next/link";
 import { AdminHeader } from "@/components/admin/header";
 import { getMatchesPaginated } from "@/lib/actions/match";
@@ -17,6 +18,7 @@ interface MatchesPageProps {
 }
 
 export default async function MatchesPage({ searchParams }: MatchesPageProps) {
+  await requireRole("EDITOR");
   const { page, status, tournamentId } = await searchParams;
   const currentPage = Math.max(1, parseInt(page ?? "1", 10));
   

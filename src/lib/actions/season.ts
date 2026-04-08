@@ -1,10 +1,22 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { auth } from "@/lib/auth";
+import { auth, getUserRole } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { z } from "zod";
 import { logActivity } from "./activity-log";
+
+// Role hierarchy levels
+const ROLE_LEVELS: Record<string, number> = {
+  SUPER_ADMIN: 3,
+  ADMIN: 2,
+  EDITOR: 1,
+};
+
+function hasRole(session: { user?: { role?: string } } | null, minRole: string): boolean {
+  const userRole = getUserRole(session);
+  return (ROLE_LEVELS[userRole] ?? 0) >= (ROLE_LEVELS[minRole] ?? 0);
+}
 
 const seasonSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -16,6 +28,7 @@ const seasonSchema = z.object({
 export async function createSeason(formData: FormData) {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };
+  if (!hasRole(session, "ADMIN")) return { success: false, error: "Forbidden: Admin role required" };
 
   const raw = Object.fromEntries(formData.entries());
   const parsed = seasonSchema.safeParse(raw);
@@ -46,6 +59,7 @@ export async function createSeason(formData: FormData) {
 export async function updateSeason(id: string, formData: FormData) {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };
+  if (!hasRole(session, "ADMIN")) return { success: false, error: "Forbidden: Admin role required" };
 
   const raw = Object.fromEntries(formData.entries());
   const parsed = seasonSchema.safeParse(raw);

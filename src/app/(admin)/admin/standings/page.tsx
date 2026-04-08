@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 
+import { requireRole } from "@/lib/auth";
 import Link from "next/link";
 import { AdminHeader } from "@/components/admin/header";
 import { prisma } from "@/lib/db";
@@ -16,7 +17,6 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { BarChart3, ExternalLink, Trophy } from "lucide-react";
 import { getInitials, gameLabel, gameColor, statusColor, statusLabel } from "@/lib/utils";
-import { requireRole } from "@/lib/auth";
 
 export const metadata = { title: "Standings" };
 
@@ -43,7 +43,7 @@ async function getAllStandings() {
 }
 
 export default async function StandingsPage() {
-  await requireRole("ADMIN");
+  await requireRole("EDITOR");
   const tournaments = await getAllStandings();
 
   return (

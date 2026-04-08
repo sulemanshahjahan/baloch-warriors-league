@@ -13,7 +13,7 @@ interface EditTeamPageProps {
 }
 
 export default async function EditTeamPage({ params }: EditTeamPageProps) {
-  await requireRole("ADMIN");
+  await requireRole("EDITOR");
   const { id } = await params;
   const team = await prisma.team.findUnique({
     where: { id },

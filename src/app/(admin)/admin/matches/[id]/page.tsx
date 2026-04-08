@@ -1,9 +1,9 @@
 export const dynamic = "force-dynamic";
 
+import { requireRole } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import { AdminHeader } from "@/components/admin/header";
 import { getMatchById } from "@/lib/actions/match";
-import { requireRole } from "@/lib/auth";
 import { MatchResultForm } from "./match-result-form";
 import { MatchEventManager } from "./match-event-manager";
 import { DeleteMatchButton } from "./delete-match-button";
@@ -23,7 +23,7 @@ interface MatchDetailPageProps {
 }
 
 export default async function MatchDetailPage({ params }: MatchDetailPageProps) {
-  await requireRole("ADMIN");
+  await requireRole("EDITOR");
   const { id } = await params;
   const match = await getMatchById(id);
 

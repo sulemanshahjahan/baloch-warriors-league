@@ -13,7 +13,7 @@ interface EditPlayerPageProps {
 }
 
 export default async function EditPlayerPage({ params }: EditPlayerPageProps) {
-  await requireRole("ADMIN");
+  await requireRole("EDITOR");
   const { id } = await params;
   const player = await prisma.player.findUnique({
     where: { id },

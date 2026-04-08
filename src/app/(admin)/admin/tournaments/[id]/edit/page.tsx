@@ -1,3 +1,4 @@
+import { requireRole } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import { AdminHeader } from "@/components/admin/header";
 import { TournamentForm } from "@/components/admin/tournament-form";
@@ -10,6 +11,7 @@ interface EditTournamentPageProps {
 }
 
 export default async function EditTournamentPage({ params }: EditTournamentPageProps) {
+  await requireRole("EDITOR");
   const { id } = await params;
   const tournament = await prisma.tournament.findUnique({ where: { id } });
 

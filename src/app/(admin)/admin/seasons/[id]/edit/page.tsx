@@ -10,12 +10,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
+import { requireRole } from "@/lib/auth";
 
 interface EditSeasonPageProps {
   params: Promise<{ id: string }>;
 }
 
 export default async function EditSeasonPage({ params }: EditSeasonPageProps) {
+  await requireRole("ADMIN");
   const { id } = await params;
   const season = await getSeasonById(id);
   if (!season) notFound();

@@ -1,5 +1,7 @@
 export const dynamic = "force-dynamic";
 
+import { requireRole } from "@/lib/auth";
+
 import Link from "next/link";
 import { AdminHeader } from "@/components/admin/header";
 import { getNewsPostsPaginated } from "@/lib/actions/news";
@@ -28,6 +30,7 @@ interface NewsPageProps {
 }
 
 export default async function NewsPage({ searchParams }: NewsPageProps) {
+  await requireRole("EDITOR");
   const { page, search } = await searchParams;
   const currentPage = Math.max(1, parseInt(page ?? "1", 10));
   

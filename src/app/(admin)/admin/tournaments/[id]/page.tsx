@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 
+import { requireRole } from "@/lib/auth";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { AdminHeader } from "@/components/admin/header";
@@ -31,7 +32,6 @@ import { PlayerEnrollment } from "./player-enrollment";
 import { AwardsManager } from "./awards-manager";
 import { GroupsManager } from "./groups-manager";
 import { QuickMatchEditor } from "./quick-match-editor";
-import { requireRole } from "@/lib/auth";
 import { RecomputeStandingsButton } from "./recompute-standings-button";
 
 interface TournamentDetailPageProps {
@@ -39,7 +39,7 @@ interface TournamentDetailPageProps {
 }
 
 export default async function TournamentDetailPage({ params }: TournamentDetailPageProps) {
-  await requireRole("ADMIN");
+  await requireRole("EDITOR");
   const { id } = await params;
   const [tournament, availableTeams, availablePlayers] = await Promise.all([
     getTournamentById(id),

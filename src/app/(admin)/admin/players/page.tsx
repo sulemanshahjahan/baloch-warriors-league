@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 
+import { requireRole } from "@/lib/auth";
 import { AdminHeader } from "@/components/admin/header";
 import { getPlayersPaginated } from "@/lib/actions/player";
 import { PlayersTable } from "./players-table";
@@ -14,6 +15,7 @@ interface PlayersPageProps {
 }
 
 export default async function PlayersPage({ searchParams }: PlayersPageProps) {
+  await requireRole("EDITOR");
   const { page, search } = await searchParams;
   const currentPage = Math.max(1, parseInt(page ?? "1", 10));
   

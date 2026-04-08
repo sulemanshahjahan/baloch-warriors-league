@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 
+import { requireRole } from "@/lib/auth";
 import Link from "next/link";
 import { AdminHeader } from "@/components/admin/header";
 import { getTeamsPaginated } from "@/lib/actions/team";
@@ -28,6 +29,7 @@ interface TeamsPageProps {
 }
 
 export default async function TeamsPage({ searchParams }: TeamsPageProps) {
+  await requireRole("EDITOR");
   const { page, search } = await searchParams;
   const currentPage = Math.max(1, parseInt(page ?? "1", 10));
   

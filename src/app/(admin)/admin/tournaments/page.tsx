@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 
+import { requireRole } from "@/lib/auth";
 import Link from "next/link";
 import { AdminHeader } from "@/components/admin/header";
 import { getTournaments } from "@/lib/actions/tournament";
@@ -28,12 +29,11 @@ import {
   formatLabel,
 } from "@/lib/utils";
 import { DeleteTournamentButton } from "./delete-button";
-import { requireRole } from "@/lib/auth";
 
 export const metadata = { title: "Tournaments" };
 
 export default async function TournamentsPage() {
-  await requireRole("ADMIN");
+  await requireRole("EDITOR");
   const tournaments = await getTournaments();
 
   return (

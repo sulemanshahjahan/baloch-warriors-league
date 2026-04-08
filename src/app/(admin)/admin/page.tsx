@@ -18,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatDate, gameLabel, statusColor, statusLabel } from "@/lib/utils";
 import Link from "next/link";
+import { requireRole } from "@/lib/auth";
 
 async function getDashboardStats() {
   const [
@@ -136,6 +137,7 @@ export default async function AdminDashboard({
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
+  await requireRole("EDITOR");
   const { error } = await searchParams;
   const stats = await getDashboardStats();
 

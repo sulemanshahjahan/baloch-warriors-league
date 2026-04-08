@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { AdminHeader } from "@/components/admin/header";
 import { getAdminUsers } from "@/lib/actions/admin-user";
-import { auth } from "@/lib/auth";
+import { auth, requireRole } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -27,6 +27,8 @@ const roleColors: Record<string, string> = {
 };
 
 export default async function AdminUsersPage() {
+  await requireRole("SUPER_ADMIN");
+  
   const session = await auth();
   const currentUserId = (session?.user as { id?: string })?.id;
   const currentUserRole = (session?.user as { role?: string })?.role;

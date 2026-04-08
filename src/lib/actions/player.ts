@@ -1,14 +1,22 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { auth } from "@/lib/auth";
+import { auth, getUserRole } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { slugify } from "@/lib/utils";
 import { z } from "zod";
 import { logActivity } from "./activity-log";
 
-function isEditorOnly(session: { user?: { role?: string } } | null) {
-  return (session?.user as { role?: string })?.role === "EDITOR";
+// Role hierarchy levels
+const ROLE_LEVELS: Record<string, number> = {
+  SUPER_ADMIN: 3,
+  ADMIN: 2,
+  EDITOR: 1,
+};
+
+function hasRole(session: { user?: { role?: string } } | null, minRole: string): boolean {
+  const userRole = getUserRole(session);
+  return (ROLE_LEVELS[userRole] ?? 0) >= (ROLE_LEVELS[minRole] ?? 0);
 }
 
 const playerSchema = z.object({
@@ -25,7 +33,7 @@ const playerSchema = z.object({
 export async function createPlayer(formData: FormData) {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };
-  if (isEditorOnly(session)) return { success: false, error: "Unauthorized: Admin role required" };
+  if (!hasRole(session, "EDITOR")) return { success: false, error: "Forbidden: Insufficient permissions" };
 
   const raw = Object.fromEntries(formData.entries());
   const parsed = playerSchema.safeParse(raw);
@@ -67,7 +75,7 @@ export async function createPlayer(formData: FormData) {
 export async function updatePlayer(id: string, formData: FormData) {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };
-  if (isEditorOnly(session)) return { success: false, error: "Unauthorized: Admin role required" };
+  if (!hasRole(session, "EDITOR")) return { success: false, error: "Forbidden: Insufficient permissions" };
 
   const raw = Object.fromEntries(formData.entries());
   const parsed = playerSchema.safeParse(raw);
@@ -107,7 +115,7 @@ export async function updatePlayer(id: string, formData: FormData) {
 export async function deletePlayer(id: string) {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };
-  if (isEditorOnly(session)) return { success: false, error: "Unauthorized: Admin role required" };
+  if (!hasRole(session, "EDITOR")) return { success: false, error: "Forbidden: Insufficient permissions" };
 
   await prisma.player.update({
     where: { id },
@@ -128,7 +136,7 @@ export async function deletePlayer(id: string) {
 export async function bulkDeletePlayers(ids: string[]) {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };
-  if (isEditorOnly(session)) return { success: false, error: "Unauthorized: Admin role required" };
+  if (!hasRole(session, "EDITOR")) return { success: false, error: "Forbidden: Insufficient permissions" };
 
   await prisma.player.updateMany({
     where: { id: { in: ids } },
@@ -152,7 +160,7 @@ const bulkPlayerSchema = z.array(
 export async function bulkCreatePlayers(players: { name: string; nickname?: string; position?: string; nationality?: string; skillLevel?: number }[]) {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };
-  if (isEditorOnly(session)) return { success: false, error: "Unauthorized: Admin role required" };
+  if (!hasRole(session, "EDITOR")) return { success: false, error: "Forbidden: Insufficient permissions" };
 
   const parsed = bulkPlayerSchema.safeParse(players);
   if (!parsed.success) {
