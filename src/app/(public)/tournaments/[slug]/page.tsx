@@ -1249,25 +1249,21 @@ function BracketView({
   };
 
   return (
-    <div className="overflow-x-auto pb-4">
-      <div className="flex gap-12 min-w-max px-4 items-stretch">
-        {rounds.map((roundNum, roundIndex) => {
+    <>
+      {/* Mobile: stacked rounds */}
+      <div className="sm:hidden space-y-6">
+        {[...rounds].reverse().map((roundNum) => {
           const matches = matchesByRound[roundNum];
-          const matchGap = getMatchGap(roundIndex, rounds.length);
-          
           return (
-            <div key={roundNum} className="flex flex-col justify-center">
-              <h3 className="text-sm font-semibold text-center mb-6 text-muted-foreground">
+            <div key={roundNum}>
+              <h3 className="text-sm font-semibold mb-3 text-muted-foreground px-1">
                 {getRoundName(roundNum, matches.length)}
               </h3>
-              <div 
-                className="flex flex-col justify-center"
-                style={{ gap: `${matchGap}px` }}
-              >
+              <div className="space-y-2">
                 {matches.map((match) => (
-                  <BracketMatchCard 
-                    key={match.id} 
-                    match={match} 
+                  <BracketMatchCard
+                    key={match.id}
+                    match={match}
                     isIndividual={isIndividual}
                     roundLabel={getRoundName(roundNum, matches.length)}
                   />
@@ -1277,7 +1273,38 @@ function BracketView({
           );
         })}
       </div>
-    </div>
+
+      {/* Desktop: horizontal bracket */}
+      <div className="hidden sm:block overflow-x-auto pb-4">
+        <div className="flex gap-12 min-w-max px-4 items-stretch">
+          {rounds.map((roundNum, roundIndex) => {
+            const matches = matchesByRound[roundNum];
+            const matchGap = getMatchGap(roundIndex, rounds.length);
+
+            return (
+              <div key={roundNum} className="flex flex-col justify-center">
+                <h3 className="text-sm font-semibold text-center mb-6 text-muted-foreground">
+                  {getRoundName(roundNum, matches.length)}
+                </h3>
+                <div
+                  className="flex flex-col justify-center"
+                  style={{ gap: `${matchGap}px` }}
+                >
+                  {matches.map((match) => (
+                    <BracketMatchCard
+                      key={match.id}
+                      match={match}
+                      isIndividual={isIndividual}
+                      roundLabel={getRoundName(roundNum, matches.length)}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -1312,7 +1339,7 @@ function BracketMatchCard({
 
   return (
     <Link href={`/matches/${match.id}`}>
-      <div className="w-48 bg-card border border-border rounded-lg overflow-hidden hover:border-primary/50 transition-colors cursor-pointer">
+      <div className="w-full sm:w-48 bg-card border border-border rounded-lg overflow-hidden hover:border-primary/50 transition-colors cursor-pointer">
         {/* Round/Status header */}
         <div className="px-2 py-1 bg-muted/50 text-[10px] text-muted-foreground flex justify-between">
           <span>{roundLabel}</span>

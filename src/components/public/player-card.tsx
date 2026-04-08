@@ -459,14 +459,35 @@ export function PlayerCard({ name, position, rating, nationality, avatarUrl, pla
     const canvas = canvasRef.current;
     if (!canvas) return;
     const blob = await new Promise<Blob>((res, rej) => canvas.toBlob((b) => b ? res(b) : rej(), "image/png"));
-    const file = new File([blob], `BWL-${name.replace(/\s+/g, "-")}-card.png`, { type: "image/png" });
+    const fileName = `BWL-${name.replace(/\s+/g, "-")}-card.png`;
+    const isCapacitor = typeof window !== "undefined" && "Capacitor" in window;
+
+    if (isCapacitor) {
+      // Capacitor: write to device then share via native share sheet
+      try {
+        const { Filesystem, Directory } = await import("@capacitor/filesystem");
+        const { Share } = await import("@capacitor/share");
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve((reader.result as string).split(",")[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+        const written = await Filesystem.writeFile({ path: fileName, data: base64, directory: Directory.Cache });
+        await Share.share({ title: `${name} — BWL Player Card`, url: written.uri, dialogTitle: "Share Player Card" });
+        return;
+      } catch { /* fall through to download */ }
+    }
+
+    // Web: try native share, then download
+    const file = new File([blob], fileName, { type: "image/png" });
     if (navigator.share && navigator.canShare?.({ files: [file] })) {
       try { await navigator.share({ files: [file], title: `${name} — BWL Player Card` }); return; }
       catch (e) { if (e instanceof Error && e.name === "AbortError") return; }
     }
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = file.name; a.click();
+    a.href = url; a.download = fileName; a.click();
     URL.revokeObjectURL(url);
   }
 

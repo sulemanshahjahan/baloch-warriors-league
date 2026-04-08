@@ -20,9 +20,7 @@ import {
   Award,
   Swords,
   BarChart3,
-  Share2,
 } from "lucide-react";
-import { ShareLink } from "@/components/public/share-link";
 import { PlayerCard } from "@/components/public/player-card";
 import {
   getInitials,
@@ -277,16 +275,6 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
             </div>
           </div>
 
-          {/* Share */}
-          <div className="flex items-center gap-2 mt-4">
-            <span className="text-xs text-muted-foreground flex items-center gap-1">
-              <Share2 className="w-3 h-3" /> Share:
-            </span>
-            <ShareLink
-              title={`${player.name} — BWL`}
-              text={`Check out ${player.name}'s profile on Baloch Warriors League! ${stats.goals > 0 ? `${stats.goals} goals` : ""}${stats.assists > 0 ? `, ${stats.assists} assists` : ""}${stats.motm > 0 ? `, ${stats.motm} MOTM` : ""}`}
-            />
-          </div>
         </div>
       </section>
 
@@ -328,6 +316,22 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Player Card */}
+            <PlayerCard
+              name={player.name}
+              position={player.position ?? ""}
+              rating={player.skillLevel ?? 50}
+              nationality={player.nationality ?? ""}
+              avatarUrl={`/api/image?type=player&id=${player.id}`}
+              playerId={player.id}
+              stats={{
+                goals: stats.goals,
+                wins: stats.wins,
+                matches: stats.appearances,
+                motm: stats.motm,
+              }}
+            />
 
             {/* Recent Matches */}
             {recentMatches.length > 0 && (
@@ -520,22 +524,6 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Player Card */}
-            <PlayerCard
-              name={player.name}
-              position={player.position ?? ""}
-              rating={player.skillLevel ?? 50}
-              nationality={player.nationality ?? ""}
-              avatarUrl={`/api/image?type=player&id=${player.id}`}
-              playerId={player.id}
-              stats={{
-                goals: stats.goals,
-                wins: stats.wins,
-                matches: stats.appearances,
-                motm: stats.motm,
-              }}
-            />
-
             {player.bio && (
               <Card>
                 <CardHeader>

@@ -95,9 +95,9 @@ export function SearchDialog() {
       {/* Trigger button */}
       <button
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border/50 bg-muted/30 hover:bg-muted/50 transition-colors text-sm text-muted-foreground"
+        className="inline-flex items-center gap-2 px-3 py-2.5 rounded-lg border border-border/50 bg-muted/30 hover:bg-muted/50 transition-colors text-sm text-muted-foreground min-h-[44px]"
       >
-        <Search className="w-3.5 h-3.5" />
+        <Search className="w-4 h-4" />
         <span className="hidden sm:inline">Search...</span>
         <kbd className="hidden sm:inline text-[10px] px-1.5 py-0.5 rounded bg-muted border border-border/50 font-mono">⌘K</kbd>
       </button>
