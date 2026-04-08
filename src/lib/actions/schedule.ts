@@ -1,9 +1,21 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { auth } from "@/lib/auth";
+import { auth, getUserRole } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { MatchStatus } from "@prisma/client";
+
+// Role hierarchy levels
+const ROLE_LEVELS: Record<string, number> = {
+  SUPER_ADMIN: 3,
+  ADMIN: 2,
+  EDITOR: 1,
+};
+
+function hasRole(session: { user?: { role?: string } } | null, minRole: string): boolean {
+  const userRole = getUserRole(session);
+  return (ROLE_LEVELS[userRole] ?? 0) >= (ROLE_LEVELS[minRole] ?? 0);
+}
 
 interface GenerateScheduleOptions {
   tournamentId: string;
@@ -57,6 +69,7 @@ function generateKnockoutBracket<T>(teams: T[]): [T | null, T | null][] {
 export async function generateSchedule(options: GenerateScheduleOptions) {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };
+  if (!hasRole(session, "ADMIN")) return { success: false, error: "Forbidden: Admin role required" };
 
   const { tournamentId, format, seedingMethod, groupCount = 4, advanceCount = 2 } = options;
 
@@ -280,6 +293,7 @@ export async function generateKnockoutFromGroups(
 ) {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };
+  if (!hasRole(session, "ADMIN")) return { success: false, error: "Forbidden: Admin role required" };
 
   const tournament = await prisma.tournament.findUnique({
     where: { id: tournamentId },
@@ -451,6 +465,7 @@ export async function generateKnockoutFromGroups(
 export async function deleteTournamentSchedule(tournamentId: string) {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };
+  if (!hasRole(session, "ADMIN")) return { success: false, error: "Forbidden: Admin role required" };
 
   const result = await prisma.match.deleteMany({
     where: {
@@ -470,6 +485,7 @@ export async function deleteTournamentSchedule(tournamentId: string) {
 export async function createGroup(tournamentId: string, name: string) {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };
+  if (!hasRole(session, "EDITOR")) return { success: false, error: "Forbidden: Insufficient permissions" };
 
   const count = await prisma.tournamentGroup.count({ where: { tournamentId } });
   
@@ -488,6 +504,7 @@ export async function createGroup(tournamentId: string, name: string) {
 export async function deleteGroup(groupId: string) {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };
+  if (!hasRole(session, "EDITOR")) return { success: false, error: "Forbidden: Insufficient permissions" };
 
   const group = await prisma.tournamentGroup.findUnique({
     where: { id: groupId },
@@ -505,6 +522,7 @@ export async function deleteGroup(groupId: string) {
 export async function assignTeamToGroup(tournamentTeamId: string, groupId: string | null) {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };
+  if (!hasRole(session, "EDITOR")) return { success: false, error: "Forbidden: Insufficient permissions" };
 
   await prisma.tournamentTeam.update({
     where: { id: tournamentTeamId },
@@ -518,6 +536,7 @@ export async function assignTeamToGroup(tournamentTeamId: string, groupId: strin
 export async function assignPlayerToGroup(tournamentPlayerId: string, groupId: string | null) {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };
+  if (!hasRole(session, "EDITOR")) return { success: false, error: "Forbidden: Insufficient permissions" };
 
   const tournamentPlayer = await prisma.tournamentPlayer.findUnique({
     where: { id: tournamentPlayerId },
@@ -545,6 +564,7 @@ interface RandomDrawOptions {
 export async function randomDrawToGroups(options: RandomDrawOptions) {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };
+  if (!hasRole(session, "ADMIN")) return { success: false, error: "Forbidden: Admin role required" };
 
   const { tournamentId, method } = options;
 

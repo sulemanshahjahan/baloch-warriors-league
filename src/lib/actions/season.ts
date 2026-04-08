@@ -91,6 +91,7 @@ export async function updateSeason(id: string, formData: FormData) {
 export async function deleteSeason(id: string) {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };
+  if (!hasRole(session, "ADMIN")) return { success: false, error: "Forbidden: Admin role required" };
 
   const tournamentCount = await prisma.tournament.count({ where: { seasonId: id } });
   if (tournamentCount > 0) {
