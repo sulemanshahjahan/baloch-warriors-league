@@ -232,6 +232,66 @@ export async function getTournamentById(id: string) {
   });
 }
 
+// ─── PAGINATED MATCHES ─────────────────────────────────────
+
+export async function getTournamentMatchesPaginated(
+  tournamentId: string,
+  options?: {
+    page?: number;
+    limit?: number;
+    status?: "SCHEDULED" | "LIVE" | "COMPLETED" | "CANCELLED" | "POSTPONED";
+    round?: string;
+  }
+) {
+  const page = Math.max(1, options?.page ?? 1);
+  const limit = Math.max(1, Math.min(50, options?.limit ?? 20));
+  const skip = (page - 1) * limit;
+
+  const where: {
+    tournamentId: string;
+    status?: "SCHEDULED" | "LIVE" | "COMPLETED" | "CANCELLED" | "POSTPONED";
+    round?: string;
+  } = {
+    tournamentId,
+    ...(options?.status && { status: options.status }),
+    ...(options?.round && { round: options.round }),
+  };
+
+  const [matches, total] = await Promise.all([
+    prisma.match.findMany({
+      where,
+      orderBy: [
+        { roundNumber: "desc" },
+        { matchNumber: "asc" },
+        { scheduledAt: "asc" },
+      ],
+      skip,
+      take: limit,
+      include: {
+        homeTeam: { select: { id: true, name: true, shortName: true, logoUrl: true } },
+        awayTeam: { select: { id: true, name: true, shortName: true, logoUrl: true } },
+        homePlayer: { select: { id: true, name: true, photoUrl: true } },
+        awayPlayer: { select: { id: true, name: true, photoUrl: true } },
+        events: {
+          include: {
+            player: { select: { id: true, name: true } },
+          },
+          orderBy: { minute: "asc" },
+        },
+      },
+    }),
+    prisma.match.count({ where }),
+  ]);
+
+  return {
+    matches,
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit),
+  };
+}
+
 // ─── TEAM ENROLLMENT ────────────────────────────────────────
 
 export async function enrollTeamInTournament(

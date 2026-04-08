@@ -284,9 +284,25 @@ async function advanceKnockoutWinner(matchId: string, tournamentId: string) {
   
   // Find existing next round match for this bracket position
   // Match number determines which next match (1&2 -> 1, 3&4 -> 2, etc.)
-  const matchNumber = completedMatch.matchNumber || 1;
-  const nextMatchNumber = Math.ceil(matchNumber / 2);
-  const isHomeSlot = matchNumber % 2 === 1; // Odd matches go to home, even to away
+  // Handle null/undefined matchNumber gracefully - use ID-based fallback
+  let matchNumber = completedMatch.matchNumber;
+  let nextMatchNumber: number;
+  let isHomeSlot: boolean;
+  
+  if (matchNumber == null) {
+    // If matchNumber is null, derive a stable position from match ID
+    // Use last 4 hex chars of UUID as a number (0-65535)
+    const idSuffix = parseInt(matchId.slice(-4), 16) || 0;
+    // Determine slot based on hash of match ID for consistency
+    isHomeSlot = (idSuffix % 2) === 0;
+    // Create a synthetic match number for calculation
+    matchNumber = (idSuffix % 8) + 1; // 1-8 range
+    nextMatchNumber = Math.ceil(matchNumber / 2);
+    console.warn(`Match ${matchId} has no matchNumber, using derived position ${matchNumber} -> next slot ${nextMatchNumber} (${isHomeSlot ? 'home' : 'away'})`);
+  } else {
+    nextMatchNumber = Math.ceil(matchNumber / 2);
+    isHomeSlot = matchNumber % 2 === 1; // Odd matches go to home, even to away
+  }
   
   const existingNextMatch = await prisma.match.findFirst({
     where: {
