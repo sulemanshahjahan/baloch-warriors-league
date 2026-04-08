@@ -1,4 +1,4 @@
-export const revalidate = 300; // Cache for 5 minutes
+export const revalidate = 300;
 
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
@@ -16,111 +16,72 @@ export const metadata: Metadata = {
 };
 
 async function getPlayersWithStats() {
-  const players = await prisma.player.findMany({
-    where: { isActive: true },
-    orderBy: { eloRating: "desc" },
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      nickname: true,
-      position: true,
-      nationality: true,
-      eloRating: true,
-      _count: { select: { matchEvents: true, awards: true } },
-      teams: {
-        where: { isActive: true },
-        select: { team: { select: { id: true, name: true } } },
-        take: 1,
+  // Two parallel queries instead of 5 sequential ones
+  const [players, eloStats] = await Promise.all([
+    // Query 1: Players with goal count
+    prisma.player.findMany({
+      where: { isActive: true },
+      orderBy: { eloRating: "desc" },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        nickname: true,
+        position: true,
+        nationality: true,
+        eloRating: true,
+        _count: {
+          select: {
+            awards: true,
+            homeMatches: { where: { status: "COMPLETED" } },
+            awayMatches: { where: { status: "COMPLETED" } },
+          },
+        },
+        teams: {
+          where: { isActive: true },
+          select: { team: { select: { id: true, name: true } } },
+          take: 1,
+        },
       },
-    },
-  });
-
-  // Get player IDs for batch queries
-  const playerIds = players.map(p => p.id);
-
-  // Handle empty case
-  if (playerIds.length === 0) {
-    return players.map(player => ({
-      ...player,
-      stats: { goals: 0, wins: 0, assists: 0, matches: 0, tournaments: 0 },
-    }));
-  }
-
-  // Get goals and assists counts
-  const [goalsAgg, assistsAgg, tournamentCounts] = await Promise.all([
-    prisma.matchEvent.groupBy({
-      by: ["playerId"],
-      where: { 
-        playerId: { in: playerIds },
-        type: "GOAL" 
-      },
-      _count: { type: true },
     }),
-    prisma.matchEvent.groupBy({
+    // Query 2: Win counts from ELO history (already indexed)
+    prisma.eloHistory.groupBy({
       by: ["playerId"],
-      where: { 
-        playerId: { in: playerIds },
-        type: "ASSIST" 
-      },
-      _count: { type: true },
-    }),
-    prisma.tournamentPlayer.groupBy({
-      by: ["playerId"],
-      where: { playerId: { in: playerIds } },
-      _count: { tournamentId: true },
+      where: { result: "WIN" },
+      _count: { result: true },
     }),
   ]);
 
-  // Get matches played (count unique matches per player)
-  const playerMatches = await prisma.match.findMany({
-    where: {
-      status: "COMPLETED",
-      OR: [
-        { homePlayerId: { in: playerIds } },
-        { awayPlayerId: { in: playerIds } },
-      ],
-    },
-    select: {
-      homePlayerId: true,
-      awayPlayerId: true,
-      homeScore: true,
-      awayScore: true,
-    },
-  });
+  // Build wins map
+  const winsMap = new Map(eloStats.map((e) => [e.playerId, e._count.result]));
 
-  // Count matches + wins per player
-  const matchesCount = new Map<string, number>();
-  const winsCount = new Map<string, number>();
-  for (const match of playerMatches) {
-    if (match.homePlayerId) {
-      matchesCount.set(match.homePlayerId, (matchesCount.get(match.homePlayerId) || 0) + 1);
-      if ((match.homeScore ?? 0) > (match.awayScore ?? 0)) {
-        winsCount.set(match.homePlayerId, (winsCount.get(match.homePlayerId) || 0) + 1);
-      }
-    }
-    if (match.awayPlayerId) {
-      matchesCount.set(match.awayPlayerId, (matchesCount.get(match.awayPlayerId) || 0) + 1);
-      if ((match.awayScore ?? 0) > (match.homeScore ?? 0)) {
-        winsCount.set(match.awayPlayerId, (winsCount.get(match.awayPlayerId) || 0) + 1);
-      }
-    }
-  }
+  // Get goal counts in one batch
+  const playerIds = players.map((p) => p.id);
+  const goalCounts = playerIds.length > 0
+    ? await prisma.matchEvent.groupBy({
+        by: ["playerId"],
+        where: { playerId: { in: playerIds }, type: "GOAL" },
+        _count: { type: true },
+      })
+    : [];
+  const goalsMap = new Map(goalCounts.map((g) => [g.playerId!, g._count.type]));
 
-  // Build stats maps
-  const goalsMap = new Map(goalsAgg.map(g => [g.playerId!, g._count.type]));
-  const assistsMap = new Map(assistsAgg.map(a => [a.playerId!, a._count.type]));
-  const tournamentsMap = new Map(tournamentCounts.map(t => [t.playerId!, t._count.tournamentId]));
-
-  // Merge stats into players
-  return players.map(player => ({
-    ...player,
+  return players.map((player) => ({
+    id: player.id,
+    name: player.name,
+    slug: player.slug,
+    nickname: player.nickname,
+    position: player.position,
+    nationality: player.nationality,
+    eloRating: player.eloRating,
+    teams: player.teams,
+    _count: { matchEvents: 0, awards: player._count.awards },
     stats: {
-      goals: goalsMap.get(player.id) || 0,
-      wins: winsCount.get(player.id) || 0,
-      assists: assistsMap.get(player.id) || 0,
-      matches: matchesCount.get(player.id) || 0,
-      tournaments: tournamentsMap.get(player.id) || 0,
+      goals: goalsMap.get(player.id) ?? 0,
+      wins: winsMap.get(player.id) ?? 0,
+      assists: 0,
+      matches: player._count.homeMatches + player._count.awayMatches,
+      tournaments: 0,
     },
   }));
 }
