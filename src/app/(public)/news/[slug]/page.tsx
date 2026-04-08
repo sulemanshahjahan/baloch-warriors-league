@@ -6,9 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft, Calendar } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 
-// Use ISR instead of full SSG to avoid DB connection pool exhaustion
-export const revalidate = 300;
-export const dynamicParams = false;
+// Static export - no revalidation
 
 interface NewsPostPageProps {
   params: Promise<{ slug: string }>;
@@ -20,6 +18,10 @@ export async function generateStaticParams() {
     where: { isPublished: true },
     select: { slug: true },
   });
+  // Return at least one dummy path if no posts exist (for build purposes)
+  if (posts.length === 0) {
+    return [{ slug: "dummy" }];
+  }
   return posts.map((p) => ({ slug: p.slug }));
 }
 
