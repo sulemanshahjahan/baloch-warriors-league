@@ -1,4 +1,4 @@
-export const revalidate = 120;
+export const revalidate = 300; // 5 minutes
 
 import Link from "next/link";
 import Image from "next/image";

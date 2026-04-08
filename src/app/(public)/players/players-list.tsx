@@ -27,6 +27,7 @@ type Player = {
   teams: { team: { id: string; name: string } }[];
   stats: {
     goals: number;
+    wins: number;
     assists: number;
     matches: number;
     tournaments: number;
@@ -192,10 +193,10 @@ export function PlayersList({ players }: { players: Player[] }) {
                       </div>
                       <div className="text-center">
                         <div className="flex items-center justify-center gap-0.5 text-blue-400">
-                          <SwordsIcon className="w-3 h-3" />
-                          <span className="text-xs font-bold">{player.stats.assists}</span>
+                          <Trophy className="w-3 h-3" />
+                          <span className="text-xs font-bold">{player.stats.wins}</span>
                         </div>
-                        <span className="text-[10px] text-muted-foreground">Assists</span>
+                        <span className="text-[10px] text-muted-foreground">Wins</span>
                       </div>
                       <div className="text-center">
                         <div className="flex items-center justify-center gap-0.5 text-orange-400">

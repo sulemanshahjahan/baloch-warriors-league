@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { getTournamentStats } from "@/lib/actions/stats";
 
 // Use ISR instead of full SSG to avoid DB connection pool exhaustion
-export const revalidate = 60;
+export const revalidate = 300;
 export const dynamicParams = true;
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Trophy, ArrowUp, ArrowDown, Minus, BarChart3 } from "lucide-react";
 import { SmartAvatar } from "@/components/public/smart-avatar";
 
-export const revalidate = 60;
+export const revalidate = 300;
 
 export const metadata: Metadata = {
   title: "ELO Rankings",

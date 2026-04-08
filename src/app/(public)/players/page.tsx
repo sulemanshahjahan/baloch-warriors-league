@@ -1,4 +1,4 @@
-export const revalidate = 60; // Cache for 1 minute (player stats change frequently)
+export const revalidate = 300; // Cache for 5 minutes
 
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
@@ -18,14 +18,19 @@ export const metadata: Metadata = {
 async function getPlayersWithStats() {
   const players = await prisma.player.findMany({
     where: { isActive: true },
-    orderBy: { name: "asc" },
-    include: {
-      _count: {
-        select: { matchEvents: true, awards: true },
-      },
+    orderBy: { eloRating: "desc" },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      nickname: true,
+      position: true,
+      nationality: true,
+      eloRating: true,
+      _count: { select: { matchEvents: true, awards: true } },
       teams: {
         where: { isActive: true },
-        include: { team: { select: { id: true, name: true } } },
+        select: { team: { select: { id: true, name: true } } },
         take: 1,
       },
     },
@@ -38,7 +43,7 @@ async function getPlayersWithStats() {
   if (playerIds.length === 0) {
     return players.map(player => ({
       ...player,
-      stats: { goals: 0, assists: 0, matches: 0, tournaments: 0 },
+      stats: { goals: 0, wins: 0, assists: 0, matches: 0, tournaments: 0 },
     }));
   }
 
@@ -79,17 +84,26 @@ async function getPlayersWithStats() {
     select: {
       homePlayerId: true,
       awayPlayerId: true,
+      homeScore: true,
+      awayScore: true,
     },
   });
 
-  // Count matches per player
+  // Count matches + wins per player
   const matchesCount = new Map<string, number>();
+  const winsCount = new Map<string, number>();
   for (const match of playerMatches) {
     if (match.homePlayerId) {
       matchesCount.set(match.homePlayerId, (matchesCount.get(match.homePlayerId) || 0) + 1);
+      if ((match.homeScore ?? 0) > (match.awayScore ?? 0)) {
+        winsCount.set(match.homePlayerId, (winsCount.get(match.homePlayerId) || 0) + 1);
+      }
     }
     if (match.awayPlayerId) {
       matchesCount.set(match.awayPlayerId, (matchesCount.get(match.awayPlayerId) || 0) + 1);
+      if ((match.awayScore ?? 0) > (match.homeScore ?? 0)) {
+        winsCount.set(match.awayPlayerId, (winsCount.get(match.awayPlayerId) || 0) + 1);
+      }
     }
   }
 
@@ -103,6 +117,7 @@ async function getPlayersWithStats() {
     ...player,
     stats: {
       goals: goalsMap.get(player.id) || 0,
+      wins: winsCount.get(player.id) || 0,
       assists: assistsMap.get(player.id) || 0,
       matches: matchesCount.get(player.id) || 0,
       tournaments: tournamentsMap.get(player.id) || 0,
