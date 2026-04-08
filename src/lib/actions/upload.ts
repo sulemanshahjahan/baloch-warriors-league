@@ -1,7 +1,6 @@
 "use server";
 
 import { auth } from "@/lib/auth";
-import { v2 as cloudinary } from "cloudinary";
 
 // Upload limits
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -11,29 +10,6 @@ interface UploadResult {
   success: boolean;
   url?: string;
   error?: string;
-}
-
-/**
- * Configure Cloudinary with env vars
- * Called inside each function to ensure env vars are available
- */
-function configureCloudinary() {
-  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-  const apiKey = process.env.CLOUDINARY_API_KEY;
-  const apiSecret = process.env.CLOUDINARY_API_SECRET;
-
-  if (!cloudName || !apiKey || !apiSecret) {
-    throw new Error(
-      "Cloudinary config missing. Check env vars: CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET"
-    );
-  }
-
-  cloudinary.config({
-    cloud_name: cloudName,
-    api_key: apiKey,
-    api_secret: apiSecret,
-    secure: true,
-  });
 }
 
 /**
@@ -58,9 +34,26 @@ export async function uploadPlayerImage(formData: FormData): Promise<UploadResul
     return { success: false, error: "File too large. Max 10MB." };
   }
 
+  // Get env vars inside the function
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  const apiKey = process.env.CLOUDINARY_API_KEY;
+  const apiSecret = process.env.CLOUDINARY_API_SECRET;
+
+  if (!cloudName || !apiKey || !apiSecret) {
+    console.error("Cloudinary env vars missing:", { cloudName: !!cloudName, apiKey: !!apiKey, apiSecret: !!apiSecret });
+    return { success: false, error: "Server configuration error. Please contact support." };
+  }
+
   try {
-    // Configure Cloudinary here to ensure env vars are loaded
-    configureCloudinary();
+    // Dynamic import cloudinary inside the function
+    const { v2: cloudinary } = await import("cloudinary");
+    
+    cloudinary.config({
+      cloud_name: cloudName,
+      api_key: apiKey,
+      api_secret: apiSecret,
+      secure: true,
+    });
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
@@ -125,8 +118,23 @@ export async function uploadTeamLogo(formData: FormData): Promise<UploadResult> 
     return { success: false, error: "File too large. Max 10MB." };
   }
 
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  const apiKey = process.env.CLOUDINARY_API_KEY;
+  const apiSecret = process.env.CLOUDINARY_API_SECRET;
+
+  if (!cloudName || !apiKey || !apiSecret) {
+    return { success: false, error: "Server configuration error." };
+  }
+
   try {
-    configureCloudinary();
+    const { v2: cloudinary } = await import("cloudinary");
+    
+    cloudinary.config({
+      cloud_name: cloudName,
+      api_key: apiKey,
+      api_secret: apiSecret,
+      secure: true,
+    });
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
@@ -191,8 +199,23 @@ export async function uploadTournamentImage(formData: FormData): Promise<UploadR
     return { success: false, error: "File too large. Max 10MB." };
   }
 
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  const apiKey = process.env.CLOUDINARY_API_KEY;
+  const apiSecret = process.env.CLOUDINARY_API_SECRET;
+
+  if (!cloudName || !apiKey || !apiSecret) {
+    return { success: false, error: "Server configuration error." };
+  }
+
   try {
-    configureCloudinary();
+    const { v2: cloudinary } = await import("cloudinary");
+    
+    cloudinary.config({
+      cloud_name: cloudName,
+      api_key: apiKey,
+      api_secret: apiSecret,
+      secure: true,
+    });
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
@@ -214,7 +237,7 @@ export async function uploadTournamentImage(formData: FormData): Promise<UploadR
           } else if (result) {
             resolve({
               success: true,
-              url: result.url,
+              url: result.secure_url,
             });
           } else {
             reject(new Error("No result from Cloudinary"));
@@ -244,8 +267,23 @@ export async function deleteImageFromCloudinary(url: string): Promise<{ success:
     return { success: false, error: "Unauthorized" };
   }
 
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  const apiKey = process.env.CLOUDINARY_API_KEY;
+  const apiSecret = process.env.CLOUDINARY_API_SECRET;
+
+  if (!cloudName || !apiKey || !apiSecret) {
+    return { success: false, error: "Server configuration error." };
+  }
+
   try {
-    configureCloudinary();
+    const { v2: cloudinary } = await import("cloudinary");
+    
+    cloudinary.config({
+      cloud_name: cloudName,
+      api_key: apiKey,
+      api_secret: apiSecret,
+      secure: true,
+    });
 
     // Extract public_id from Cloudinary URL
     const urlMatch = url.match(/\/upload\/v\d+\/(.+?)\.[^.]+$/);
