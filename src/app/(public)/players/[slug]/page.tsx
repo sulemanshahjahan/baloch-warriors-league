@@ -283,6 +283,22 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main */}
           <div className="lg:col-span-2 space-y-6">
+            {/* Player Card */}
+            <PlayerCard
+              name={player.name}
+              position={player.position ?? ""}
+              rating={player.skillLevel ?? 50}
+              nationality={player.nationality ?? ""}
+              avatarUrl={`/api/image?type=player&id=${player.id}`}
+              playerId={player.id}
+              stats={{
+                goals: stats.goals,
+                wins: stats.wins,
+                matches: stats.appearances,
+                motm: stats.motm,
+              }}
+            />
+
             {/* Stats */}
             <Card>
               <CardHeader>
@@ -316,22 +332,6 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                 </div>
               </CardContent>
             </Card>
-
-            {/* Player Card */}
-            <PlayerCard
-              name={player.name}
-              position={player.position ?? ""}
-              rating={player.skillLevel ?? 50}
-              nationality={player.nationality ?? ""}
-              avatarUrl={`/api/image?type=player&id=${player.id}`}
-              playerId={player.id}
-              stats={{
-                goals: stats.goals,
-                wins: stats.wins,
-                matches: stats.appearances,
-                motm: stats.motm,
-              }}
-            />
 
             {/* Recent Matches */}
             {recentMatches.length > 0 && (
