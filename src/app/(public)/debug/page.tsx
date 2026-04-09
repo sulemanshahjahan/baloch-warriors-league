@@ -2,23 +2,26 @@
 
 import { useState, useEffect } from "react";
 
+export const dynamic = "force-dynamic";
+
 export default function DebugPage() {
   const [logs, setLogs] = useState<Array<{ t: string; msg: string; data: string }>>([]);
+  const [token, setToken] = useState("");
+  const [isCap, setIsCap] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem("bwl-push-debug");
-    if (stored) {
-      try { setLogs(JSON.parse(stored)); } catch {}
-    }
+    setIsCap("Capacitor" in window);
+    setToken(localStorage.getItem("bwl-fcm-token") || "none");
 
-    // Refresh every 2 seconds
-    const interval = setInterval(() => {
+    const load = () => {
       const stored = localStorage.getItem("bwl-push-debug");
       if (stored) {
         try { setLogs(JSON.parse(stored)); } catch {}
       }
-    }, 2000);
+    };
 
+    load();
+    const interval = setInterval(load, 2000);
     return () => clearInterval(interval);
   }, []);
 
@@ -26,10 +29,10 @@ export default function DebugPage() {
     <div className="p-4 max-w-lg mx-auto">
       <h1 className="text-lg font-bold mb-4">Push Debug Log</h1>
       <p className="text-xs text-muted-foreground mb-2">
-        FCM Token: {localStorage.getItem("bwl-fcm-token")?.slice(0, 30) ?? "none"}...
+        FCM Token: {token.slice(0, 30)}...
       </p>
       <p className="text-xs text-muted-foreground mb-4">
-        Capacitor: {typeof window !== "undefined" && "Capacitor" in window ? "Yes" : "No"}
+        Capacitor: {isCap ? "Yes" : "No"}
       </p>
 
       <button
