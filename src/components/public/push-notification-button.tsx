@@ -65,12 +65,6 @@ async function subscribeToFCM(): Promise<boolean> {
       PushNotifications.addListener("registrationError", () => {
         resolve(false);
       });
-
-      // Handle notification tap — navigate to the URL
-      PushNotifications.addListener("pushNotificationActionPerformed", (notification) => {
-        const url = notification.notification.data?.url;
-        if (url) window.location.href = url;
-      });
     });
   } catch (err) {
     console.error("FCM subscribe error:", err);
@@ -107,6 +101,15 @@ export function PushNotificationButton() {
     if (isCapacitor) {
       setSupported(true);
       setSubscribed(!!localStorage.getItem("bwl-fcm-token"));
+
+      // Register tap handler on EVERY app load (not just during subscribe)
+      import("@capacitor/push-notifications").then(({ PushNotifications }) => {
+        PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
+          const url = action.notification.data?.url;
+          if (url) window.location.href = url;
+        });
+      }).catch(() => {});
+
       return;
     }
 
