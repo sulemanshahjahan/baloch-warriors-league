@@ -29,6 +29,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { BracketVisualization } from "@/components/public/bracket-view";
 import { DrawReplayButton } from "@/components/public/draw-replay";
+import { PlayerFixturesShare } from "@/components/public/player-fixtures-share";
 import {
   formatDate,
   formatDateTime,
@@ -637,6 +638,19 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
           {/* Matches */}
           <TabsContent value="matches" className="mt-0">
             <div className="space-y-4">
+              {/* Share Fixtures per player */}
+              {tournament.matches.length > 0 && (
+                <PlayerFixturesShare
+                  tournamentName={tournament.name}
+                  matches={tournament.matches as any}
+                  players={tournament.players?.map((tp: any) => ({
+                    id: tp.player?.id ?? tp.id,
+                    name: tp.player?.name ?? "?",
+                  })) ?? []}
+                  participantType={tournament.participantType}
+                />
+              )}
+
               {upcomingMatches.length > 0 && (
                 <Card>
                   <CardHeader>
