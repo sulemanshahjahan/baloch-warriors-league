@@ -102,11 +102,37 @@ export function PushNotificationButton() {
       setSupported(true);
       setSubscribed(!!localStorage.getItem("bwl-fcm-token"));
 
-      // Register tap handler on EVERY app load (not just during subscribe)
+      // Register tap handler on EVERY app load
       import("@capacitor/push-notifications").then(({ PushNotifications }) => {
+        // Handle tap when app is in foreground/background
         PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
           const url = action.notification.data?.url;
-          if (url) window.location.href = url;
+          if (url) {
+            // Use router-style navigation with delay to ensure page is ready
+            setTimeout(() => {
+              window.location.href = url;
+            }, 500);
+          }
+        });
+
+        // Handle notification received while app is in foreground
+        PushNotifications.addListener("pushNotificationReceived", (notification) => {
+          // Store the URL so user can tap to navigate
+          const url = notification.data?.url;
+          if (url) {
+            localStorage.setItem("bwl-pending-notification-url", url);
+          }
+        });
+
+        // Check if app was opened from a notification (cold start)
+        PushNotifications.getDeliveredNotifications().then(({ notifications }) => {
+          if (notifications.length > 0) {
+            const url = notifications[0].data?.url;
+            if (url) {
+              PushNotifications.removeAllDeliveredNotifications();
+              window.location.href = url;
+            }
+          }
         });
       }).catch(() => {});
 
