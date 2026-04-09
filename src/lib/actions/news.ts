@@ -65,14 +65,14 @@ export async function createNewsPost(formData: FormData): Promise<ActionResult<{
 
   // Push notification for published news
   if (data.isPublished) {
-    import("@/lib/push").then(({ sendPushToAll }) =>
-      sendPushToAll({
+    import("@/lib/push").then(({ notify }) =>
+      notify({
         title: "BWL News",
         body: data.title,
         url: `/news/${post.slug}`,
         tag: `news-${post.id}`,
       })
-    ).catch(() => {});
+    ).catch((err) => console.error("News push failed:", err));
   }
 
   return { success: true, data: { id: post.id, slug: post.slug } };
@@ -119,6 +119,20 @@ export async function updateNewsPost(id: string, formData: FormData): Promise<Ac
   revalidatePath("/admin/news");
   revalidatePath(`/admin/news/${id}`);
   revalidatePath("/news");
+  if (existing?.slug) revalidatePath(`/news/${existing.slug}`);
+
+  // Push notification when publishing (new publish or re-publish)
+  if (data.isPublished && !existing?.isPublished) {
+    const updated = await prisma.newsPost.findUnique({ where: { id }, select: { slug: true } });
+    import("@/lib/push").then(({ notify }) =>
+      notify({
+        title: "BWL News",
+        body: data.title,
+        url: `/news/${updated?.slug ?? id}`,
+        tag: `news-${id}`,
+      })
+    ).catch((err) => console.error("News push failed:", err));
+  }
 
   return { success: true, data: undefined };
 }
