@@ -31,10 +31,8 @@ export default async function RankingsPage() {
     },
   });
 
-  // Filter to only players who have at least 1 ELO match or non-default rating
-  const ranked = players.filter(
-    (p) => p.eloRating !== 100 || p.eloHistory.length > 0
-  );
+  // Show all active players
+  const ranked = players;
 
   // Get match counts for each ranked player
   const matchCounts = new Map<string, { wins: number; losses: number; draws: number }>();
