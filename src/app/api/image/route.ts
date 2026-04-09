@@ -56,11 +56,22 @@ export async function GET(req: NextRequest) {
       return new NextResponse("Not found", { status: 404 });
     }
 
-    // External URL (Cloudinary etc.) — redirect
+    // External URL (Cloudinary etc.) — proxy the image instead of redirect
+    // Redirects get cached by browsers and cause stale image issues
     if (imageData.startsWith("https://") || imageData.startsWith("http://")) {
-      return NextResponse.redirect(imageData, {
-        headers: { "Cache-Control": CACHE },
-      });
+      try {
+        const imgRes = await fetch(imageData);
+        const imgBuffer = await imgRes.arrayBuffer();
+        const contentType = imgRes.headers.get("content-type") || "image/jpeg";
+        return new NextResponse(imgBuffer, {
+          headers: {
+            "Content-Type": contentType,
+            "Cache-Control": "public, max-age=60, stale-while-revalidate=30",
+          },
+        });
+      } catch {
+        return NextResponse.redirect(imageData);
+      }
     }
 
     // Base64 data URL

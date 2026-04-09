@@ -10,11 +10,12 @@ interface SmartAvatarProps {
   className?: string;
   fallbackClassName?: string;
   primaryColor?: string | null;
+  photoUrl?: string | null;
 }
 
 /**
- * SmartAvatar - Loads images via API endpoint instead of embedding base64
- * HTML stays small (~50 bytes for the URL), image loads separately with caching
+ * SmartAvatar — uses photoUrl directly when provided (no API call),
+ * falls back to /api/image with per-minute cache busting.
  */
 export function SmartAvatar({
   type,
@@ -23,8 +24,11 @@ export function SmartAvatar({
   className,
   fallbackClassName,
   primaryColor,
+  photoUrl,
 }: SmartAvatarProps) {
-  const imageUrl = `/api/image?type=${type}&id=${id}`;
+  // Direct Cloudinary/external URL — bypass API entirely
+  // API fallback with cache buster that changes every minute
+  const imageUrl = photoUrl || `/api/image?type=${type}&id=${id}&_=${Math.floor(Date.now() / 60000)}`;
 
   return (
     <Avatar className={className}>
