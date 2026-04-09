@@ -128,6 +128,22 @@ export function PushNotificationButton() {
 
         PushNotifications.addListener("pushNotificationReceived", (notification) => {
           debugLog("RECEIVED in foreground", notification);
+
+          // Data-only messages need manual local notification display
+          const title = notification.data?.title || notification.title;
+          const body = notification.data?.body || notification.body;
+          if (title) {
+            import("@capacitor/local-notifications").then(({ LocalNotifications }) => {
+              LocalNotifications.schedule({
+                notifications: [{
+                  title,
+                  body: body || "",
+                  id: Math.floor(Math.random() * 100000),
+                  extra: { url: notification.data?.url },
+                }],
+              });
+            }).catch(() => {});
+          }
         });
 
         PushNotifications.getDeliveredNotifications().then(({ notifications }) => {

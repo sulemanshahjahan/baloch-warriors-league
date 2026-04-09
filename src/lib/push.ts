@@ -145,20 +145,14 @@ export async function notify(payload: NotifyPayload): Promise<void> {
           try {
             const result = await messaging.send({
               token: t.token,
-              notification: {
+              data: {
                 title: payload.title,
                 body: payload.body,
-              },
-              data: {
                 url: payload.url || "/",
                 tag: payload.tag || "",
               },
               android: {
                 priority: "high" as const,
-                notification: {
-                  channelId: "bwl_default",
-                  clickAction: "FCM_PLUGIN_ACTIVITY",
-                },
               },
             });
             console.log("FCM sent successfully:", result);
