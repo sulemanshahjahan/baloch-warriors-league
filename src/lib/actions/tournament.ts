@@ -9,6 +9,16 @@ import type { ActionResult } from "@/lib/utils";
 import type { TournamentStatus, GameCategory } from "@prisma/client";
 import { logActivity } from "./activity-log";
 
+/** Revalidate all public + admin paths for a tournament */
+async function revalidateTournament(tournamentId: string) {
+  const t = await prisma.tournament.findUnique({ where: { id: tournamentId }, select: { slug: true } });
+  revalidatePath(`/admin/tournaments/${tournamentId}`);
+  revalidatePath("/admin/tournaments");
+  revalidatePath("/tournaments");
+  if (t?.slug) revalidatePath(`/tournaments/${t.slug}`);
+  revalidatePath("/");
+}
+
 const ROLE_LEVELS: Record<string, number> = {
   SUPER_ADMIN: 3,
   ADMIN: 2,
@@ -407,7 +417,7 @@ export async function enrollTeamInTournament(
       details: { teamId, enrollmentId: enrollment.id },
     });
 
-    revalidatePath(`/admin/tournaments/${tournamentId}`);
+    await revalidateTournament(tournamentId);
     return { success: true, data: undefined };
   } catch (error) {
     return { success: false, error: "Team is already enrolled in this tournament" };
@@ -432,7 +442,7 @@ export async function removeTeamFromTournament(
     details: { teamEnrollmentId: tournamentTeamId },
   });
 
-  revalidatePath(`/admin/tournaments/${tournamentId}`);
+  await revalidateTournament(tournamentId);
   return { success: true, data: undefined };
 }
 
@@ -458,7 +468,7 @@ export async function enrollPlayerInTournament(
     await prisma.tournamentPlayer.create({
       data: { tournamentId, playerId },
     });
-    revalidatePath(`/admin/tournaments/${tournamentId}`);
+    await revalidateTournament(tournamentId);
     return { success: true, data: undefined };
   } catch {
     return { success: false, error: "Player is already enrolled in this tournament" };
@@ -473,7 +483,7 @@ export async function removePlayerFromTournament(
   if (denied) return denied;
 
   await prisma.tournamentPlayer.delete({ where: { id: tournamentPlayerId } });
-  revalidatePath(`/admin/tournaments/${tournamentId}`);
+  await revalidateTournament(tournamentId);
   return { success: true, data: undefined };
 }
 
@@ -489,7 +499,7 @@ export async function bulkEnrollPlayersInTournament(
     skipDuplicates: true,
   });
 
-  revalidatePath(`/admin/tournaments/${tournamentId}`);
+  await revalidateTournament(tournamentId);
   return { success: true, data: { count: result.count } };
 }
 
@@ -507,7 +517,7 @@ export async function bulkRemovePlayersFromTournament(
     },
   });
 
-  revalidatePath(`/admin/tournaments/${tournamentId}`);
+  await revalidateTournament(tournamentId);
   return { success: true, data: { count: tournamentPlayerIds.length } };
 }
 
