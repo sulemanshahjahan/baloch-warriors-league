@@ -554,6 +554,44 @@ export async function assignPlayerToGroup(tournamentPlayerId: string, groupId: s
   return { success: true };
 }
 
+export async function bulkAssignPlayersToGroups(
+  assignments: Array<{ tournamentPlayerId: string; groupId: string }>
+) {
+  const session = await auth();
+  if (!session) return { success: false, error: "Unauthorized" };
+  if (!hasRole(session, "EDITOR")) return { success: false, error: "Forbidden" };
+
+  let tournamentId: string | null = null;
+
+  for (const { tournamentPlayerId, groupId } of assignments) {
+    const tp = await prisma.tournamentPlayer.update({
+      where: { id: tournamentPlayerId },
+      data: { groupId },
+      select: { tournamentId: true },
+    });
+    if (!tournamentId) tournamentId = tp.tournamentId;
+  }
+
+  if (tournamentId) {
+    revalidatePath(`/admin/tournaments/${tournamentId}`);
+    const t = await prisma.tournament.findUnique({ where: { id: tournamentId }, select: { slug: true } });
+    if (t?.slug) revalidatePath(`/tournaments/${t.slug}`);
+    revalidatePath("/tournaments");
+
+    // Notify about the draw
+    import("@/lib/push").then(({ notify }) =>
+      notify({
+        title: "Group Draw Complete!",
+        body: `${assignments.length} players have been drawn into groups`,
+        url: t?.slug ? `/tournaments/${t.slug}` : "/tournaments",
+        tag: `draw-${tournamentId}`,
+      })
+    ).catch(() => {});
+  }
+
+  return { success: true, data: { count: assignments.length } };
+}
+
 // ─── RANDOM DRAW FOR GROUPS ──────────────────────────────────
 
 interface RandomDrawOptions {

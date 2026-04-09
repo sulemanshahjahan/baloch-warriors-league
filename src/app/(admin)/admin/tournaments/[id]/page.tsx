@@ -32,6 +32,7 @@ import { AwardsManager } from "./awards-manager";
 import { GroupsManager } from "./groups-manager";
 import { RecomputeStandingsButton } from "./recompute-standings-button";
 import { CollapsibleSection } from "@/components/admin/collapsible-section";
+import { AnimatedDraw } from "@/components/admin/animated-draw";
 import { PaginatedMatchesTable } from "./matches-table";
 
 interface TournamentDetailPageProps {
@@ -165,6 +166,36 @@ export default async function TournamentDetailPage({ params }: TournamentDetailP
                       }))
               }
             />
+
+            {/* Animated Draw — only for individual tournaments with unassigned players */}
+            {tournament.participantType === "INDIVIDUAL" &&
+              tournament.players.filter((p) => !p.groupId).length > 0 &&
+              tournament.groups.length >= 2 && (
+                <div className="mt-4 pt-4 border-t border-border/50">
+                  <AnimatedDraw
+                    players={tournament.players
+                      .filter((p) => !p.groupId)
+                      .map((p) => ({
+                        id: p.id,
+                        name: p.player.name,
+                        photoUrl: p.player.photoUrl,
+                      }))}
+                    groups={tournament.groups.map((g) => ({
+                      id: g.id,
+                      name: g.name,
+                    }))}
+                    onComplete={async (assignments) => {
+                      const { bulkAssignPlayersToGroups } = await import("@/lib/actions/schedule");
+                      await bulkAssignPlayersToGroups(
+                        assignments.map((a) => ({
+                          tournamentPlayerId: a.playerId,
+                          groupId: a.groupId,
+                        }))
+                      );
+                    }}
+                  />
+                </div>
+              )}
           </CollapsibleSection>
         )}
 
