@@ -145,9 +145,11 @@ export async function notify(payload: NotifyPayload): Promise<void> {
           try {
             const result = await messaging.send({
               token: t.token,
-              data: {
+              notification: {
                 title: payload.title,
                 body: payload.body,
+              },
+              data: {
                 url: payload.url || "/",
                 tag: payload.tag || "",
               },
