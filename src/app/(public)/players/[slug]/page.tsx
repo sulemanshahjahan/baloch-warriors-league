@@ -296,7 +296,7 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
               position={player.position ?? ""}
               rating={player.skillLevel ?? 50}
               nationality={player.nationality ?? ""}
-              avatarUrl={`/api/image?type=player&id=${player.id}`}
+              avatarUrl={player.photoUrl || `/api/image?type=player&id=${player.id}&_=${Date.now()}`}
               playerId={player.id}
               stats={{
                 goals: stats.goals,
