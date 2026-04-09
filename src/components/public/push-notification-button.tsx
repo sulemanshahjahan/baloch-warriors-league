@@ -11,6 +11,9 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
 }
 
+const isCapacitor = typeof window !== "undefined" && "Capacitor" in window;
+const hasWebPush = typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window;
+
 async function subscribeToPush(): Promise<boolean> {
   try {
     const permission = await Notification.requestPermission();
@@ -38,6 +41,59 @@ async function subscribeToPush(): Promise<boolean> {
 }
 
 // ═══════════════════════════════════════
+// In-app polling for Capacitor (no Web Push)
+// Checks for new match results every 60 seconds
+// ═══════════════════════════════════════
+
+function useCapacitorPolling(enabled: boolean) {
+  useEffect(() => {
+    if (!enabled || !isCapacitor) return;
+
+    let lastCheck = Date.now();
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/matches?status=COMPLETED&limit=1`);
+        const matches = await res.json();
+        if (!Array.isArray(matches) || matches.length === 0) return;
+
+        const latest = matches[0];
+        const completedAt = new Date(latest.completedAt || latest.scheduledAt).getTime();
+
+        // If match completed after our last check, show in-app alert
+        if (completedAt > lastCheck) {
+          const home = latest.homePlayer?.name ?? latest.homeTeam?.name ?? "Home";
+          const away = latest.awayPlayer?.name ?? latest.awayTeam?.name ?? "Away";
+          const title = latest.tournament?.name ?? "BWL";
+
+          // Use Capacitor Local Notifications if available
+          try {
+            const { LocalNotifications } = await import("@capacitor/local-notifications");
+            await LocalNotifications.schedule({
+              notifications: [{
+                title: `${title} — Result`,
+                body: `${home} ${latest.homeScore ?? 0} - ${latest.awayScore ?? 0} ${away}`,
+                id: Math.floor(Math.random() * 100000),
+                schedule: { at: new Date() },
+              }],
+            });
+          } catch {
+            // Fallback: no local notifications plugin, just skip
+          }
+        }
+
+        lastCheck = Date.now();
+      } catch {
+        // Silent fail
+      }
+    };
+
+    const interval = setInterval(poll, 60000); // Every 60 seconds
+    return () => clearInterval(interval);
+  }, [enabled]);
+}
+
+// ═══════════════════════════════════════
 // Navbar bell icon button
 // ═══════════════════════════════════════
 
@@ -46,9 +102,21 @@ export function PushNotificationButton() {
   const [subscribed, setSubscribed] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // For Capacitor: enable polling when "subscribed"
+  useCapacitorPolling(isCapacitor && subscribed);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+
+    // Capacitor app — always show button (uses polling instead of Web Push)
+    if (isCapacitor) {
+      setSupported(true);
+      setSubscribed(localStorage.getItem("bwl-push-enabled") === "1");
+      return;
+    }
+
+    // Web browser — check for Web Push support
+    if (!hasWebPush) return;
     if (Notification.permission === "denied") return;
 
     setSupported(true);
@@ -65,22 +133,41 @@ export function PushNotificationButton() {
   async function handleToggle() {
     setLoading(true);
     try {
-      const reg = await navigator.serviceWorker.ready;
+      if (isCapacitor) {
+        // Capacitor — toggle polling
+        if (subscribed) {
+          localStorage.removeItem("bwl-push-enabled");
+          setSubscribed(false);
+        } else {
+          localStorage.setItem("bwl-push-enabled", "1");
+          setSubscribed(true);
 
-      if (subscribed) {
-        const sub = await reg.pushManager.getSubscription();
-        if (sub) {
-          await fetch("/api/push/subscribe", {
-            method: "DELETE",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ endpoint: sub.endpoint }),
-          });
-          await sub.unsubscribe();
+          // Try to request local notification permission
+          try {
+            const { LocalNotifications } = await import("@capacitor/local-notifications");
+            await LocalNotifications.requestPermissions();
+          } catch {
+            // Plugin not installed — polling still works, just no system notifications
+          }
         }
-        setSubscribed(false);
       } else {
-        const ok = await subscribeToPush();
-        setSubscribed(ok);
+        // Web browser — Web Push API
+        const reg = await navigator.serviceWorker.ready;
+        if (subscribed) {
+          const sub = await reg.pushManager.getSubscription();
+          if (sub) {
+            await fetch("/api/push/subscribe", {
+              method: "DELETE",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ endpoint: sub.endpoint }),
+            });
+            await sub.unsubscribe();
+          }
+          setSubscribed(false);
+        } else {
+          const ok = await subscribeToPush();
+          setSubscribed(ok);
+        }
       }
     } catch (err) {
       console.error("Push toggle error:", err);
@@ -106,8 +193,7 @@ export function PushNotificationButton() {
 }
 
 // ═══════════════════════════════════════
-// Auto-prompt banner — shows on every visit
-// until user subscribes or dismisses
+// Auto-prompt banner
 // ═══════════════════════════════════════
 
 export function PushPromptBanner() {
@@ -116,37 +202,49 @@ export function PushPromptBanner() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
-    if (Notification.permission === "denied") return;
-    if (Notification.permission === "granted") {
-      // Already granted — check if actually subscribed
-      navigator.serviceWorker.register("/sw.js").then((reg) => {
-        reg.pushManager.getSubscription().then((sub) => {
-          // If granted but not subscribed, auto-subscribe silently
-          if (!sub) subscribeToPush();
-          // Don't show banner — already handled
+
+    // Check if already enabled
+    if (isCapacitor) {
+      if (localStorage.getItem("bwl-push-enabled") === "1") return;
+    } else {
+      if (!hasWebPush) return;
+      if (Notification.permission === "denied") return;
+      if (Notification.permission === "granted") {
+        navigator.serviceWorker.register("/sw.js").then((reg) => {
+          reg.pushManager.getSubscription().then((sub) => {
+            if (!sub) subscribeToPush();
+          });
         });
-      });
-      return;
+        return;
+      }
     }
 
-    // Permission is "default" — show the banner
-    // Check if user dismissed this session
     const dismissed = sessionStorage.getItem("bwl-push-dismissed");
     if (dismissed) return;
 
-    // Delay showing banner by 3 seconds so it doesn't feel aggressive
     const timer = setTimeout(() => setShow(true), 3000);
     return () => clearTimeout(timer);
   }, []);
 
   const handleAllow = useCallback(async () => {
     setLoading(true);
-    const ok = await subscribeToPush();
+
+    if (isCapacitor) {
+      localStorage.setItem("bwl-push-enabled", "1");
+      try {
+        const { LocalNotifications } = await import("@capacitor/local-notifications");
+        await LocalNotifications.requestPermissions();
+      } catch {
+        // Plugin not available — polling still works
+      }
+      setShow(false);
+    } else {
+      const ok = await subscribeToPush();
+      if (!ok) sessionStorage.setItem("bwl-push-dismissed", "1");
+      setShow(false);
+    }
+
     setLoading(false);
-    if (ok) setShow(false);
-    else sessionStorage.setItem("bwl-push-dismissed", "1");
-    setShow(false);
   }, []);
 
   const handleDismiss = useCallback(() => {
