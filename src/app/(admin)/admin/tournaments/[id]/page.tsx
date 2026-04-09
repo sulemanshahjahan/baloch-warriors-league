@@ -32,7 +32,7 @@ import { AwardsManager } from "./awards-manager";
 import { GroupsManager } from "./groups-manager";
 import { RecomputeStandingsButton } from "./recompute-standings-button";
 import { CollapsibleSection } from "@/components/admin/collapsible-section";
-import { AnimatedDraw } from "@/components/admin/animated-draw";
+import { DrawWrapper } from "./draw-wrapper";
 import { PaginatedMatchesTable } from "./matches-table";
 
 interface TournamentDetailPageProps {
@@ -171,30 +171,19 @@ export default async function TournamentDetailPage({ params }: TournamentDetailP
             {tournament.participantType === "INDIVIDUAL" &&
               tournament.players.filter((p) => !p.groupId).length > 0 &&
               tournament.groups.length >= 2 && (
-                <div className="mt-4 pt-4 border-t border-border/50">
-                  <AnimatedDraw
-                    players={tournament.players
-                      .filter((p) => !p.groupId)
-                      .map((p) => ({
-                        id: p.id,
-                        name: p.player.name,
-                        photoUrl: p.player.photoUrl,
-                      }))}
-                    groups={tournament.groups.map((g) => ({
-                      id: g.id,
-                      name: g.name,
+                <DrawWrapper
+                  players={tournament.players
+                    .filter((p) => !p.groupId)
+                    .map((p) => ({
+                      id: p.id,
+                      name: p.player.name,
+                      photoUrl: p.player.photoUrl,
                     }))}
-                    onComplete={async (assignments) => {
-                      const { bulkAssignPlayersToGroups } = await import("@/lib/actions/schedule");
-                      await bulkAssignPlayersToGroups(
-                        assignments.map((a) => ({
-                          tournamentPlayerId: a.playerId,
-                          groupId: a.groupId,
-                        }))
-                      );
-                    }}
-                  />
-                </div>
+                  groups={tournament.groups.map((g) => ({
+                    id: g.id,
+                    name: g.name,
+                  }))}
+                />
               )}
           </CollapsibleSection>
         )}
