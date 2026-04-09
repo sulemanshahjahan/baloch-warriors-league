@@ -10,11 +10,12 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(req: NextRequest) {
   const since = req.nextUrl.searchParams.get("since");
+  const limit = parseInt(req.nextUrl.searchParams.get("limit") ?? "10", 10);
 
   const notifications = await prisma.notification.findMany({
     where: since ? { createdAt: { gt: new Date(since) } } : {},
     orderBy: { createdAt: "desc" },
-    take: 10,
+    take: Math.min(limit, 50),
     select: {
       id: true,
       title: true,
