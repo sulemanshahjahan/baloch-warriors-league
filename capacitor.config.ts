@@ -7,6 +7,11 @@ const config: CapacitorConfig = {
   server: {
     url: 'https://www.bwlleague.com',
     cleartext: false,
+    androidScheme: 'https',
+  },
+  android: {
+    webContentsDebuggingEnabled: false,
+    allowMixedContent: false,
   },
   plugins: {
     SplashScreen: {

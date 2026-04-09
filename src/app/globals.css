@@ -127,6 +127,8 @@ textarea {
 body {
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
+  /* Enable pull-to-refresh in WebView */
+  overscroll-behavior-y: auto;
 }
 
 /* ─────────────────────────────────────────────────────────────
