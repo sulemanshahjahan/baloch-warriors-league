@@ -85,6 +85,16 @@ export async function createTournament(
   revalidatePath("/admin/tournaments");
   revalidatePath("/");
 
+  // Push notification — new tournament created
+  import("@/lib/push").then(({ notify }) =>
+    notify({
+      title: "New Tournament!",
+      body: `${data.name} has been created`,
+      url: `/tournaments/${tournament.slug}`,
+      tag: `tournament-created-${tournament.id}`,
+    })
+  ).catch(() => {});
+
   return { success: true, data: { id: tournament.id, slug: tournament.slug } };
 }
 

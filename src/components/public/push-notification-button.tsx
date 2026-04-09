@@ -14,83 +14,82 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 const isCapacitor = typeof window !== "undefined" && "Capacitor" in window;
 const hasWebPush = typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window;
 
-async function subscribeToPush(): Promise<boolean> {
+// ── Web Push subscribe (browsers) ──
+async function subscribeToWebPush(): Promise<boolean> {
   try {
     const permission = await Notification.requestPermission();
     if (permission !== "granted") return false;
-
     const reg = await navigator.serviceWorker.ready;
     const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
     if (!vapidKey) return false;
-
     const sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(vapidKey) as BufferSource,
     });
-
     await fetch("/api/push/subscribe", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(sub.toJSON()),
     });
-
     return true;
   } catch {
     return false;
   }
 }
 
-// ═══════════════════════════════════════
-// In-app polling for Capacitor (no Web Push)
-// Checks for new match results every 60 seconds
-// ═══════════════════════════════════════
+// ── FCM subscribe (Capacitor Android app) ──
+async function subscribeToFCM(): Promise<boolean> {
+  try {
+    const { PushNotifications } = await import("@capacitor/push-notifications");
 
-function useCapacitorPolling(enabled: boolean) {
-  useEffect(() => {
-    if (!enabled || !isCapacitor) return;
+    // Request permission
+    const perm = await PushNotifications.requestPermissions();
+    if (perm.receive !== "granted") return false;
 
-    let lastCheck = Date.now();
+    // Register for push
+    await PushNotifications.register();
 
-    const poll = async () => {
-      try {
-        const res = await fetch(`/api/matches?status=COMPLETED&limit=1`);
-        const matches = await res.json();
-        if (!Array.isArray(matches) || matches.length === 0) return;
+    // Listen for token
+    return new Promise((resolve) => {
+      PushNotifications.addListener("registration", async (token) => {
+        // Send FCM token to our server
+        await fetch("/api/push/fcm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: token.value }),
+        });
+        localStorage.setItem("bwl-fcm-token", token.value);
+        resolve(true);
+      });
 
-        const latest = matches[0];
-        const completedAt = new Date(latest.completedAt || latest.scheduledAt).getTime();
+      PushNotifications.addListener("registrationError", () => {
+        resolve(false);
+      });
 
-        // If match completed after our last check, show in-app alert
-        if (completedAt > lastCheck) {
-          const home = latest.homePlayer?.name ?? latest.homeTeam?.name ?? "Home";
-          const away = latest.awayPlayer?.name ?? latest.awayTeam?.name ?? "Away";
-          const title = latest.tournament?.name ?? "BWL";
+      // Handle notification tap — navigate to the URL
+      PushNotifications.addListener("pushNotificationActionPerformed", (notification) => {
+        const url = notification.notification.data?.url;
+        if (url) window.location.href = url;
+      });
+    });
+  } catch (err) {
+    console.error("FCM subscribe error:", err);
+    return false;
+  }
+}
 
-          // Use Capacitor Local Notifications if available
-          try {
-            const { LocalNotifications } = await import("@capacitor/local-notifications");
-            await LocalNotifications.schedule({
-              notifications: [{
-                title: `${title} — Result`,
-                body: `${home} ${latest.homeScore ?? 0} - ${latest.awayScore ?? 0} ${away}`,
-                id: Math.floor(Math.random() * 100000),
-                schedule: { at: new Date() },
-              }],
-            });
-          } catch {
-            // Fallback: no local notifications plugin, just skip
-          }
-        }
-
-        lastCheck = Date.now();
-      } catch {
-        // Silent fail
-      }
-    };
-
-    const interval = setInterval(poll, 60000); // Every 60 seconds
-    return () => clearInterval(interval);
-  }, [enabled]);
+async function unsubscribeFromFCM(): Promise<void> {
+  try {
+    const token = localStorage.getItem("bwl-fcm-token");
+    if (token) {
+      await fetch("/api/push/fcm", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+      localStorage.removeItem("bwl-fcm-token");
+    }
+  } catch { /* silent */ }
 }
 
 // ═══════════════════════════════════════
@@ -102,30 +101,21 @@ export function PushNotificationButton() {
   const [subscribed, setSubscribed] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // For Capacitor: enable polling when "subscribed"
-  useCapacitorPolling(isCapacitor && subscribed);
-
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // Capacitor app — always show button (uses polling instead of Web Push)
     if (isCapacitor) {
       setSupported(true);
-      setSubscribed(localStorage.getItem("bwl-push-enabled") === "1");
+      setSubscribed(!!localStorage.getItem("bwl-fcm-token"));
       return;
     }
 
-    // Web browser — check for Web Push support
-    if (!hasWebPush) return;
-    if (Notification.permission === "denied") return;
-
-    setSupported(true);
-
-    navigator.serviceWorker.register("/sw.js").then((reg) => {
-      reg.pushManager.getSubscription().then((sub) => {
-        setSubscribed(!!sub);
+    if (hasWebPush && Notification.permission !== "denied") {
+      setSupported(true);
+      navigator.serviceWorker.register("/sw.js").then((reg) => {
+        reg.pushManager.getSubscription().then((sub) => setSubscribed(!!sub));
       });
-    });
+    }
   }, []);
 
   if (!supported) return null;
@@ -134,26 +124,16 @@ export function PushNotificationButton() {
     setLoading(true);
     try {
       if (isCapacitor) {
-        // Capacitor — toggle polling
         if (subscribed) {
-          localStorage.removeItem("bwl-push-enabled");
+          await unsubscribeFromFCM();
           setSubscribed(false);
         } else {
-          localStorage.setItem("bwl-push-enabled", "1");
-          setSubscribed(true);
-
-          // Try to request local notification permission
-          try {
-            const { LocalNotifications } = await import("@capacitor/local-notifications");
-            await LocalNotifications.requestPermissions();
-          } catch {
-            // Plugin not installed — polling still works, just no system notifications
-          }
+          const ok = await subscribeToFCM();
+          setSubscribed(ok);
         }
       } else {
-        // Web browser — Web Push API
-        const reg = await navigator.serviceWorker.ready;
         if (subscribed) {
+          const reg = await navigator.serviceWorker.ready;
           const sub = await reg.pushManager.getSubscription();
           if (sub) {
             await fetch("/api/push/subscribe", {
@@ -165,8 +145,7 @@ export function PushNotificationButton() {
           }
           setSubscribed(false);
         } else {
-          const ok = await subscribeToPush();
-          setSubscribed(ok);
+          setSubscribed(await subscribeToWebPush());
         }
       }
     } catch (err) {
@@ -181,11 +160,9 @@ export function PushNotificationButton() {
       onClick={handleToggle}
       disabled={loading}
       className={`p-2.5 rounded-lg transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center ${
-        subscribed
-          ? "text-primary hover:bg-primary/10"
-          : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+        subscribed ? "text-primary hover:bg-primary/10" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
       }`}
-      title={subscribed ? "Notifications on — tap to turn off" : "Turn on notifications"}
+      title={subscribed ? "Notifications on" : "Turn on notifications"}
     >
       {subscribed ? <BellRing className="w-5 h-5" /> : <Bell className="w-5 h-5" />}
     </button>
@@ -203,20 +180,21 @@ export function PushPromptBanner() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // Check if already enabled
+    // Already subscribed?
     if (isCapacitor) {
-      if (localStorage.getItem("bwl-push-enabled") === "1") return;
-    } else {
-      if (!hasWebPush) return;
+      if (localStorage.getItem("bwl-fcm-token")) return;
+    } else if (hasWebPush) {
       if (Notification.permission === "denied") return;
       if (Notification.permission === "granted") {
         navigator.serviceWorker.register("/sw.js").then((reg) => {
           reg.pushManager.getSubscription().then((sub) => {
-            if (!sub) subscribeToPush();
+            if (!sub) subscribeToWebPush();
           });
         });
         return;
       }
+    } else {
+      return; // No push support at all
     }
 
     const dismissed = sessionStorage.getItem("bwl-push-dismissed");
@@ -228,22 +206,14 @@ export function PushPromptBanner() {
 
   const handleAllow = useCallback(async () => {
     setLoading(true);
-
     if (isCapacitor) {
-      localStorage.setItem("bwl-push-enabled", "1");
-      try {
-        const { LocalNotifications } = await import("@capacitor/local-notifications");
-        await LocalNotifications.requestPermissions();
-      } catch {
-        // Plugin not available — polling still works
-      }
-      setShow(false);
-    } else {
-      const ok = await subscribeToPush();
+      const ok = await subscribeToFCM();
       if (!ok) sessionStorage.setItem("bwl-push-dismissed", "1");
-      setShow(false);
+    } else {
+      const ok = await subscribeToWebPush();
+      if (!ok) sessionStorage.setItem("bwl-push-dismissed", "1");
     }
-
+    setShow(false);
     setLoading(false);
   }, []);
 

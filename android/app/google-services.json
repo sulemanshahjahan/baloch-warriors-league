@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "954295476116",
+    "project_id": "lustrous-jet-272912",
+    "storage_bucket": "lustrous-jet-272912.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:954295476116:android:ece38eda1207ffa321f981",
+        "android_client_info": {
+          "package_name": "com.bwl.league"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "954295476116-iurmlbrfqe8cquarvm7085so5pfq07vh.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBgpH0IHrBAw6IXZo5NOIo1Gw8hJWeJsYE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "954295476116-iurmlbrfqe8cquarvm7085so5pfq07vh.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

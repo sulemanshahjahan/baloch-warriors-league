@@ -599,3 +599,27 @@ model PushSubscription {
 
   @@map("push_subscriptions")
 }
+
+model FcmToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  createdAt DateTime @default(now())
+
+  @@map("fcm_tokens")
+}
+
+// ─────────────────────────────────────────────────────────────
+// NOTIFICATION LOG (central record of all sent notifications)
+// ─────────────────────────────────────────────────────────────
+
+model Notification {
+  id        String   @id @default(cuid())
+  title     String
+  body      String
+  url       String?
+  tag       String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("notifications")
+}
