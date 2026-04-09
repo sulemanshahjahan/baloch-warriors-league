@@ -7,6 +7,7 @@ import { Menu, X, Trophy, Users } from "lucide-react";
 import { DownloadAppButton } from "./download-app-button";
 import { SearchDialog } from "./search-dialog";
 import { ThemeToggle } from "./theme-toggle";
+import { PushNotificationButton } from "./push-notification-button";
 import { cn } from "@/lib/utils";
 
 const navLinks = [
@@ -44,8 +45,9 @@ export function PublicNavbar() {
           </Link>
 
           {/* Mobile Quick Actions - Center (only on mobile) */}
-          <div className="flex md:hidden items-center gap-2">
+          <div className="flex md:hidden items-center gap-1">
             <SearchDialog />
+            <PushNotificationButton />
             <ThemeToggle />
           </div>
 
@@ -62,6 +64,7 @@ export function PublicNavbar() {
               </Link>
             ))}
             <SearchDialog />
+            <PushNotificationButton />
             <ThemeToggle />
             <DownloadAppButton variant="navbar-desktop" />
           </div>

@@ -225,6 +225,22 @@ export async function updateMatchResult(
     // Update ELO ratings for 1v1 matches
     const { updateEloAfterMatch } = await import("@/lib/elo");
     await updateEloAfterMatch(matchId);
+
+    // Push notification — match result
+    const homeName = currentMatch.homePlayerId
+      ? (await prisma.player.findUnique({ where: { id: currentMatch.homePlayerId }, select: { name: true } }))?.name
+      : (await prisma.team.findUnique({ where: { id: currentMatch.homeTeamId! }, select: { name: true } }))?.name;
+    const awayName = currentMatch.awayPlayerId
+      ? (await prisma.player.findUnique({ where: { id: currentMatch.awayPlayerId }, select: { name: true } }))?.name
+      : (await prisma.team.findUnique({ where: { id: currentMatch.awayTeamId! }, select: { name: true } }))?.name;
+    import("@/lib/push").then(({ sendPushToAll }) =>
+      sendPushToAll({
+        title: `${match.tournament.name} — Result`,
+        body: `${homeName ?? "Home"} ${data.homeScore} - ${data.awayScore} ${awayName ?? "Away"}`,
+        url: `/matches/${matchId}`,
+        tag: `match-result-${matchId}`,
+      })
+    ).catch(() => {});
   }
 
   await logActivity({

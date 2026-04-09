@@ -114,7 +114,7 @@ export async function updateTournament(
   // Get old slug before update for cache invalidation
   const oldTournament = await prisma.tournament.findUnique({
     where: { id },
-    select: { slug: true },
+    select: { slug: true, status: true },
   });
 
   const updated = await prisma.tournament.update({
@@ -154,6 +154,18 @@ export async function updateTournament(
     revalidatePath(`/tournaments/${oldTournament.slug}`);
   }
   revalidatePath("/tournaments");
+
+  // Push notification when tournament goes ACTIVE
+  if (data.status === "ACTIVE" && oldTournament?.status !== "ACTIVE") {
+    import("@/lib/push").then(({ sendPushToAll }) =>
+      sendPushToAll({
+        title: "Tournament Started!",
+        body: `${data.name} is now live`,
+        url: `/tournaments/${updated.slug}`,
+        tag: `tournament-active-${id}`,
+      })
+    ).catch(() => {});
+  }
 
   return { success: true, data: undefined };
 }

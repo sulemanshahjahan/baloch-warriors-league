@@ -63,6 +63,18 @@ export async function createNewsPost(formData: FormData): Promise<ActionResult<{
   revalidatePath("/admin/news");
   revalidatePath("/news");
 
+  // Push notification for published news
+  if (data.isPublished) {
+    import("@/lib/push").then(({ sendPushToAll }) =>
+      sendPushToAll({
+        title: "BWL News",
+        body: data.title,
+        url: `/news/${post.slug}`,
+        tag: `news-${post.id}`,
+      })
+    ).catch(() => {});
+  }
+
   return { success: true, data: { id: post.id, slug: post.slug } };
 }
 
