@@ -69,6 +69,7 @@ export async function createPlayer(formData: FormData) {
   });
 
   revalidatePath("/admin/players");
+  revalidatePath("/players");
   return { success: true, data: { id: player.id } };
 }
 
@@ -111,6 +112,9 @@ export async function updatePlayer(id: string, formData: FormData) {
 
   revalidatePath("/admin/players");
   revalidatePath(`/admin/players/${id}`);
+  revalidatePath("/players");
+  revalidatePath(`/players/${data.name ? slugify(data.name) : id}`);
+  revalidatePath("/rankings");
   return { success: true, data: undefined };
 }
 

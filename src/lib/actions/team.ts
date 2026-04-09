@@ -100,6 +100,7 @@ export async function updateTeam(id: string, formData: FormData) {
 
   revalidatePath("/admin/teams");
   revalidatePath(`/admin/teams/${id}`);
+  revalidatePath("/teams");
   return { success: true, data: undefined };
 }
 
