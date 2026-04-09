@@ -46,16 +46,16 @@ async function getMatch(id: string) {
         select: { id: true, name: true, slug: true, gameCategory: true },
       },
       homeTeam: {
-        select: { id: true, name: true, shortName: true, slug: true },
+        select: { id: true, name: true, shortName: true, slug: true, logoUrl: true },
       },
       awayTeam: {
-        select: { id: true, name: true, shortName: true, slug: true },
+        select: { id: true, name: true, shortName: true, slug: true, logoUrl: true },
       },
       homePlayer: {
-        select: { id: true, name: true, slug: true },
+        select: { id: true, name: true, slug: true, photoUrl: true },
       },
       awayPlayer: {
-        select: { id: true, name: true, slug: true },
+        select: { id: true, name: true, slug: true, photoUrl: true },
       },
       motmPlayer: {
         select: { id: true, name: true, slug: true },
@@ -406,6 +406,8 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
                 matchId={match.id}
                 round={match.round}
                 matchNumber={match.matchNumber}
+                homePhoto={match.homePlayer?.photoUrl ?? match.homeTeam?.logoUrl ?? null}
+                awayPhoto={match.awayPlayer?.photoUrl ?? match.awayTeam?.logoUrl ?? null}
               />
             </div>
           )}
