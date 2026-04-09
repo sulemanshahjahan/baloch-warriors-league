@@ -102,39 +102,50 @@ export function PushNotificationButton() {
       setSupported(true);
       setSubscribed(!!localStorage.getItem("bwl-fcm-token"));
 
-      // Register tap handler on EVERY app load
+      // DEBUG: log all push events to screen
+      const debugLog = (msg: string, data?: unknown) => {
+        const log = JSON.parse(localStorage.getItem("bwl-push-debug") || "[]");
+        log.push({ t: new Date().toISOString(), msg, data: data ? JSON.stringify(data).slice(0, 200) : "" });
+        if (log.length > 20) log.shift();
+        localStorage.setItem("bwl-push-debug", JSON.stringify(log));
+        console.log("[PUSH]", msg, data);
+      };
+
       import("@capacitor/push-notifications").then(({ PushNotifications }) => {
-        // Handle tap when app is in foreground/background
+        debugLog("Listeners registering");
+
         PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
+          debugLog("TAP event", action.notification);
           const url = action.notification.data?.url;
+          debugLog("TAP url", url);
           if (url) {
-            // Use router-style navigation with delay to ensure page is ready
             setTimeout(() => {
+              debugLog("Navigating to", url);
               window.location.href = url;
             }, 500);
           }
         });
 
-        // Handle notification received while app is in foreground
         PushNotifications.addListener("pushNotificationReceived", (notification) => {
-          // Store the URL so user can tap to navigate
-          const url = notification.data?.url;
-          if (url) {
-            localStorage.setItem("bwl-pending-notification-url", url);
-          }
+          debugLog("RECEIVED in foreground", notification);
         });
 
-        // Check if app was opened from a notification (cold start)
         PushNotifications.getDeliveredNotifications().then(({ notifications }) => {
+          debugLog("Delivered on load", notifications.length);
           if (notifications.length > 0) {
-            const url = notifications[0].data?.url;
+            const first = notifications[0];
+            debugLog("First delivered", first);
+            const url = first.data?.url;
             if (url) {
               PushNotifications.removeAllDeliveredNotifications();
+              debugLog("Cold start navigate", url);
               window.location.href = url;
             }
           }
         });
-      }).catch(() => {});
+      }).catch((err) => {
+        debugLog("Plugin error", err);
+      });
 
       return;
     }
