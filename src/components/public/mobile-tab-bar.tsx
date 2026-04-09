@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Trophy, Swords, Users, BarChart3, Home, Bug } from "lucide-react";
+import { Trophy, Swords, Users, BarChart3, Home } from "lucide-react";
 
 const tabs = [
   { href: "/", icon: Home, label: "Home" },
   { href: "/tournaments", icon: Trophy, label: "Tours" },
   { href: "/matches", icon: Swords, label: "Matches" },
   { href: "/players", icon: Users, label: "Players" },
-  { href: "/debug", icon: Bug, label: "Debug" },
+  { href: "/stats", icon: BarChart3, label: "Stats" },
 ];
 
 export function MobileTabBar() {
