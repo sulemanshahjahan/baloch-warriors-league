@@ -12,7 +12,7 @@ const prisma = new PrismaClient();
 const K_NEW = 40;
 const K_ESTABLISHED = 32;
 const K_THRESHOLD = 10;
-const RATING_FLOOR = 100;
+const RATING_FLOOR = 10;
 
 function expectedScore(ratingA: number, ratingB: number): number {
   return 1 / (1 + Math.pow(10, (ratingB - ratingA) / 400));

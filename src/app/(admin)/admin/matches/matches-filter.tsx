@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { BulkDeleteBar } from "@/components/admin/bulk-delete-bar";
+import { ResponsiveTable } from "@/components/admin/responsive-table";
 import { bulkDeleteMatches } from "@/lib/actions/match";
 import {
   Select,
@@ -170,7 +171,7 @@ function GameSection({ gameCategory, matches, selected, onToggle }: { gameCatego
       </button>
 
       {!collapsed && (
-        <Table>
+        <ResponsiveTable><Table>
           <TableHeader>
             <TableRow className="bg-muted/20">
               <TableHead>Match</TableHead>
@@ -187,7 +188,7 @@ function GameSection({ gameCategory, matches, selected, onToggle }: { gameCatego
               <MatchRow key={match.id} match={match} isSelected={selected?.has(match.id)} onToggle={onToggle ? () => onToggle(match.id) : undefined} />
             ))}
           </TableBody>
-        </Table>
+        </Table></ResponsiveTable>
       )}
     </div>
   );
@@ -283,8 +284,8 @@ export function MatchesFilter({
   return (
     <div className="space-y-4">
       {/* Filters */}
-      <div className="flex flex-wrap gap-3">
-        <div className="relative flex-1 min-w-[200px]">
+      <div className="flex flex-col sm:flex-row flex-wrap gap-3">
+        <div className="relative flex-1 min-w-0 sm:min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Search matches..."
@@ -295,7 +296,7 @@ export function MatchesFilter({
         </div>
 
         <Select value={statusFilter} onValueChange={(value) => updateFilters({ status: value })}>
-          <SelectTrigger className="w-[150px]">
+          <SelectTrigger className="w-full sm:w-[150px]">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -312,7 +313,7 @@ export function MatchesFilter({
           value={tournamentFilter}
           onValueChange={(value) => updateFilters({ tournamentId: value })}
         >
-          <SelectTrigger className="w-[200px]">
+          <SelectTrigger className="w-full sm:w-[200px]">
             <SelectValue placeholder="Tournament" />
           </SelectTrigger>
           <SelectContent>

@@ -107,7 +107,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
             prefetch={true}
             onClick={onNavigate}
             className={cn(
-              "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+              "flex items-center gap-3 px-3 py-3 rounded-md text-sm font-medium transition-colors min-h-[44px]",
               active
                 ? "bg-primary/10 text-primary border border-primary/20"
                 : "text-muted-foreground hover:text-foreground hover:bg-secondary"
@@ -192,7 +192,7 @@ export function AdminSidebar() {
                 <span className="sr-only">Open menu</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-[280px] p-0">
+            <SheetContent side="left" className="w-[280px] p-0" style={{ paddingTop: "env(safe-area-inset-top)" }}>
               <div className="flex flex-col h-full">
                 <SidebarContent onNavigate={() => setOpen(false)} />
               </div>

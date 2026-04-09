@@ -228,7 +228,7 @@ model Player {
   nationality String?
   position    String?
   skillLevel  Int?      @default(50) // 0-99 rating for seeding
-  eloRating   Int       @default(1500)
+  eloRating   Int       @default(100)
   bio              String?   @db.Text
   isActive         Boolean   @default(true)
   suspendedUntil   DateTime?

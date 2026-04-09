@@ -12,6 +12,7 @@ import { formatDate, gameLabel, gameColor, statusLabel, statusColor, formatLabel
 import { DeleteTournamentButton } from "./delete-button";
 import { CloneTournamentButton } from "./clone-button";
 import { BulkDeleteBar } from "@/components/admin/bulk-delete-bar";
+import { ResponsiveTable } from "@/components/admin/responsive-table";
 import { bulkDeleteTournaments } from "@/lib/actions/tournament";
 
 interface Tournament {
@@ -44,7 +45,7 @@ export function TournamentsTable({ tournaments }: { tournaments: Tournament[] })
   return (
     <>
       <div className="rounded-lg border border-border overflow-hidden">
-        <Table>
+        <ResponsiveTable><Table>
           <TableHeader>
             <TableRow className="bg-muted/50">
               <TableHead className="w-10">
@@ -109,7 +110,7 @@ export function TournamentsTable({ tournaments }: { tournaments: Tournament[] })
               </TableRow>
             ))}
           </TableBody>
-        </Table>
+        </Table></ResponsiveTable>
       </div>
 
       <BulkDeleteBar

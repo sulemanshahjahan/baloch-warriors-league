@@ -91,6 +91,13 @@ export function PublicNavbar() {
             </Link>
           ))}
           <DownloadAppButton variant="navbar-mobile" />
+          <Link
+            href="/admin"
+            onClick={() => setMobileOpen(false)}
+            className="block px-4 py-3.5 rounded-lg text-base font-medium text-primary hover:bg-primary/10 transition-colors min-h-[48px] mt-2 border-t border-border/50 pt-4"
+          >
+            Admin Panel
+          </Link>
         </div>
       )}
     </nav>

@@ -495,13 +495,12 @@ function drawPortrait(ctx: CanvasRenderingContext2D, theme: CardTheme, avatar: H
   ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
 
   if (avatar) {
-    // Fit to width — portrait photos show more of the subject
+    // Fit to width, top-center aligned so face is always visible
     const aspect = avatar.width / avatar.height;
     const dw = r * 2;
     const dh = dw / aspect;
-    // Shift up slightly so face is more centered
-    const offsetY = -dh * 0.08;
-    ctx.drawImage(avatar, cx - dw / 2, cy - dh / 2 + offsetY, dw, dh);
+    // Align to top of circle (cy - r), not center
+    ctx.drawImage(avatar, cx - dw / 2, cy - r, dw, dh);
 
     // Bottom fade
     const btmFade = ctx.createLinearGradient(0, cy + r * 0.3, 0, cy + r);

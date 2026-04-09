@@ -36,8 +36,8 @@ export default async function MatchesPage({ searchParams }: MatchesPageProps) {
         description={`${total} match${total !== 1 ? "es" : ""} total`}
       />
 
-      <main className="flex-1 p-6 space-y-6">
-        <div className="flex justify-end gap-2">
+      <main className="flex-1 p-4 sm:p-6 space-y-4 sm:space-y-6">
+        <div className="flex flex-col sm:flex-row justify-end gap-2">
           <Button variant="outline" asChild>
             <Link href="/admin/matches/bulk">
               Bulk Entry

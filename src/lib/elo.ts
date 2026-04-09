@@ -7,7 +7,7 @@ import { prisma } from "./db";
 const K_NEW = 40;         // K-factor for players with < 10 matches
 const K_ESTABLISHED = 32; // K-factor for players with 10+ matches
 const K_THRESHOLD = 10;   // Matches needed to be "established"
-const RATING_FLOOR = 100; // Minimum rating
+const RATING_FLOOR = 10; // minimum rating // Minimum rating
 
 /**
  * Expected score (probability of winning) for player A against player B.
