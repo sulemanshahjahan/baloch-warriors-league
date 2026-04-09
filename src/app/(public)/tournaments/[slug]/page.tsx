@@ -177,7 +177,7 @@ async function getTournamentBySlug(slug: string) {
       players: {
         select: {
           id: true,
-          player: { select: { id: true, name: true, photoUrl: true } },
+          player: { select: { id: true, name: true, slug: true, photoUrl: true } },
         },
       },
     },
@@ -569,17 +569,39 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      {group.standings.length === 0 ? (
-                        <p className="text-muted-foreground text-center py-4">
-                          No standings available for this group yet.
-                        </p>
-                      ) : (
+                      {group.standings.length > 0 ? (
                         <StandingsTable
                           standings={group.standings}
                           participantType={tournament.participantType}
                           gameCategory={tournament.gameCategory}
                           formMatches={tournament.formMatches}
                         />
+                      ) : (group as any).players?.length > 0 ? (
+                        <div className="space-y-2">
+                          {(group as any).players.map((tp: any, i: number) => {
+                            const name = tp.player?.name ?? "?";
+                            const playerId = tp.player?.id;
+                            const slug = tp.player?.slug;
+                            return (
+                              <div key={tp.id} className="flex items-center gap-3 p-2 rounded-lg bg-muted/30">
+                                <span className="text-sm font-bold text-muted-foreground w-6 text-center">{i + 1}</span>
+                                {playerId && (
+                                  <SmartAvatar type="player" id={playerId} name={name} photoUrl={tp.player?.photoUrl} className="h-7 w-7" fallbackClassName="text-[10px]" />
+                                )}
+                                {slug ? (
+                                  <Link href={`/players/${slug}`} className="text-sm font-medium hover:text-primary">{name}</Link>
+                                ) : (
+                                  <span className="text-sm font-medium">{name}</span>
+                                )}
+                              </div>
+                            );
+                          })}
+                          <p className="text-xs text-muted-foreground text-center pt-2">No matches played yet</p>
+                        </div>
+                      ) : (
+                        <p className="text-muted-foreground text-center py-4">
+                          No players in this group yet.
+                        </p>
                       )}
                     </CardContent>
                   </Card>
