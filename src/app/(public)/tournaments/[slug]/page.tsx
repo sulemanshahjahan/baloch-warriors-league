@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { BracketVisualization } from "@/components/public/bracket-view";
+import { DrawReplayButton } from "@/components/public/draw-replay";
 import {
   formatDate,
   formatDateTime,
@@ -171,6 +172,12 @@ async function getTournamentBySlug(slug: string) {
           playerId: true,
           team: { select: { id: true, slug: true, name: true } },
           player: { select: { id: true, slug: true, name: true } },
+        },
+      },
+      players: {
+        select: {
+          id: true,
+          player: { select: { id: true, name: true, photoUrl: true } },
         },
       },
     },
@@ -496,6 +503,23 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
               </p>
             </div>
           </Link>
+        )}
+
+        {/* Draw Replay — show when groups have players */}
+        {tournament.groups.length >= 2 && tournament.groups.some((g) => (g as any).players?.length > 0) && (
+          <div className="mb-6">
+            <DrawReplayButton
+              groups={tournament.groups.map((g) => ({
+                id: g.id,
+                name: g.name,
+                players: (g as any).players?.map((tp: any) => ({
+                  id: tp.player?.id ?? tp.id,
+                  name: tp.player?.name ?? tp.name ?? "?",
+                  photoUrl: tp.player?.photoUrl ?? null,
+                })) ?? [],
+              }))}
+            />
+          </div>
         )}
 
         <Tabs defaultValue="standings" className="space-y-6">
