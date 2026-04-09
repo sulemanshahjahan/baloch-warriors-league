@@ -3,8 +3,9 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Swords, Calendar, ArrowRight } from "lucide-react";
+import { Swords, Calendar, ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   formatDateTime,
   gameLabel,
@@ -33,6 +34,8 @@ type Match = {
   awayPlayer: { id: string; name: string } | null;
 };
 
+const ITEMS_PER_PAGE = 10;
+
 function MatchSkeleton() {
   return (
     <div className="space-y-3">
@@ -46,6 +49,7 @@ function MatchSkeleton() {
 function MatchCard({ match }: { match: Match }) {
   const isCompleted = match.status === "COMPLETED";
   const isLive = match.status === "LIVE";
+  const hasPens = match.homeScorePens != null && match.awayScorePens != null;
 
   const homeName = match.homePlayer?.name ?? match.homeTeam?.name ?? "TBD";
   const awayName = match.awayPlayer?.name ?? match.awayTeam?.name ?? "TBD";
@@ -85,9 +89,6 @@ function MatchCard({ match }: { match: Match }) {
               ) : null}
               <div className="min-w-0">
                 <p className="font-medium truncate">{homeName}</p>
-                {match.homeTeam?.shortName && !match.homePlayer && (
-                  <p className="text-xs text-muted-foreground">{match.homeTeam.shortName}</p>
-                )}
               </div>
             </div>
 
@@ -97,7 +98,7 @@ function MatchCard({ match }: { match: Match }) {
                   <span className="text-2xl font-black">
                     {match.homeScore ?? 0} - {match.awayScore ?? 0}
                   </span>
-                  {match.homeScorePens != null && match.awayScorePens != null && (
+                  {hasPens && (
                     <p className="text-xs text-muted-foreground">({match.homeScorePens}–{match.awayScorePens} pens)</p>
                   )}
                 </div>
@@ -109,9 +110,6 @@ function MatchCard({ match }: { match: Match }) {
             <div className="flex items-center gap-3 flex-1 justify-end">
               <div className="min-w-0 text-right">
                 <p className="font-medium truncate">{awayName}</p>
-                {match.awayTeam?.shortName && !match.awayPlayer && (
-                  <p className="text-xs text-muted-foreground">{match.awayTeam.shortName}</p>
-                )}
               </div>
               {match.awayPlayer ? (
                 <SmartAvatar type="player" id={match.awayPlayer.id} name={awayName} className="h-10 w-10 shrink-0" fallbackClassName="text-sm" />
@@ -149,29 +147,26 @@ function EmptyState({ message = "No matches found." }: { message?: string }) {
   );
 }
 
-function MatchList({ matches, loading, message }: { matches: Match[]; loading: boolean; message?: string }) {
-  if (loading) return <MatchSkeleton />;
-  if (matches.length === 0) return <EmptyState message={message} />;
-  return (
-    <>
-      {matches.map((match) => (
-        <MatchCard key={match.id} match={match} />
-      ))}
-    </>
-  );
-}
-
 export function MatchesClient() {
   const [matches, setMatches] = useState<Match[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [tab, setTab] = useState("all");
 
-  const fetchMatches = useCallback(async () => {
+  const fetchMatches = useCallback(async (p: number, status?: string) => {
+    setLoading(true);
     try {
-      const res = await fetch("/api/matches");
+      const params = new URLSearchParams({ page: String(p), limit: String(ITEMS_PER_PAGE) });
+      if (status) params.set("status", status);
+      const res = await fetch(`/api/matches?${params}`);
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
-      setMatches(data);
+      setMatches(data.matches);
+      setTotal(data.total);
+      setTotalPages(data.totalPages);
     } catch {
       setError(true);
     } finally {
@@ -180,80 +175,102 @@ export function MatchesClient() {
   }, []);
 
   useEffect(() => {
-    fetchMatches();
-  }, [fetchMatches]);
+    const status = tab === "upcoming" ? "SCHEDULED" : tab === "completed" ? "COMPLETED" : tab === "live" ? "LIVE" : undefined;
+    fetchMatches(page, status);
+  }, [page, tab, fetchMatches]);
 
-  const upcoming = matches.filter((m) => m.status === "SCHEDULED");
-  const live = matches.filter((m) => m.status === "LIVE");
-  const completed = matches.filter((m) => m.status === "COMPLETED");
+  function handleTabChange(newTab: string) {
+    setTab(newTab);
+    setPage(1);
+  }
 
   return (
     <div className="min-h-screen">
-        {/* Hero */}
-        <section className="border-b border-border/50 bg-card/30">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10 border border-primary/20">
-                <Swords className="w-5 h-5 text-primary" />
-              </div>
-              <span className="text-sm font-semibold text-primary tracking-widest uppercase">
-                Matches
-              </span>
+      {/* Hero */}
+      <section className="border-b border-border/50 bg-card/30">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10 border border-primary/20">
+              <Swords className="w-5 h-5 text-primary" />
             </div>
-            <h1 className="text-3xl sm:text-4xl font-black tracking-tight">
-              All Fixtures & Results
-            </h1>
-            <p className="text-muted-foreground mt-2 max-w-2xl">
-              View upcoming fixtures and match results from all BWL tournaments.
-            </p>
+            <span className="text-sm font-semibold text-primary tracking-widest uppercase">
+              Matches
+            </span>
           </div>
-        </section>
+          <h1 className="text-3xl sm:text-4xl font-black tracking-tight">
+            All Fixtures & Results
+          </h1>
+          <p className="text-muted-foreground mt-2 max-w-2xl">
+            View upcoming fixtures and match results from all BWL tournaments.
+          </p>
+        </div>
+      </section>
 
-        {/* Content */}
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {error ? (
-            <div className="text-center py-16">
-              <p className="text-muted-foreground">Failed to load matches. Please refresh.</p>
-            </div>
-          ) : (
-            <Tabs defaultValue="all" className="space-y-6">
+      {/* Content */}
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {error ? (
+          <div className="text-center py-16">
+            <p className="text-muted-foreground">Failed to load matches. Please refresh.</p>
+          </div>
+        ) : (
+          <>
+            <Tabs value={tab} onValueChange={handleTabChange} className="space-y-6">
               <TabsList className="bg-muted/50">
-                <TabsTrigger value="all">
-                  All {!loading && `(${matches.length})`}
-                </TabsTrigger>
-                {live.length > 0 && (
-                  <TabsTrigger value="live" className="text-red-400">
-                    ● Live ({live.length})
-                  </TabsTrigger>
-                )}
-                <TabsTrigger value="upcoming">
-                  Upcoming {!loading && `(${upcoming.length})`}
-                </TabsTrigger>
-                <TabsTrigger value="completed">
-                  Results {!loading && `(${completed.length})`}
-                </TabsTrigger>
+                <TabsTrigger value="all">All</TabsTrigger>
+                <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
+                <TabsTrigger value="completed">Results</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="all" className="mt-0 space-y-3">
-                <MatchList matches={matches} loading={loading} />
-              </TabsContent>
-
-              {live.length > 0 && (
-                <TabsContent value="live" className="mt-0 space-y-3">
-                  <MatchList matches={live} loading={false} />
-                </TabsContent>
-              )}
-
-              <TabsContent value="upcoming" className="mt-0 space-y-3">
-                <MatchList matches={upcoming} loading={loading} message="No upcoming fixtures scheduled." />
-              </TabsContent>
-
-              <TabsContent value="completed" className="mt-0 space-y-3">
-                <MatchList matches={completed} loading={loading} message="No completed matches yet." />
+              <TabsContent value={tab} className="mt-0 space-y-3">
+                {loading ? (
+                  <MatchSkeleton />
+                ) : matches.length === 0 ? (
+                  <EmptyState message={
+                    tab === "upcoming" ? "No upcoming fixtures scheduled." :
+                    tab === "completed" ? "No completed matches yet." :
+                    "No matches found."
+                  } />
+                ) : (
+                  <>
+                    {matches.map((match) => (
+                      <MatchCard key={match.id} match={match} />
+                    ))}
+                  </>
+                )}
               </TabsContent>
             </Tabs>
-          )}
-        </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-6 pt-4 border-t border-border/50">
+                <span className="text-sm text-muted-foreground">
+                  Page {page} of {totalPages} ({total} matches)
+                </span>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page <= 1 || loading}
+                    onClick={() => setPage((p) => p - 1)}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                    Prev
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={page >= totalPages || loading}
+                    onClick={() => setPage((p) => p + 1)}
+                  >
+                    Next
+                    <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
+    </div>
   );
 }
