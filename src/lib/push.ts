@@ -17,28 +17,48 @@ if (VAPID_PUBLIC && VAPID_PRIVATE) {
 }
 
 // ═══════════════════════════════════════════════════════
-// FIREBASE ADMIN — for Android app (FCM)
+// FIREBASE ADMIN — lazy init to avoid import issues
 // ═══════════════════════════════════════════════════════
 
-import admin from "firebase-admin";
+let firebaseApp: any = null;
 
-const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID;
-const FIREBASE_CLIENT_EMAIL = process.env.FIREBASE_CLIENT_EMAIL;
-const FIREBASE_PRIVATE_KEY = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
+async function getFirebaseMessaging() {
+  if (firebaseApp) return firebaseApp.messaging();
 
-let fcmConfigured = false;
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
 
-if (FIREBASE_PROJECT_ID && FIREBASE_CLIENT_EMAIL && FIREBASE_PRIVATE_KEY) {
-  if (!admin.apps.length) {
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId: FIREBASE_PROJECT_ID,
-        clientEmail: FIREBASE_CLIENT_EMAIL,
-        privateKey: FIREBASE_PRIVATE_KEY,
-      }),
+  if (!projectId || !clientEmail || !privateKey) {
+    console.warn("FCM: Missing Firebase env vars", {
+      hasProjectId: !!projectId,
+      hasClientEmail: !!clientEmail,
+      hasPrivateKey: !!privateKey,
+      privateKeyLength: privateKey?.length,
     });
+    return null;
   }
-  fcmConfigured = true;
+
+  try {
+    const admin = (await import("firebase-admin")).default;
+
+    if (admin.apps.length === 0) {
+      firebaseApp = admin.initializeApp({
+        credential: admin.credential.cert({
+          projectId,
+          clientEmail,
+          privateKey,
+        }),
+      });
+    } else {
+      firebaseApp = admin.apps[0];
+    }
+
+    return firebaseApp!.messaging();
+  } catch (err) {
+    console.error("FCM: Firebase init failed:", err);
+    return null;
+  }
 }
 
 // ═══════════════════════════════════════════════════════
@@ -53,14 +73,14 @@ interface NotifyPayload {
 }
 
 /**
- * Send a notification via ALL channels:
+ * Send notification via ALL channels:
  * 1. Save to DB (notification history + polling fallback)
  * 2. Web Push (browsers)
- * 3. FCM (Android app — works even when app is closed)
- *
- * Fire-and-forget — never throws.
+ * 3. FCM (Android app — works when closed)
  */
 export async function notify(payload: NotifyPayload): Promise<void> {
+  console.log("notify() called:", payload.title, "-", payload.body);
+
   try {
     // 1. Save to DB
     await prisma.notification.create({
@@ -71,10 +91,13 @@ export async function notify(payload: NotifyPayload): Promise<void> {
         tag: payload.tag || null,
       },
     });
+    console.log("notify: saved to DB");
 
     // 2. Web Push (browsers)
     if (vapidConfigured) {
       const subs = await prisma.pushSubscription.findMany();
+      console.log("notify: sending Web Push to", subs.length, "subscribers");
+
       if (subs.length > 0) {
         const message = JSON.stringify(payload);
         const expiredIds: string[] = [];
@@ -89,6 +112,7 @@ export async function notify(payload: NotifyPayload): Promise<void> {
               );
             } catch (err: unknown) {
               const code = (err as { statusCode?: number })?.statusCode;
+              console.error("Web Push failed for", sub.endpoint.slice(0, 40), "status:", code);
               if (code === 404 || code === 410) expiredIds.push(sub.id);
             }
           })
@@ -98,51 +122,65 @@ export async function notify(payload: NotifyPayload): Promise<void> {
           await prisma.pushSubscription.deleteMany({ where: { id: { in: expiredIds } } });
         }
       }
+    } else {
+      console.warn("notify: VAPID not configured, skipping Web Push");
     }
 
     // 3. FCM (Android app)
-    if (fcmConfigured) {
-      const tokens = await prisma.fcmToken.findMany();
-      if (tokens.length > 0) {
-        const expiredTokenIds: string[] = [];
+    const tokens = await prisma.fcmToken.findMany();
+    console.log("notify: FCM tokens found:", tokens.length);
 
-        await Promise.allSettled(
-          tokens.map(async (t) => {
-            try {
-              await admin.messaging().send({
-                token: t.token,
+    if (tokens.length > 0) {
+      const messaging = await getFirebaseMessaging();
+
+      if (!messaging) {
+        console.warn("notify: Firebase messaging not available, skipping FCM");
+        return;
+      }
+
+      const expiredTokenIds: string[] = [];
+
+      const results = await Promise.allSettled(
+        tokens.map(async (t) => {
+          try {
+            const result = await messaging.send({
+              token: t.token,
+              notification: {
+                title: payload.title,
+                body: payload.body,
+              },
+              data: {
+                url: payload.url || "/",
+                tag: payload.tag || "",
+              },
+              android: {
+                priority: "high" as const,
                 notification: {
-                  title: payload.title,
-                  body: payload.body,
+                  channelId: "bwl_default",
+                  clickAction: "FCM_PLUGIN_ACTIVITY",
                 },
-                data: {
-                  url: payload.url || "/",
-                  tag: payload.tag || "",
-                },
-                android: {
-                  priority: "high",
-                  notification: {
-                    channelId: "bwl_default",
-                    icon: "ic_notification",
-                    clickAction: "FCM_PLUGIN_ACTIVITY",
-                  },
-                },
-              });
-            } catch (err: unknown) {
-              const code = (err as { code?: string })?.code;
-              if (
-                code === "messaging/registration-token-not-registered" ||
-                code === "messaging/invalid-registration-token"
-              ) {
-                expiredTokenIds.push(t.id);
-              }
+              },
+            });
+            console.log("FCM sent successfully:", result);
+          } catch (err: unknown) {
+            const code = (err as { code?: string })?.code;
+            const msg = (err as { message?: string })?.message;
+            console.error("FCM send failed:", code, msg);
+            if (
+              code === "messaging/registration-token-not-registered" ||
+              code === "messaging/invalid-registration-token"
+            ) {
+              expiredTokenIds.push(t.id);
             }
-          })
-        );
+          }
+        })
+      );
 
-        if (expiredTokenIds.length > 0) {
-          await prisma.fcmToken.deleteMany({ where: { id: { in: expiredTokenIds } } });
-        }
+      console.log("FCM results:", results.map(r => r.status));
+
+      if (expiredTokenIds.length > 0) {
+        await prisma.fcmToken.deleteMany({ where: { id: { in: expiredTokenIds } } });
+        console.log("FCM: cleaned", expiredTokenIds.length, "expired tokens");
       }
     }
   } catch (err) {
