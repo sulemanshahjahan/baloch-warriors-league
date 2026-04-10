@@ -141,18 +141,12 @@ async function getTournamentBySlug(slug: string) {
 
   if (!tournament) return null;
 
-  // Fetch only counts - no heavy data
-  const [teamCount, playerCount, matchCount, groupCount, awardCount] = await Promise.all([
-    prisma.tournamentTeam.count({ where: { tournamentId: tournament.id } }),
-    prisma.tournamentPlayer.count({ where: { tournamentId: tournament.id } }),
-    prisma.match.count({ where: { tournamentId: tournament.id } }),
-    prisma.tournamentGroup.count({ where: { tournamentId: tournament.id } }),
-    prisma.award.count({ where: { tournamentId: tournament.id } }),
-  ]);
+  const tid = tournament.id;
 
-  // Fetch groups with standings (essential fields only)
-  const groups = await prisma.tournamentGroup.findMany({
-    where: { tournamentId: tournament.id },
+  // ALL queries in parallel — was 10+ sequential, now 1 batch
+  const [groups, matches, awards, teams, players, standings, formMatches, latestMOTM] = await Promise.all([
+    prisma.tournamentGroup.findMany({
+    where: { tournamentId: tid },
     orderBy: { orderIndex: "asc" },
     select: {
       id: true,
@@ -182,12 +176,10 @@ async function getTournamentBySlug(slug: string) {
         },
       },
     },
-  });
-
-  // Fetch all matches for display and bracket
-  // Order: Knockout rounds first (by roundNumber desc), then group rounds (by roundNumber asc)
-  const matches = await prisma.match.findMany({
-    where: { tournamentId: tournament.id },
+  }),
+    // Matches
+    prisma.match.findMany({
+    where: { tournamentId: tid },
     orderBy: [{ roundNumber: "desc" }, { matchNumber: "asc" }],
     select: {
       id: true,
@@ -220,10 +212,10 @@ async function getTournamentBySlug(slug: string) {
         },
       },
     },
-  });
-
-  const awards = await prisma.award.findMany({
-    where: { tournamentId: tournament.id },
+  }),
+    // Awards
+    prisma.award.findMany({
+    where: { tournamentId: tid },
     select: {
       id: true,
       type: true,
@@ -232,27 +224,24 @@ async function getTournamentBySlug(slug: string) {
       player: { select: { id: true, name: true, slug: true } },
       team: { select: { id: true, name: true, slug: true } },
     },
-  });
-
-  // Fetch teams with minimal data
-  const teams = await prisma.tournamentTeam.findMany({
-    where: { tournamentId: tournament.id },
+  }),
+    // Teams
+    prisma.tournamentTeam.findMany({
+    where: { tournamentId: tid },
     select: {
       team: { select: { id: true, slug: true, name: true, shortName: true } },
     },
-  });
-
-  // Fetch players with minimal data
-  const players = await prisma.tournamentPlayer.findMany({
-    where: { tournamentId: tournament.id },
+  }),
+    // Players
+    prisma.tournamentPlayer.findMany({
+    where: { tournamentId: tid },
     select: {
       player: { select: { id: true, slug: true, name: true } },
     },
-  });
-
-  // Fetch overall standings (no group filter, essential fields only)
-  const standings = await prisma.standing.findMany({
-    where: { tournamentId: tournament.id, groupId: null },
+  }),
+    // Overall standings
+    prisma.standing.findMany({
+    where: { tournamentId: tid, groupId: null },
     orderBy: [{ points: "desc" }, { goalDiff: "desc" }],
     select: {
       id: true,
@@ -269,11 +258,10 @@ async function getTournamentBySlug(slug: string) {
       team: { select: { id: true, slug: true, name: true } },
       player: { select: { id: true, slug: true, name: true } },
     },
-  });
-
-  // Fetch completed matches for form calculation (last 20 to cover all participants)
-  const formMatches = await prisma.match.findMany({
-    where: { tournamentId: tournament.id, status: "COMPLETED" },
+  }),
+    // Form matches
+    prisma.match.findMany({
+    where: { tournamentId: tid, status: "COMPLETED" },
     orderBy: { completedAt: "desc" },
     take: 50,
     select: {
@@ -284,11 +272,10 @@ async function getTournamentBySlug(slug: string) {
       homePlayerId: true,
       awayPlayerId: true,
     },
-  });
-
-  // Latest MOTM
-  const latestMOTM = await prisma.match.findFirst({
-    where: { tournamentId: tournament.id, status: "COMPLETED", motmPlayerId: { not: null } },
+  }),
+    // Latest MOTM
+    prisma.match.findFirst({
+    where: { tournamentId: tid, status: "COMPLETED", motmPlayerId: { not: null } },
     orderBy: { completedAt: "desc" },
     select: {
       round: true,
@@ -298,16 +285,17 @@ async function getTournamentBySlug(slug: string) {
       homeTeam: { select: { name: true } },
       awayTeam: { select: { name: true } },
     },
-  });
+  }),
+  ]);
 
   return {
     ...tournament,
     _count: {
-      teams: teamCount,
-      players: playerCount,
-      matches: matchCount,
-      groups: groupCount,
-      awards: awardCount,
+      teams: teams.length,
+      players: players.length,
+      matches: matches.length,
+      groups: groups.length,
+      awards: awards.length,
     },
     groups,
     matches,
