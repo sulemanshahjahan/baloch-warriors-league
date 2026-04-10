@@ -196,21 +196,11 @@ async function getTournamentBySlug(slug: string) {
       awayTeamId: true,
       homePlayerId: true,
       awayPlayerId: true,
-      notes: true,
       homeTeam: { select: { id: true, name: true, shortName: true } },
       awayTeam: { select: { id: true, name: true, shortName: true } },
       homePlayer: { select: { id: true, name: true } },
       awayPlayer: { select: { id: true, name: true } },
       _count: { select: { participants: true } },
-      participants: {
-        select: {
-          id: true,
-          placement: true,
-          score: true,
-          player: { select: { id: true, name: true } },
-          team: { select: { id: true, name: true } },
-        },
-      },
     },
   }),
     // Awards
@@ -263,7 +253,7 @@ async function getTournamentBySlug(slug: string) {
     prisma.match.findMany({
     where: { tournamentId: tid, status: "COMPLETED" },
     orderBy: { completedAt: "desc" },
-    take: 50,
+    take: 20,
     select: {
       homeScore: true,
       awayScore: true,
@@ -298,7 +288,7 @@ async function getTournamentBySlug(slug: string) {
       awards: awards.length,
     },
     groups,
-    matches,
+    matches: matches.map((m) => ({ ...m, participants: [], notes: null })),
     awards,
     teams,
     latestMOTM,
