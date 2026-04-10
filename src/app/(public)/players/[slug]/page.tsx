@@ -377,7 +377,7 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                       return (
                         <Link
                           key={match.id}
-                          href={`/tournaments/${match.tournament.slug}`}
+                          href={`/matches/${match.id}`}
                           className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
                         >
                           <div className="flex items-center gap-3">
