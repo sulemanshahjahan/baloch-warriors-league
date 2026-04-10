@@ -6,7 +6,8 @@ import { prisma } from "@/lib/db";
 export const revalidate = 300;
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { UrlTabs } from "@/components/public/url-tabs";
 import {
   Table,
   TableBody,
@@ -27,7 +28,12 @@ import {
   GitBranch,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { BracketVisualization } from "@/components/public/bracket-view";
+import dynamic from "next/dynamic";
+
+const BracketVisualization = dynamic(
+  () => import("@/components/public/bracket-view").then((m) => m.BracketVisualization),
+  { loading: () => <div className="h-64 animate-pulse bg-muted/50 rounded-lg" /> }
+);
 import { DrawReplayButton } from "@/components/public/draw-replay";
 import { PlayerFixturesShare } from "@/components/public/player-fixtures-share";
 import {
@@ -143,8 +149,9 @@ async function getTournamentBySlug(slug: string) {
 
   const tid = tournament.id;
 
-  // ALL queries in parallel — was 10+ sequential, now 1 batch
-  const [groups, matches, awards, teams, players, standings, formMatches, latestMOTM] = await Promise.all([
+  // ALL queries in parallel — reduced from 8 to 6 queries
+  // (formMatches and latestMOTM derived from main matches query)
+  const [groups, matches, awards, teams, players, standings] = await Promise.all([
     prisma.tournamentGroup.findMany({
     where: { tournamentId: tid },
     orderBy: { orderIndex: "asc" },
@@ -200,6 +207,9 @@ async function getTournamentBySlug(slug: string) {
       awayTeam: { select: { id: true, name: true, shortName: true } },
       homePlayer: { select: { id: true, name: true } },
       awayPlayer: { select: { id: true, name: true } },
+      completedAt: true,
+      motmPlayerId: true,
+      motmPlayer: { select: { id: true, name: true, slug: true } },
       _count: { select: { participants: true } },
     },
   }),
@@ -249,34 +259,40 @@ async function getTournamentBySlug(slug: string) {
       player: { select: { id: true, slug: true, name: true } },
     },
   }),
-    // Form matches
-    prisma.match.findMany({
-    where: { tournamentId: tid, status: "COMPLETED" },
-    orderBy: { completedAt: "desc" },
-    take: 20,
-    select: {
-      homeScore: true,
-      awayScore: true,
-      homeTeamId: true,
-      awayTeamId: true,
-      homePlayerId: true,
-      awayPlayerId: true,
-    },
-  }),
-    // Latest MOTM
-    prisma.match.findFirst({
-    where: { tournamentId: tid, status: "COMPLETED", motmPlayerId: { not: null } },
-    orderBy: { completedAt: "desc" },
-    select: {
-      round: true,
-      motmPlayer: { select: { id: true, name: true, slug: true } },
-      homePlayer: { select: { name: true } },
-      awayPlayer: { select: { name: true } },
-      homeTeam: { select: { name: true } },
-      awayTeam: { select: { name: true } },
-    },
-  }),
   ]);
+
+  // Derive formMatches from main matches query (avoids extra DB query)
+  const formMatches = matches
+    .filter((m) => m.status === "COMPLETED" && m.completedAt)
+    .sort((a, b) => {
+      const aTime = a.completedAt ? new Date(a.completedAt).getTime() : 0;
+      const bTime = b.completedAt ? new Date(b.completedAt).getTime() : 0;
+      return bTime - aTime;
+    })
+    .slice(0, 20)
+    .map((m) => ({
+      homeScore: m.homeScore,
+      awayScore: m.awayScore,
+      homeTeamId: m.homeTeamId,
+      awayTeamId: m.awayTeamId,
+      homePlayerId: m.homePlayerId,
+      awayPlayerId: m.awayPlayerId,
+    }));
+
+  // Derive latestMOTM from main matches query (avoids extra DB query)
+  const motmMatch = matches.find(
+    (m) => m.status === "COMPLETED" && m.motmPlayerId && m.motmPlayer
+  );
+  const latestMOTM = motmMatch
+    ? {
+        round: motmMatch.round,
+        motmPlayer: motmMatch.motmPlayer,
+        homePlayer: motmMatch.homePlayer,
+        awayPlayer: motmMatch.awayPlayer,
+        homeTeam: motmMatch.homeTeam,
+        awayTeam: motmMatch.awayTeam,
+      }
+    : null;
 
   return {
     ...tournament,
@@ -501,7 +517,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
           </div>
         )}
 
-        <Tabs defaultValue="standings" className="space-y-6">
+        <UrlTabs defaultValue="standings" className="space-y-6">
           <TabsList className={`bg-muted/50 w-full grid h-auto ${hasKnockoutFormat ? (tournament.rules ? 'grid-cols-3 sm:grid-cols-6' : 'grid-cols-2 sm:grid-cols-5') : (tournament.rules ? 'grid-cols-3 sm:grid-cols-5' : 'grid-cols-2 sm:grid-cols-4')}`}>
             <TabsTrigger value="standings" className="text-xs sm:text-sm py-2">
               <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
@@ -836,7 +852,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
               </Card>
             </TabsContent>
           )}
-        </Tabs>
+        </UrlTabs>
       </div>
     </div>
   );

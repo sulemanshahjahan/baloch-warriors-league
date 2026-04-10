@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { cached, CACHE_KEYS, CACHE_TTL } from "@/lib/redis";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Trophy, ArrowUp, ArrowDown, Minus, BarChart3 } from "lucide-react";
 import { SmartAvatar } from "@/components/public/smart-avatar";
@@ -13,43 +14,51 @@ export const metadata: Metadata = {
 };
 
 export default async function RankingsPage() {
-  // Get all players with ELO history (not default 1500 with 0 matches)
-  const players = await prisma.player.findMany({
-    where: { isActive: true },
-    orderBy: { eloRating: "desc" },
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      position: true,
-      eloRating: true,
-      eloHistory: {
-        orderBy: { createdAt: "desc" },
-        take: 1,
-        select: { change: true, result: true },
-      },
-    },
-  });
+  const { ranked, matchCounts: matchCountsRaw } = await cached(
+    CACHE_KEYS.rankings("all"),
+    CACHE_TTL.rankings,
+    async () => {
+      // Get all players with ELO history (not default 1500 with 0 matches)
+      const players = await prisma.player.findMany({
+        where: { isActive: true },
+        orderBy: { eloRating: "desc" },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          position: true,
+          eloRating: true,
+          eloHistory: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: { change: true, result: true },
+          },
+        },
+      });
 
-  // Only show players who have played at least 1 match
-  const ranked = players.filter((p) => p.eloHistory.length > 0);
+      const ranked = players.filter((p) => p.eloHistory.length > 0);
 
-  // Get match counts for each ranked player
-  const matchCounts = new Map<string, { wins: number; losses: number; draws: number }>();
-  if (ranked.length > 0) {
-    const histories = await prisma.eloHistory.groupBy({
-      by: ["playerId", "result"],
-      where: { playerId: { in: ranked.map((p) => p.id) } },
-      _count: { result: true },
-    });
-    for (const h of histories) {
-      const existing = matchCounts.get(h.playerId) ?? { wins: 0, losses: 0, draws: 0 };
-      if (h.result === "WIN") existing.wins = h._count.result;
-      else if (h.result === "LOSS") existing.losses = h._count.result;
-      else if (h.result === "DRAW") existing.draws = h._count.result;
-      matchCounts.set(h.playerId, existing);
+      const matchCountsMap: Record<string, { wins: number; losses: number; draws: number }> = {};
+      if (ranked.length > 0) {
+        const histories = await prisma.eloHistory.groupBy({
+          by: ["playerId", "result"],
+          where: { playerId: { in: ranked.map((p) => p.id) } },
+          _count: { result: true },
+        });
+        for (const h of histories) {
+          const existing = matchCountsMap[h.playerId] ?? { wins: 0, losses: 0, draws: 0 };
+          if (h.result === "WIN") existing.wins = h._count.result;
+          else if (h.result === "LOSS") existing.losses = h._count.result;
+          else if (h.result === "DRAW") existing.draws = h._count.result;
+          matchCountsMap[h.playerId] = existing;
+        }
+      }
+
+      return { ranked, matchCounts: matchCountsMap };
     }
-  }
+  );
+
+  const matchCounts = new Map(Object.entries(matchCountsRaw));
 
   return (
     <div className="min-h-screen">

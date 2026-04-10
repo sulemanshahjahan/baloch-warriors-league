@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { z } from "zod";
 import type { MatchStatus } from "@prisma/client";
 import { logActivity } from "./activity-log";
+import { invalidateCache } from "@/lib/redis";
 
 // Role hierarchy levels
 const ROLE_LEVELS: Record<string, number> = {
@@ -258,6 +259,10 @@ export async function updateMatchResult(
   revalidatePath(`/admin/matches/${matchId}`);
   revalidatePath(`/admin/tournaments/${match.tournamentId}`);
   revalidatePath("/admin/matches");
+  await invalidateCache(`standings:${match.tournamentId}`);
+  await invalidateCache(`tstats:${match.tournamentId}`);
+  await invalidateCache("leaderboard:");
+  await invalidateCache("rankings:");
   return { success: true, data: undefined };
 }
 
@@ -1141,5 +1146,9 @@ export async function updatePUBGMatchResult(matchId: string, formData: FormData)
   revalidatePath(`/admin/tournaments/${match.tournamentId}`);
   revalidatePath("/admin/matches");
   revalidatePath(`/tournaments/${match.tournament.slug}`);
+  await invalidateCache(`standings:${match.tournamentId}`);
+  await invalidateCache(`tstats:${match.tournamentId}`);
+  await invalidateCache("leaderboard:");
+  await invalidateCache("rankings:");
   return { success: true, data: undefined };
 }

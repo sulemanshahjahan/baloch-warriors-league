@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 
 /**
@@ -10,51 +10,58 @@ import { useRouter } from "next/navigation";
  * activity log ID changes, calls router.refresh() to re-fetch
  * all server components without a full page reload.
  *
- * Detects: player edits, tournament changes, match results,
- * enrollments, schedule generation — anything that writes to ActivityLog.
+ * Optimizations:
+ * - Pauses polling when the tab/app is not visible (saves battery on mobile)
+ * - Server caches the DB query for 5s (prevents DB hammering)
+ * - Default interval is 30s (100 users = ~200 req/min to endpoint, ~12 DB queries/min)
  */
-export function LiveRefresh({ interval = 10000 }: { interval?: number }) {
+export function LiveRefresh({ interval = 30000 }: { interval?: number }) {
   const router = useRouter();
   const lastIdRef = useRef<string | null>(null);
   const initializedRef = useRef(false);
+  const visibleRef = useRef(true);
+
+  const poll = useCallback(async () => {
+    if (!visibleRef.current) return;
+
+    try {
+      const res = await fetch("/api/last-updated");
+      const data = await res.json();
+      const currentId = data.id;
+
+      if (!initializedRef.current) {
+        lastIdRef.current = currentId;
+        initializedRef.current = true;
+        return;
+      }
+
+      if (currentId && currentId !== lastIdRef.current) {
+        lastIdRef.current = currentId;
+        router.refresh();
+      }
+    } catch {
+      // Silent fail — will retry on next interval
+    }
+  }, [router]);
 
   useEffect(() => {
-    let mounted = true;
-
-    const poll = async () => {
-      if (!mounted) return;
-
-      try {
-        const res = await fetch("/api/last-updated");
-        const data = await res.json();
-        const currentId = data.id;
-
-        if (!initializedRef.current) {
-          // First poll — just record the current state
-          lastIdRef.current = currentId;
-          initializedRef.current = true;
-          return;
-        }
-
-        if (currentId && currentId !== lastIdRef.current) {
-          lastIdRef.current = currentId;
-          router.refresh();
-        }
-      } catch {
-        // Silent fail
-      }
+    const onVisibilityChange = () => {
+      visibleRef.current = document.visibilityState === "visible";
+      // Poll immediately when tab becomes visible again
+      if (visibleRef.current && initializedRef.current) poll();
     };
 
-    // First check after 2 seconds, then every `interval`
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
     const initial = setTimeout(poll, 2000);
     const timer = setInterval(poll, interval);
 
     return () => {
-      mounted = false;
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       clearTimeout(initial);
       clearInterval(timer);
     };
-  }, [interval, router]);
+  }, [interval, poll]);
 
   return null;
 }
