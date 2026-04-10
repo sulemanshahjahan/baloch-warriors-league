@@ -31,8 +31,8 @@ export default async function RankingsPage() {
     },
   });
 
-  // Show all active players
-  const ranked = players;
+  // Only show players who have played at least 1 match
+  const ranked = players.filter((p) => p.eloHistory.length > 0);
 
   // Get match counts for each ranked player
   const matchCounts = new Map<string, { wins: number; losses: number; draws: number }>();
