@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,8 +13,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Save, Share2, MessageCircle } from "lucide-react";
+import { Loader2, Save, Share2 } from "lucide-react";
 import { updateMatchResult } from "@/lib/actions/match";
+import { generateAndShareScorecard } from "@/lib/share-scorecard";
 
 interface Player {
   id: string;
@@ -42,6 +43,9 @@ interface MatchResultFormProps {
   awayName: string;
   tournamentName: string;
   round: string | null;
+  matchNumber: number | null;
+  homePhoto: string | null;
+  awayPhoto: string | null;
 }
 
 export function MatchResultForm({
@@ -65,8 +69,12 @@ export function MatchResultForm({
   awayName,
   tournamentName,
   round,
+  matchNumber,
+  homePhoto,
+  awayPhoto,
 }: MatchResultFormProps) {
   const router = useRouter();
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isPending, startTransition] = useTransition();
   const [status, setStatus] = useState(currentStatus);
   const [motm, setMotm] = useState<string>(motmPlayerId ?? "");
@@ -74,22 +82,26 @@ export function MatchResultForm({
   const [success, setSuccess] = useState(false);
   const [savedScores, setSavedScores] = useState<{ home: number; away: number } | null>(null);
 
-  function buildWhatsAppUrl(hScore: number, aScore: number) {
-    const shareUrl = `https://bwlleague.com/matches/${matchId}`;
-    const scoreline = `${homeName} ${hScore}–${aScore} ${awayName}`;
-    const shareText = [
-      `🏆 ${tournamentName}`,
-      round ? round : null,
-      ``,
-      `*FULL-TIME*`,
-      `*${scoreline}*`,
-      ``,
-      `🔗 Match details:`,
-      shareUrl,
-    ]
-      .filter((line) => line !== null)
-      .join("\n");
-    return `https://wa.me/?text=${encodeURIComponent(shareText)}`;
+  async function autoShareScorecard(hScore: number, aScore: number) {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    try {
+      await generateAndShareScorecard(canvas, {
+        homeName, awayName, homeScore: hScore, awayScore: aScore,
+        tournamentName, matchId, round, matchNumber,
+        homePhoto, awayPhoto,
+      });
+    } catch {
+      // Fallback: open WhatsApp with text only
+      const shareUrl = `https://bwlleague.com/matches/${matchId}`;
+      const scoreline = `${homeName} ${hScore}–${aScore} ${awayName}`;
+      const shareText = [
+        `🏆 ${tournamentName}`, round || null, ``,
+        `*FULL-TIME*`, `*${scoreline}*`, ``,
+        `🔗 Match details:`, shareUrl,
+      ].filter((line) => line !== null).join("\n");
+      window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, "_blank");
+    }
   }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -111,8 +123,8 @@ export function MatchResultForm({
         setSuccess(true);
         if (status === "COMPLETED") {
           setSavedScores({ home: hScore, away: aScore });
-          // Auto-open WhatsApp with pre-filled result
-          window.open(buildWhatsAppUrl(hScore, aScore), "_blank");
+          // Auto-generate scorecard image and open share dialog
+          autoShareScorecard(hScore, aScore);
         }
         router.refresh();
       } else {
@@ -130,28 +142,18 @@ export function MatchResultForm({
         <div className="bg-emerald-400/10 border border-emerald-400/20 p-3 rounded-md space-y-2">
           <p className="text-sm text-emerald-400 font-medium">
             Result saved. Standings updated.
-            {savedScores && " WhatsApp opened — just tap send!"}
+            {savedScores && " Share dialog opened!"}
           </p>
           {savedScores && (
             <div className="flex flex-wrap gap-2">
-              <a
-                href={buildWhatsAppUrl(savedScores.home, savedScores.away)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-green-600 hover:bg-green-700 text-white text-xs font-medium transition-colors"
-              >
-                <MessageCircle className="w-3.5 h-3.5" />
-                Re-share to WhatsApp
-              </a>
-              <a
-                href={`/matches/${matchId}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted hover:bg-muted/80 text-xs font-medium transition-colors"
+              <button
+                type="button"
+                onClick={() => autoShareScorecard(savedScores.home, savedScores.away)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-green-600 hover:bg-green-700 text-white text-xs font-medium transition-colors cursor-pointer"
               >
                 <Share2 className="w-3.5 h-3.5" />
-                Share Scorecard Image
-              </a>
+                Re-share Scorecard
+              </button>
             </div>
           )}
         </div>
@@ -326,6 +328,9 @@ export function MatchResultForm({
         <Save className="w-4 h-4" />
         Save Result
       </Button>
+
+      {/* Hidden canvas for scorecard image generation */}
+      <canvas ref={canvasRef} style={{ display: "none" }} />
     </form>
   );
 }

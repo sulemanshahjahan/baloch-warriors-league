@@ -243,6 +243,9 @@ export default async function MatchDetailPage({ params }: MatchDetailPageProps) 
                   awayName={awayName}
                   tournamentName={match.tournament.name}
                   round={match.round}
+                  matchNumber={match.matchNumber}
+                  homePhoto={match.homePlayer?.photoUrl ?? match.homeTeam?.logoUrl ?? null}
+                  awayPhoto={match.awayPlayer?.photoUrl ?? match.awayTeam?.logoUrl ?? null}
                 />
               )}
             </CardContent>

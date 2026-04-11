@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef } from "react";
+import { generateAndShareScorecard, type ScorecardData } from "@/lib/share-scorecard";
 
 interface ShareButtonsProps {
   homeName: string;
@@ -43,7 +44,6 @@ export function ShareButtons({
   const shareUrl = `https://bwlleague.com/matches/${matchId}`;
   const scoreline = `${homeName} ${homeScore}–${awayScore} ${awayName}`;
 
-  // Pre-filled text for all share paths
   const shareText = [
     `🏆 ${tournamentName}`,
     matchInfo ? matchInfo : null,
@@ -57,233 +57,18 @@ export function ShareButtons({
     .filter((line) => line !== null)
     .join("\n");
 
-  // WhatsApp share URL
   const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
 
+  const data: ScorecardData = {
+    homeName, awayName, homeScore, awayScore,
+    tournamentName, matchId, round, matchNumber,
+    homePhoto, awayPhoto,
+  };
 
-  // Local assets (same-origin) must NOT use crossOrigin — it causes cache
-  // mismatch issues that taint the canvas even for same-origin requests.
-  const loadLocalImage = (path: string): Promise<HTMLImageElement> =>
-    new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = reject;
-      img.src = path;
-    });
-
-  // External images (Cloudinary etc.) need crossOrigin to avoid canvas taint.
-  const loadExternalImage = (url: string): Promise<HTMLImageElement> =>
-    new Promise((resolve, reject) => {
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-      img.onload = () => resolve(img);
-      img.onerror = reject;
-      img.src = url;
-    });
-
-  // Generate and download scorecard image
-  const generateScorecard = async () => {
+  const handleShare = async () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const size = 800;
-    canvas.width = size;
-    canvas.height = size;
-
-    // Step 1: load ALL images in parallel before touching the canvas.
-    // Local assets use loadLocalImage (no crossOrigin).
-    // External player photos use loadExternalImage (crossOrigin = anonymous).
-    const [bgResult, logoResult, homeResult, awayResult] = await Promise.allSettled([
-      loadLocalImage("/scorecard-bg.jpg"),
-      loadLocalImage("/logo.png"),
-      homePhoto ? loadExternalImage(homePhoto) : Promise.reject("none"),
-      awayPhoto ? loadExternalImage(awayPhoto) : Promise.reject("none"),
-    ]);
-
-    const bgImg   = bgResult.status   === "fulfilled" ? bgResult.value   : null;
-    const logoImg = logoResult.status === "fulfilled" ? logoResult.value : null;
-    const homeImg = homeResult.status === "fulfilled" ? homeResult.value : null;
-    const awayImg = awayResult.status === "fulfilled" ? awayResult.value : null;
-
-    // Step 2: draw everything synchronously — no more awaits after this point
-
-    // Background — stadium photo, cover-fit, then dark overlay for readability
-    if (bgImg) {
-      const aspect = bgImg.width / bgImg.height;
-      const dw = aspect >= 1 ? size * aspect : size;
-      const dh = aspect >= 1 ? size : size / aspect;
-      ctx.drawImage(bgImg, (size - dw) / 2, (size - dh) / 2, dw, dh);
-    }
-    // Dark overlay — gradient from near-opaque top to semi-transparent middle to dark bottom
-    const overlay = ctx.createLinearGradient(0, 0, 0, size);
-    overlay.addColorStop(0,   "rgba(0,0,0,0.82)");
-    overlay.addColorStop(0.4, "rgba(0,0,0,0.55)");
-    overlay.addColorStop(0.7, "rgba(0,0,0,0.65)");
-    overlay.addColorStop(1,   "rgba(0,0,0,0.88)");
-    ctx.fillStyle = overlay;
-    ctx.fillRect(0, 0, size, size);
-
-    // Logo — actual PNG, no red fallback box
-    if (logoImg) {
-      ctx.drawImage(logoImg, size / 2 - 50, 30, 100, 100);
-    } else {
-      // Text-only fallback if logo.png fails
-      ctx.fillStyle = "#ef4444";
-      ctx.font = "bold 56px system-ui";
-      ctx.textAlign = "center";
-      ctx.fillText("BWL", size / 2, 115);
-    }
-
-    // Tournament name
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "700 36px system-ui";
-    ctx.textAlign = "center";
-    ctx.fillText(tournamentName.toUpperCase(), size / 2, 175);
-
-    // Match round
-    if (matchInfo) {
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "500 24px system-ui";
-      ctx.fillText(matchInfo, size / 2, 215);
-    }
-
-    // Synchronous avatar draw — no async, no interleaved clip states
-    const drawAvatar = (img: HTMLImageElement | null, x: number, y: number, name: string) => {
-      const r = 70;
-      const initials = name.split(" ").map((n) => n[0] ?? "").join("").slice(0, 2).toUpperCase();
-
-      // Background circle
-      ctx.beginPath();
-      ctx.arc(x, y, r, 0, Math.PI * 2);
-      ctx.fillStyle = "#2a2a2a";
-      ctx.fill();
-
-      if (img) {
-        // Clip to circle, draw image, restore — all synchronous
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.clip();
-        const aspect = img.width / img.height;
-        const dw = aspect >= 1 ? r * 2 * aspect : r * 2;
-        const dh = aspect >= 1 ? r * 2 : (r * 2) / aspect;
-        ctx.drawImage(img, x - dw / 2, y - dh / 2, dw, dh);
-        ctx.restore();
-      } else {
-        // Initials fallback
-        ctx.fillStyle = "#fff";
-        ctx.font = "bold 40px system-ui";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(initials, x, y);
-        ctx.textBaseline = "alphabetic";
-      }
-
-      // Border — drawn after restore so it's never clipped
-      ctx.beginPath();
-      ctx.arc(x, y, r, 0, Math.PI * 2);
-      ctx.strokeStyle = "#ef4444";
-      ctx.lineWidth = 3;
-      ctx.stroke();
-
-      // Name below avatar
-      ctx.fillStyle = "#fff";
-      ctx.font = "bold 26px system-ui";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "alphabetic";
-      ctx.fillText(name, x, y + r + 42);
-    };
-
-    // Draw home (left) then away (right) — sequential, no concurrency
-    drawAvatar(homeImg, 200, 370, homeName);
-    drawAvatar(awayImg, 600, 370, awayName);
-
-    // Score — drawn last so it sits on top between the two avatars
-    ctx.fillStyle = "#ef4444";
-    ctx.font = "bold 80px system-ui";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(`${homeScore} - ${awayScore}`, size / 2, 370);
-    ctx.textBaseline = "alphabetic";
-
-    // Divider
-    ctx.strokeStyle = "#222";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(80, 540);
-    ctx.lineTo(720, 540);
-    ctx.stroke();
-
-    // Footer
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "600 26px system-ui";
-    ctx.textAlign = "center";
-    ctx.fillText("bwlleague.com", size / 2, 760);
-
-    // Step 3: convert canvas to blob (more memory-efficient than toDataURL)
-    const blob = await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("toBlob failed"))), "image/png");
-    });
-
-    const fileName = `BWL-${homeName}-vs-${awayName}.png`;
-    const file = new File([blob], fileName, { type: "image/png" });
-
-    const imageShareText = shareText;
-
-    const title = `${homeName} ${homeScore} - ${awayScore} ${awayName}`;
-
-    // Step 4: choose share path based on environment
-    const isCapacitor =
-      typeof window !== "undefined" && "Capacitor" in window;
-
-    if (isCapacitor) {
-      // Native Capacitor path: write file to device cache then share via OS
-      const { Filesystem, Directory } = await import("@capacitor/filesystem");
-      const { Share } = await import("@capacitor/share");
-
-      // Convert blob → base64 (Filesystem plugin requires base64 string)
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const result = reader.result as string;
-          resolve(result.split(",")[1]); // strip data:image/png;base64, prefix
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
-
-      // Write to device cache directory
-      const written = await Filesystem.writeFile({
-        path: "bwl-scorecard.png",
-        data: base64,
-        directory: Directory.Cache,
-      });
-
-      // Open native share sheet — WhatsApp, Telegram, IG, etc. all receive it
-      await Share.share({
-        title,
-        text: imageShareText,
-        url: written.uri,
-        dialogTitle: "Share Scorecard",
-      });
-    } else if (navigator.canShare?.({ files: [file] })) {
-      // Mobile browser Web Share API (Chrome on Android outside the APK)
-      try {
-        await navigator.share({ files: [file], text: imageShareText, title });
-      } catch (err) {
-        if (err instanceof Error && err.name !== "AbortError") throw err;
-      }
-    } else {
-      // Desktop fallback: download
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.download = fileName;
-      link.href = url;
-      link.click();
-      URL.revokeObjectURL(url);
-    }
+    await generateAndShareScorecard(canvas, data);
   };
 
   return (
@@ -302,7 +87,7 @@ export function ShareButtons({
           WhatsApp
         </a>
         <button
-          onClick={generateScorecard}
+          onClick={handleShare}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-500/10 text-blue-500 text-xs font-medium hover:bg-blue-500/20 transition-colors cursor-pointer"
           aria-label="Share scorecard"
         >
@@ -313,7 +98,6 @@ export function ShareButtons({
         </button>
       </div>
 
-      {/* Hidden canvas for generating image */}
       <canvas ref={canvasRef} style={{ display: "none" }} />
     </>
   );
