@@ -814,9 +814,217 @@ export async function createPUBGMatches(options: PUBGMatchOptions) {
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath("/admin/matches");
-  
-  return { 
-    success: true, 
+
+  return {
+    success: true,
     count: createdMatches.length,
   };
+}
+
+// ─── ADD LATE PLAYER/TEAM TO GROUP ──────────────────────────────
+//
+// Enrolls a player (or team) into a group mid-tournament and generates
+// only the missing matches against existing group members.
+// Does NOT touch any existing matches, results, or fixtures.
+
+export async function addLatePlayerToGroup(
+  tournamentId: string,
+  playerId: string,
+  groupId: string
+) {
+  const session = await auth();
+  if (!session) return { success: false, error: "Unauthorized" };
+  if (!hasRole(session, "ADMIN")) return { success: false, error: "Forbidden: Admin role required" };
+
+  const tournament = await prisma.tournament.findUnique({
+    where: { id: tournamentId },
+    select: { id: true, slug: true, participantType: true, format: true },
+  });
+
+  if (!tournament) return { success: false, error: "Tournament not found" };
+  if (tournament.format !== "GROUP_KNOCKOUT") {
+    return { success: false, error: "Late additions only supported for Group + Knockout format" };
+  }
+
+  const group = await prisma.tournamentGroup.findUnique({
+    where: { id: groupId },
+    select: { id: true, name: true, tournamentId: true },
+  });
+  if (!group || group.tournamentId !== tournamentId) {
+    return { success: false, error: "Group not found in this tournament" };
+  }
+
+  const isIndividual = tournament.participantType === "INDIVIDUAL";
+
+  if (isIndividual) {
+    // Enroll if not already enrolled
+    const existing = await prisma.tournamentPlayer.findUnique({
+      where: { tournamentId_playerId: { tournamentId, playerId } },
+    });
+
+    if (existing) {
+      // Already enrolled — just assign to group if not already
+      if (existing.groupId === groupId) {
+        return { success: false, error: "Player is already in this group" };
+      }
+      await prisma.tournamentPlayer.update({
+        where: { id: existing.id },
+        data: { groupId },
+      });
+    } else {
+      // Enroll and assign to group in one step
+      await prisma.tournamentPlayer.create({
+        data: { tournamentId, playerId, groupId },
+      });
+    }
+
+    // Find all other players in this group
+    const groupMembers = await prisma.tournamentPlayer.findMany({
+      where: { tournamentId, groupId, playerId: { not: playerId } },
+      select: { playerId: true, player: { select: { name: true } } },
+    });
+
+    // Find existing matches for this player in this group (avoid duplicates)
+    const existingMatches = await prisma.match.findMany({
+      where: {
+        tournamentId,
+        groupId,
+        OR: [
+          { homePlayerId: playerId },
+          { awayPlayerId: playerId },
+        ],
+      },
+      select: { homePlayerId: true, awayPlayerId: true },
+    });
+
+    const alreadyScheduled = new Set(
+      existingMatches.map((m) =>
+        m.homePlayerId === playerId ? m.awayPlayerId : m.homePlayerId
+      )
+    );
+
+    // Create only the missing matches
+    const newOpponents = groupMembers.filter(
+      (m) => !alreadyScheduled.has(m.playerId)
+    );
+
+    if (newOpponents.length === 0) {
+      return { success: true, data: undefined, message: "Player added to group. All matches already exist." };
+    }
+
+    // Get highest existing match number in this group for numbering
+    const lastMatch = await prisma.match.findFirst({
+      where: { tournamentId, groupId },
+      orderBy: { matchNumber: "desc" },
+      select: { matchNumber: true },
+    });
+    let nextMatchNum = (lastMatch?.matchNumber ?? 0) + 1;
+
+    for (const opponent of newOpponents) {
+      await prisma.match.create({
+        data: {
+          tournamentId,
+          groupId,
+          round: `${group.name} - Late`,
+          roundNumber: 99, // high number so they sort at end
+          matchNumber: nextMatchNum++,
+          homePlayerId: playerId,
+          awayPlayerId: opponent.playerId,
+          status: "SCHEDULED" as MatchStatus,
+        },
+      });
+    }
+
+    revalidatePath(`/admin/tournaments/${tournamentId}`);
+    revalidatePath(`/tournaments/${tournament.slug}`);
+    revalidatePath("/admin/matches");
+
+    return {
+      success: true,
+      data: undefined,
+      message: `Player added to ${group.name}. Created ${newOpponents.length} new match(es).`,
+    };
+  } else {
+    // Team-based late addition
+    const existing = await prisma.tournamentTeam.findUnique({
+      where: { tournamentId_teamId: { tournamentId, teamId: playerId } },
+    });
+
+    if (existing) {
+      if (existing.groupId === groupId) {
+        return { success: false, error: "Team is already in this group" };
+      }
+      await prisma.tournamentTeam.update({
+        where: { id: existing.id },
+        data: { groupId },
+      });
+    } else {
+      await prisma.tournamentTeam.create({
+        data: { tournamentId, teamId: playerId, groupId },
+      });
+    }
+
+    const groupMembers = await prisma.tournamentTeam.findMany({
+      where: { tournamentId, groupId, teamId: { not: playerId } },
+      select: { teamId: true },
+    });
+
+    const existingMatches = await prisma.match.findMany({
+      where: {
+        tournamentId,
+        groupId,
+        OR: [
+          { homeTeamId: playerId },
+          { awayTeamId: playerId },
+        ],
+      },
+      select: { homeTeamId: true, awayTeamId: true },
+    });
+
+    const alreadyScheduled = new Set(
+      existingMatches.map((m) =>
+        m.homeTeamId === playerId ? m.awayTeamId : m.homeTeamId
+      )
+    );
+
+    const newOpponents = groupMembers.filter(
+      (m) => !alreadyScheduled.has(m.teamId)
+    );
+
+    if (newOpponents.length === 0) {
+      return { success: true, data: undefined, message: "Team added to group. All matches already exist." };
+    }
+
+    const lastMatch = await prisma.match.findFirst({
+      where: { tournamentId, groupId },
+      orderBy: { matchNumber: "desc" },
+      select: { matchNumber: true },
+    });
+    let nextMatchNum = (lastMatch?.matchNumber ?? 0) + 1;
+
+    for (const opponent of newOpponents) {
+      await prisma.match.create({
+        data: {
+          tournamentId,
+          groupId,
+          round: `${group.name} - Late`,
+          roundNumber: 99,
+          matchNumber: nextMatchNum++,
+          homeTeamId: playerId,
+          awayTeamId: opponent.teamId,
+          status: "SCHEDULED" as MatchStatus,
+        },
+      });
+    }
+
+    revalidatePath(`/admin/tournaments/${tournamentId}`);
+    revalidatePath(`/tournaments/${tournament.slug}`);
+    revalidatePath("/admin/matches");
+
+    return {
+      success: true,
+      data: undefined,
+      message: `Team added to ${group.name}. Created ${newOpponents.length} new match(es).`,
+    };
+  }
 }

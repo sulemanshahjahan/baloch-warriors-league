@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createGroup, deleteGroup, assignTeamToGroup, assignPlayerToGroup, randomDrawToGroups } from "@/lib/actions/schedule";
+import { createGroup, deleteGroup, assignTeamToGroup, assignPlayerToGroup, randomDrawToGroups, addLatePlayerToGroup } from "@/lib/actions/schedule";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, Users, Shield, Shuffle, Dices, Trophy, X } from "lucide-react";
+import { Plus, Trash2, Users, Shield, Shuffle, Dices, Trophy, X, UserPlus } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Label } from "@/components/ui/label";
 import { getInitials } from "@/lib/utils";
@@ -60,11 +60,18 @@ interface Participant {
   skillLevel?: number | null;
 }
 
+interface AvailablePlayer {
+  id: string;
+  name: string;
+  photoUrl: string | null;
+}
+
 interface GroupsManagerProps {
   tournamentId: string;
   groups: Group[];
   unassignedParticipants: Participant[];
   participantType: "TEAM" | "INDIVIDUAL";
+  availablePlayers?: AvailablePlayer[];
 }
 
 export function GroupsManager({
@@ -72,6 +79,7 @@ export function GroupsManager({
   groups,
   unassignedParticipants,
   participantType,
+  availablePlayers = [],
 }: GroupsManagerProps) {
   const router = useRouter();
   const [newGroupName, setNewGroupName] = useState("");
@@ -89,6 +97,14 @@ export function GroupsManager({
   const [drawMethod, setDrawMethod] = useState<"RANDOM" | "SNAKE" | "BY_SKILL">("RANDOM");
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawResult, setDrawResult] = useState<string[] | null>(null);
+
+  // Late player addition dialog states
+  const [lateAddDialogOpen, setLateAddDialogOpen] = useState(false);
+  const [lateAddGroupId, setLateAddGroupId] = useState<string>("");
+  const [lateAddPlayerId, setLateAddPlayerId] = useState<string>("");
+  const [isAddingLate, setIsAddingLate] = useState(false);
+  const [lateAddResult, setLateAddResult] = useState<string | null>(null);
+  const [lateAddError, setLateAddError] = useState<string | null>(null);
 
   const handleCreateGroup = async () => {
     if (!newGroupName.trim()) return;
@@ -145,6 +161,29 @@ export function GroupsManager({
     }
   };
 
+  const handleLateAdd = async () => {
+    if (!lateAddPlayerId || !lateAddGroupId) return;
+    setIsAddingLate(true);
+    setLateAddResult(null);
+    setLateAddError(null);
+
+    const result = await addLatePlayerToGroup(tournamentId, lateAddPlayerId, lateAddGroupId);
+
+    setIsAddingLate(false);
+    if (result.success) {
+      setLateAddResult(result.message ?? "Player added successfully.");
+      setTimeout(() => {
+        setLateAddDialogOpen(false);
+        setLateAddResult(null);
+        setLateAddPlayerId("");
+        setLateAddGroupId("");
+        router.refresh();
+      }, 2000);
+    } else {
+      setLateAddError(result.error ?? "Something went wrong");
+    }
+  };
+
   const isIndividual = participantType === "INDIVIDUAL";
   const hasUnassigned = unassignedParticipants.length > 0;
 
@@ -187,6 +226,16 @@ export function GroupsManager({
               Random Draw
             </Button>
           </>
+        )}
+        {groups.length > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setLateAddDialogOpen(true)}
+          >
+            <UserPlus className="w-4 h-4 mr-1" />
+            Add Late {isIndividual ? "Player" : "Team"}
+          </Button>
         )}
       </div>
 
@@ -437,6 +486,101 @@ export function GroupsManager({
               disabled={isDrawing || unassignedParticipants.length === 0}
             >
               {isDrawing ? "Drawing..." : "Start Draw"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Late Player/Team Dialog */}
+      <Dialog open={lateAddDialogOpen} onOpenChange={(open) => {
+        setLateAddDialogOpen(open);
+        if (!open) { setLateAddResult(null); setLateAddError(null); }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Late {isIndividual ? "Player" : "Team"}</DialogTitle>
+            <DialogDescription>
+              Add a new {isIndividual ? "player" : "team"} to a group mid-tournament. Matches against existing group members will be created automatically.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Select Group</Label>
+              <Select value={lateAddGroupId} onValueChange={setLateAddGroupId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a group..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {groups.map((g) => {
+                    const count = isIndividual ? (g.players?.length ?? 0) : (g.teams?.length ?? 0);
+                    return (
+                      <SelectItem key={g.id} value={g.id}>
+                        {g.name} ({count} {isIndividual ? "players" : "teams"})
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Select {isIndividual ? "Player" : "Team"}</Label>
+              <Select value={lateAddPlayerId} onValueChange={setLateAddPlayerId}>
+                <SelectTrigger>
+                  <SelectValue placeholder={`Choose a ${isIndividual ? "player" : "team"}...`} />
+                </SelectTrigger>
+                <SelectContent>
+                  {availablePlayers.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-5 w-5">
+                          <AvatarImage src={p.photoUrl ?? undefined} />
+                          <AvatarFallback className="text-[8px]">
+                            {getInitials(p.name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        {p.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                  {availablePlayers.length === 0 && (
+                    <div className="px-2 py-4 text-sm text-muted-foreground text-center">
+                      No available {isIndividual ? "players" : "teams"} to add
+                    </div>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {lateAddGroupId && lateAddPlayerId && (
+              <div className="text-sm text-muted-foreground bg-muted p-3 rounded">
+                This will enroll the {isIndividual ? "player" : "team"} and create matches against all existing members of the group. No existing matches or results will be affected.
+              </div>
+            )}
+
+            {lateAddResult && (
+              <div className="bg-green-500/10 text-green-500 p-3 rounded text-sm font-medium">
+                {lateAddResult}
+              </div>
+            )}
+
+            {lateAddError && (
+              <div className="bg-red-500/10 text-red-500 p-3 rounded text-sm font-medium">
+                {lateAddError}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLateAddDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleLateAdd}
+              disabled={isAddingLate || !lateAddGroupId || !lateAddPlayerId}
+            >
+              {isAddingLate ? "Adding..." : `Add & Generate Matches`}
             </Button>
           </DialogFooter>
         </DialogContent>

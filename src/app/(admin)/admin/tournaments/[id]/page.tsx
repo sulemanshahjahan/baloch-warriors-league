@@ -145,6 +145,7 @@ export default async function TournamentDetailPage({ params }: TournamentDetailP
               tournamentId={id}
               groups={tournament.groups}
               participantType={tournament.participantType}
+              availablePlayers={availablePlayers}
               unassignedParticipants={
                 tournament.participantType === "INDIVIDUAL"
                   ? tournament.players
