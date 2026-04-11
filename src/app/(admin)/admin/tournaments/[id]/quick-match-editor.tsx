@@ -66,7 +66,7 @@ export function QuickMatchEditor({ match, participantType }: QuickMatchEditorPro
         setIsEditing(false);
         router.refresh();
       } else {
-        console.error("Failed to update match:", result.error);
+        console.error("Failed to update match:", (result as { error?: string }).error);
       }
     } catch (error) {
       console.error("Error updating match:", error);

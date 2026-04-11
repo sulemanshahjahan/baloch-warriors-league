@@ -7,6 +7,7 @@ import { z } from "zod";
 import type { MatchStatus } from "@prisma/client";
 import { logActivity } from "./activity-log";
 import { invalidateCache } from "@/lib/redis";
+import { randomUUID } from "crypto";
 
 // Role hierarchy levels
 const ROLE_LEVELS: Record<string, number> = {
@@ -88,6 +89,8 @@ export async function createMatch(formData: FormData) {
       venueId: data.venueId || null,
       notes: data.notes || null,
       status: data.status,
+      homeToken: randomUUID(),
+      awayToken: randomUUID(),
     },
   });
 
@@ -105,6 +108,90 @@ export async function createMatch(formData: FormData) {
   revalidatePath("/admin/matches");
   revalidatePath(`/admin/tournaments/${data.tournamentId}`);
   return { success: true, data: { id: match.id } };
+}
+
+// ─── MATCH COMPLETION CASCADE ────────────────────────────────
+// Core function that handles all post-score updates.
+// Used by both admin updateMatchResult() and player self-reporting.
+
+export async function executeMatchCompletion(
+  matchId: string,
+  homeScore: number,
+  awayScore: number,
+): Promise<{ success: boolean; error?: string }> {
+  const currentMatch = await prisma.match.findUnique({
+    where: { id: matchId },
+    include: { tournament: true },
+  });
+
+  if (!currentMatch) return { success: false, error: "Match not found" };
+
+  const match = await prisma.match.update({
+    where: { id: matchId },
+    data: {
+      homeScore,
+      awayScore,
+      status: "COMPLETED",
+      completedAt: new Date(),
+    },
+    include: { tournament: true },
+  });
+
+  // Auto-create goal events for individual tournaments
+  if (currentMatch.tournament.participantType === "INDIVIDUAL") {
+    await prisma.matchEvent.deleteMany({
+      where: { matchId, type: "GOAL", description: { equals: "Auto-generated from match result" } },
+    });
+
+    if (currentMatch.homePlayerId && homeScore > 0) {
+      for (let i = 0; i < homeScore; i++) {
+        await prisma.matchEvent.create({
+          data: { matchId, playerId: currentMatch.homePlayerId, type: "GOAL", description: "Auto-generated from match result" },
+        });
+      }
+    }
+    if (currentMatch.awayPlayerId && awayScore > 0) {
+      for (let i = 0; i < awayScore; i++) {
+        await prisma.matchEvent.create({
+          data: { matchId, playerId: currentMatch.awayPlayerId, type: "GOAL", description: "Auto-generated from match result" },
+        });
+      }
+    }
+  }
+
+  // Recompute standings, advance knockout, update ELO
+  await recomputeStandings(match.tournamentId);
+  await advanceKnockoutWinner(matchId, match.tournamentId);
+  const { updateEloAfterMatch } = await import("@/lib/elo");
+  await updateEloAfterMatch(matchId);
+
+  // Push notification
+  const homeName = currentMatch.homePlayerId
+    ? (await prisma.player.findUnique({ where: { id: currentMatch.homePlayerId }, select: { name: true } }))?.name
+    : (await prisma.team.findUnique({ where: { id: currentMatch.homeTeamId! }, select: { name: true } }))?.name;
+  const awayName = currentMatch.awayPlayerId
+    ? (await prisma.player.findUnique({ where: { id: currentMatch.awayPlayerId }, select: { name: true } }))?.name
+    : (await prisma.team.findUnique({ where: { id: currentMatch.awayTeamId! }, select: { name: true } }))?.name;
+  import("@/lib/push").then(({ sendPushToAll }) =>
+    sendPushToAll({
+      title: `${match.tournament.name} — Result`,
+      body: `${homeName ?? "Home"} ${homeScore} - ${awayScore} ${awayName ?? "Away"}`,
+      url: `/matches/${matchId}`,
+      tag: `match-result-${matchId}`,
+    })
+  ).catch(() => {});
+
+  // Cache invalidation
+  revalidatePath(`/admin/matches/${matchId}`);
+  revalidatePath(`/admin/tournaments/${match.tournamentId}`);
+  revalidatePath("/admin/matches");
+  revalidatePath(`/matches/${matchId}`);
+  await invalidateCache(`standings:${match.tournamentId}`);
+  await invalidateCache(`tstats:${match.tournamentId}`);
+  await invalidateCache("leaderboard:");
+  await invalidateCache("rankings:");
+
+  return { success: true };
 }
 
 export async function updateMatchResult(
@@ -142,74 +229,71 @@ export async function updateMatchResult(
   const rivalNote = (raw.rivalNote as string) || null;
   const highlights = (raw.highlights as string) || null;
 
-  const match = await prisma.match.update({
+  // If status is COMPLETED, use the shared cascade
+  if (data.status === "COMPLETED") {
+    // First update the extra fields that executeMatchCompletion doesn't handle
+    await prisma.match.update({
+      where: { id: matchId },
+      data: {
+        homeScorePens: data.homeScorePens ? Number(data.homeScorePens) : null,
+        awayScorePens: data.awayScorePens ? Number(data.awayScorePens) : null,
+        homeClub, awayClub, homeFormation, awayFormation,
+        isDerby, rivalNote, highlights,
+        motmPlayerId: data.motmPlayerId || null,
+      },
+    });
+
+    // Save player ratings (eFootball)
+    for (const [key, val] of Object.entries(raw)) {
+      if (key.startsWith("rating_") && val) {
+        const ratingPlayerId = key.replace("rating_", "");
+        const ratingValue = parseFloat(val as string);
+        if (ratingValue >= 1 && ratingValue <= 10) {
+          await prisma.matchEvent.deleteMany({
+            where: { matchId, playerId: ratingPlayerId, type: "CUSTOM", description: "PLAYER_RATING" },
+          });
+          await prisma.matchEvent.create({
+            data: { matchId, playerId: ratingPlayerId, type: "CUSTOM", value: ratingValue, description: "PLAYER_RATING" },
+          });
+        }
+      }
+    }
+
+    // Run the full cascade
+    const result = await executeMatchCompletion(matchId, data.homeScore, data.awayScore);
+    if (!result.success) return result;
+
+    await logActivity({
+      action: "COMPLETE",
+      entityType: "MATCH",
+      entityId: matchId,
+      details: { homeScore: data.homeScore, awayScore: data.awayScore, status: "COMPLETED", tournamentId: currentMatch.tournamentId },
+    });
+
+    return { success: true, data: undefined };
+  }
+
+  // Non-COMPLETED status updates (LIVE, SCHEDULED, etc.)
+  await prisma.match.update({
     where: { id: matchId },
     data: {
       homeScore: data.homeScore,
       awayScore: data.awayScore,
       homeScorePens: data.homeScorePens ? Number(data.homeScorePens) : null,
       awayScorePens: data.awayScorePens ? Number(data.awayScorePens) : null,
-      homeClub,
-      awayClub,
-      homeFormation,
-      awayFormation,
-      isDerby,
-      rivalNote,
-      highlights,
+      homeClub, awayClub, homeFormation, awayFormation,
+      isDerby, rivalNote, highlights,
       motmPlayerId: data.motmPlayerId || null,
       status: data.status,
-      completedAt: data.status === "COMPLETED" ? new Date() : null,
     },
-    include: { tournament: true },
   });
 
-  // For individual player tournaments (eFootball 1v1), auto-create goal events
-  if (currentMatch.tournament.participantType === "INDIVIDUAL" && data.status === "COMPLETED") {
-    // Delete existing auto-generated goal events for this match to avoid duplicates
-    await prisma.matchEvent.deleteMany({
-      where: {
-        matchId,
-        type: "GOAL",
-        description: { equals: "Auto-generated from match result" },
-      },
-    });
-
-    // Create goal events for home player
-    if (currentMatch.homePlayerId && data.homeScore > 0) {
-      for (let i = 0; i < data.homeScore; i++) {
-        await prisma.matchEvent.create({
-          data: {
-            matchId,
-            playerId: currentMatch.homePlayerId,
-            type: "GOAL",
-            description: "Auto-generated from match result",
-          },
-        });
-      }
-    }
-
-    // Create goal events for away player
-    if (currentMatch.awayPlayerId && data.awayScore > 0) {
-      for (let i = 0; i < data.awayScore; i++) {
-        await prisma.matchEvent.create({
-          data: {
-            matchId,
-            playerId: currentMatch.awayPlayerId,
-            type: "GOAL",
-            description: "Auto-generated from match result",
-          },
-        });
-      }
-    }
-  }
-
-  // Save player ratings (eFootball) — rating_<playerId> fields
+  // Save player ratings (eFootball)
   for (const [key, val] of Object.entries(raw)) {
     if (key.startsWith("rating_") && val) {
       const ratingPlayerId = key.replace("rating_", "");
       const ratingValue = parseFloat(val as string);
       if (ratingValue >= 1 && ratingValue <= 10) {
-        // Upsert: delete old rating event then create new
         await prisma.matchEvent.deleteMany({
           where: { matchId, playerId: ratingPlayerId, type: "CUSTOM", description: "PLAYER_RATING" },
         });
@@ -220,51 +304,16 @@ export async function updateMatchResult(
     }
   }
 
-  // Recompute standings if match is completed
-  if (data.status === "COMPLETED") {
-    await recomputeStandings(match.tournamentId);
-    await advanceKnockoutWinner(matchId, match.tournamentId);
-
-    // Update ELO ratings for 1v1 matches
-    const { updateEloAfterMatch } = await import("@/lib/elo");
-    await updateEloAfterMatch(matchId);
-
-    // Push notification — match result
-    const homeName = currentMatch.homePlayerId
-      ? (await prisma.player.findUnique({ where: { id: currentMatch.homePlayerId }, select: { name: true } }))?.name
-      : (await prisma.team.findUnique({ where: { id: currentMatch.homeTeamId! }, select: { name: true } }))?.name;
-    const awayName = currentMatch.awayPlayerId
-      ? (await prisma.player.findUnique({ where: { id: currentMatch.awayPlayerId }, select: { name: true } }))?.name
-      : (await prisma.team.findUnique({ where: { id: currentMatch.awayTeamId! }, select: { name: true } }))?.name;
-    import("@/lib/push").then(({ sendPushToAll }) =>
-      sendPushToAll({
-        title: `${match.tournament.name} — Result`,
-        body: `${homeName ?? "Home"} ${data.homeScore} - ${data.awayScore} ${awayName ?? "Away"}`,
-        url: `/matches/${matchId}`,
-        tag: `match-result-${matchId}`,
-      })
-    ).catch(() => {});
-  }
-
   await logActivity({
-    action: data.status === "COMPLETED" ? "COMPLETE" : "UPDATE",
+    action: "UPDATE",
     entityType: "MATCH",
     entityId: matchId,
-    details: {
-      homeScore: data.homeScore,
-      awayScore: data.awayScore,
-      status: data.status,
-      tournamentId: match.tournamentId,
-    },
+    details: { homeScore: data.homeScore, awayScore: data.awayScore, status: data.status, tournamentId: currentMatch.tournamentId },
   });
 
   revalidatePath(`/admin/matches/${matchId}`);
-  revalidatePath(`/admin/tournaments/${match.tournamentId}`);
+  revalidatePath(`/admin/tournaments/${currentMatch.tournamentId}`);
   revalidatePath("/admin/matches");
-  await invalidateCache(`standings:${match.tournamentId}`);
-  await invalidateCache(`tstats:${match.tournamentId}`);
-  await invalidateCache("leaderboard:");
-  await invalidateCache("rankings:");
   return { success: true, data: undefined };
 }
 
@@ -389,6 +438,8 @@ async function advanceKnockoutWinner(matchId: string, tournamentId: string) {
         roundNumber: nextRound,
         matchNumber: nextMatchNumber,
         status: "SCHEDULED",
+        homeToken: randomUUID(),
+        awayToken: randomUUID(),
         ...(isIndividual
           ? (isHomeSlot ? { homePlayerId: winnerId } : { awayPlayerId: winnerId })
           : (isHomeSlot ? { homeTeamId: winnerId } : { awayTeamId: winnerId })),
@@ -1114,6 +1165,10 @@ export async function getMatchById(id: string) {
           player: { select: { id: true, name: true } },
           team: { select: { id: true, name: true } },
         },
+      },
+      scoreReports: {
+        where: { status: { in: ["PENDING", "DISPUTED"] } },
+        select: { id: true, submittedBy: true, homeScore: true, awayScore: true, status: true },
       },
     },
   });

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { auth, getUserRole } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { MatchStatus } from "@prisma/client";
+import { randomUUID } from "crypto";
 
 // Role hierarchy levels
 const ROLE_LEVELS: Record<string, number> = {
@@ -150,6 +151,8 @@ export async function generateSchedule(options: GenerateScheduleOptions) {
             homePlayerId: home.id,
             awayPlayerId: away.id,
             status: "SCHEDULED" as MatchStatus,
+            homeToken: randomUUID(),
+            awayToken: randomUUID(),
             deadline: computeDeadline(roundNum),
           },
         });
@@ -163,6 +166,8 @@ export async function generateSchedule(options: GenerateScheduleOptions) {
             homeTeamId: home.id,
             awayTeamId: away.id,
             status: "SCHEDULED" as MatchStatus,
+            homeToken: randomUUID(),
+            awayToken: randomUUID(),
             deadline: computeDeadline(roundNum),
           },
         });
@@ -186,6 +191,8 @@ export async function generateSchedule(options: GenerateScheduleOptions) {
             homePlayerId: home.id,
             awayPlayerId: away?.id || null,
             status: "SCHEDULED" as MatchStatus,
+            homeToken: randomUUID(),
+            awayToken: randomUUID(),
             deadline: computeDeadline(1),
           },
         });
@@ -199,6 +206,8 @@ export async function generateSchedule(options: GenerateScheduleOptions) {
             homeTeamId: home.id,
             awayTeamId: away?.id || null,
             status: "SCHEDULED" as MatchStatus,
+            homeToken: randomUUID(),
+            awayToken: randomUUID(),
             deadline: computeDeadline(1),
           },
         });
@@ -458,6 +467,8 @@ export async function generateKnockoutFromGroups(
           homePlayerId: match.home.id,
           awayPlayerId: match.away?.id || null,
           status: "SCHEDULED" as MatchStatus,
+          homeToken: randomUUID(),
+          awayToken: randomUUID(),
         },
       });
     } else {
@@ -470,6 +481,8 @@ export async function generateKnockoutFromGroups(
           homeTeamId: match.home.id,
           awayTeamId: match.away?.id || null,
           status: "SCHEDULED" as MatchStatus,
+          homeToken: randomUUID(),
+          awayToken: randomUUID(),
         },
       });
     }
@@ -808,6 +821,8 @@ export async function createPUBGMatches(options: PUBGMatchOptions) {
         roundNumber: i,
         matchNumber: i,
         status: "SCHEDULED" as MatchStatus,
+        homeToken: randomUUID(),
+        awayToken: randomUUID(),
         // Store PUBG scoring config in notes field as JSON
         notes: JSON.stringify({
           type: "PUBG",
@@ -953,6 +968,8 @@ export async function addLatePlayerToGroup(
           homePlayerId: playerId,
           awayPlayerId: opponent.playerId,
           status: "SCHEDULED" as MatchStatus,
+          homeToken: randomUUID(),
+          awayToken: randomUUID(),
         },
       });
     }
@@ -1035,6 +1052,8 @@ export async function addLatePlayerToGroup(
           homeTeamId: playerId,
           awayTeamId: opponent.teamId,
           status: "SCHEDULED" as MatchStatus,
+          homeToken: randomUUID(),
+          awayToken: randomUUID(),
         },
       });
     }

@@ -10,6 +10,7 @@ import { MatchEventManager } from "./match-event-manager";
 import { DeleteMatchButton } from "./delete-match-button";
 import { RescheduleForm } from "./reschedule-form";
 import { RoomIdForm } from "./room-id-form";
+import { MagicLinksCard } from "./magic-links-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -193,6 +194,17 @@ export default async function MatchDetailPage({ params }: MatchDetailPageProps) 
           currentRoomPassword={match.roomPassword}
           gameCategory={match.tournament.gameCategory}
           matchStatus={match.status}
+        />
+
+        {/* Magic links for player self-reporting */}
+        <MagicLinksCard
+          matchId={match.id}
+          homeToken={match.homeToken}
+          awayToken={match.awayToken}
+          homeName={homeName}
+          awayName={awayName}
+          matchStatus={match.status}
+          pendingReport={match.scoreReports?.find((r: { status: string }) => r.status === "PENDING" || r.status === "DISPUTED") ?? null}
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

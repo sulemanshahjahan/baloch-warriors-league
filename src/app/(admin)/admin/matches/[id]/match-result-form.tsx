@@ -128,7 +128,7 @@ export function MatchResultForm({
         }
         router.refresh();
       } else {
-        setError(result.error ?? '');
+        setError((result as { error?: string }).error ?? '');
       }
     });
   }
