@@ -30,6 +30,7 @@ const matchSchema = z.object({
   roundNumber: z.coerce.number().int().optional().or(z.literal("")),
   matchNumber: z.coerce.number().int().optional().or(z.literal("")),
   scheduledAt: z.string().optional(),
+  deadline: z.string().optional(),
   venueId: z.string().optional(),
   notes: z.string().optional(),
   status: z.enum(["SCHEDULED", "LIVE", "COMPLETED", "CANCELLED", "POSTPONED"]),
@@ -83,6 +84,7 @@ export async function createMatch(formData: FormData) {
       roundNumber: data.roundNumber ? Number(data.roundNumber) : null,
       matchNumber: data.matchNumber ? Number(data.matchNumber) : null,
       scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : null,
+      deadline: data.deadline ? new Date(data.deadline) : null,
       venueId: data.venueId || null,
       notes: data.notes || null,
       status: data.status,
@@ -872,11 +874,58 @@ async function recomputeIndividualStandings(tournamentId: string, gameCategory: 
   }
 }
 
+export async function setRoomId(matchId: string, formData: FormData) {
+  const session = await auth();
+  if (!session) return { success: false, error: "Unauthorized" };
+  if (!hasRole(session, "EDITOR")) return { success: false, error: "Forbidden: Insufficient permissions" };
+
+  const roomId = (formData.get("roomId") as string)?.trim() || null;
+  const roomPassword = (formData.get("roomPassword") as string)?.trim() || null;
+
+  const match = await prisma.match.update({
+    where: { id: matchId },
+    data: { roomId, roomPassword },
+    include: {
+      tournament: { select: { name: true, gameCategory: true } },
+      homePlayer: { select: { name: true } },
+      awayPlayer: { select: { name: true } },
+      homeTeam: { select: { name: true } },
+      awayTeam: { select: { name: true } },
+    },
+  });
+
+  // Send push notification when room ID is set
+  if (roomId) {
+    const homeName = match.homePlayer?.name ?? match.homeTeam?.name ?? "Home";
+    const awayName = match.awayPlayer?.name ?? match.awayTeam?.name ?? "Away";
+    import("@/lib/push").then(({ sendPushToAll }) =>
+      sendPushToAll({
+        title: "Room ID Ready!",
+        body: `${homeName} vs ${awayName} — Room ID has been shared. Join now!`,
+        url: `/matches/${matchId}`,
+        tag: `room-id-${matchId}`,
+      })
+    ).catch(() => {});
+  }
+
+  await logActivity({
+    action: "UPDATE",
+    entityType: "MATCH",
+    entityId: matchId,
+    details: { roomId: roomId ? "set" : "cleared" },
+  });
+
+  revalidatePath(`/admin/matches/${matchId}`);
+  revalidatePath(`/matches/${matchId}`);
+  return { success: true, data: undefined };
+}
+
 export async function rescheduleMatch(matchId: string, formData: FormData) {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };
 
   const scheduledAt = formData.get("scheduledAt") as string;
+  const deadline = formData.get("deadline") as string;
   const status = formData.get("status") as string;
   const notes = formData.get("notes") as string;
 
@@ -889,8 +938,11 @@ export async function rescheduleMatch(matchId: string, formData: FormData) {
     where: { id: matchId },
     data: {
       scheduledAt: scheduledAt ? new Date(scheduledAt) : undefined,
+      deadline: deadline ? new Date(deadline) : undefined,
       status: (status as MatchStatus) || undefined,
       notes: notes || null,
+      // Reset reminders when rescheduling so they fire again for the new deadline
+      ...(deadline ? { remindersSent: [], isOverdue: false } : {}),
     },
   });
 

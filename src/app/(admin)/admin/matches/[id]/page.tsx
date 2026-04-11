@@ -9,6 +9,7 @@ import { PUBGResultForm } from "./pubg-result-form";
 import { MatchEventManager } from "./match-event-manager";
 import { DeleteMatchButton } from "./delete-match-button";
 import { RescheduleForm } from "./reschedule-form";
+import { RoomIdForm } from "./room-id-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -17,7 +18,7 @@ import {
   statusColor,
   statusLabel,
 } from "@/lib/utils";
-import { Calendar, MapPin, Trophy } from "lucide-react";
+import { Calendar, Clock, MapPin, Trophy, AlertTriangle, MessageCircle } from "lucide-react";
 
 interface MatchDetailPageProps {
   params: Promise<{ id: string }>;
@@ -88,12 +89,51 @@ export default async function MatchDetailPage({ params }: MatchDetailPageProps) 
                 {formatDateTime(match.scheduledAt)}
               </span>
             )}
+            {match.deadline && (
+              <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5" />
+                Deadline: {formatDateTime(match.deadline)}
+              </span>
+            )}
+            {match.isOverdue && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-destructive/10 text-destructive">
+                <AlertTriangle className="w-3 h-3" />
+                OVERDUE
+              </span>
+            )}
           </div>
-          <DeleteMatchButton
-            matchId={match.id}
-            homeName={homeName}
-            awayName={awayName}
-          />
+          <div className="flex items-center gap-2">
+            {match.status === "COMPLETED" && match.homeScore != null && (
+              <a
+                href={(() => {
+                  const shareUrl = `https://bwlleague.com/matches/${match.id}`;
+                  const scoreline = `${homeName} ${match.homeScore}–${match.awayScore} ${awayName}`;
+                  const shareText = [
+                    `🏆 ${match.tournament.name}`,
+                    match.round || null,
+                    ``,
+                    `*FULL-TIME*`,
+                    `*${scoreline}*`,
+                    ``,
+                    `🔗 Match details:`,
+                    shareUrl,
+                  ].filter((line) => line !== null).join("\n");
+                  return `https://wa.me/?text=${encodeURIComponent(shareText)}`;
+                })()}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-green-600 hover:bg-green-700 text-white text-xs font-medium transition-colors"
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                WhatsApp
+              </a>
+            )}
+            <DeleteMatchButton
+              matchId={match.id}
+              homeName={homeName}
+              awayName={awayName}
+            />
+          </div>
         </div>
 
         {/* Score display - hide for PUBG */}
@@ -141,8 +181,18 @@ export default async function MatchDetailPage({ params }: MatchDetailPageProps) 
         <RescheduleForm
           matchId={match.id}
           currentScheduledAt={match.scheduledAt}
+          currentDeadline={match.deadline}
           currentStatus={match.status}
           currentNotes={match.notes}
+        />
+
+        {/* Room ID - for online games (eFootball, PUBG) */}
+        <RoomIdForm
+          matchId={match.id}
+          currentRoomId={match.roomId}
+          currentRoomPassword={match.roomPassword}
+          gameCategory={match.tournament.gameCategory}
+          matchStatus={match.status}
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -189,6 +239,10 @@ export default async function MatchDetailPage({ params }: MatchDetailPageProps) 
                   motmPlayerId={match.motmPlayerId}
                   players={allPlayers}
                   gameCategory={match.tournament.gameCategory}
+                  homeName={homeName}
+                  awayName={awayName}
+                  tournamentName={match.tournament.name}
+                  round={match.round}
                 />
               )}
             </CardContent>

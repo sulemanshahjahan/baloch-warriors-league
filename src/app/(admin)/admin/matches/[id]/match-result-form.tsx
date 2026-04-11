@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Save } from "lucide-react";
+import { Loader2, Save, Share2, MessageCircle } from "lucide-react";
 import { updateMatchResult } from "@/lib/actions/match";
 
 interface Player {
@@ -38,6 +38,10 @@ interface MatchResultFormProps {
   motmPlayerId: string | null;
   players: Player[];
   gameCategory: string;
+  homeName: string;
+  awayName: string;
+  tournamentName: string;
+  round: string | null;
 }
 
 export function MatchResultForm({
@@ -57,6 +61,10 @@ export function MatchResultForm({
   motmPlayerId,
   players,
   gameCategory,
+  homeName,
+  awayName,
+  tournamentName,
+  round,
 }: MatchResultFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -64,20 +72,48 @@ export function MatchResultForm({
   const [motm, setMotm] = useState<string>(motmPlayerId ?? "");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [savedScores, setSavedScores] = useState<{ home: number; away: number } | null>(null);
+
+  function buildWhatsAppUrl(hScore: number, aScore: number) {
+    const shareUrl = `https://bwlleague.com/matches/${matchId}`;
+    const scoreline = `${homeName} ${hScore}–${aScore} ${awayName}`;
+    const shareText = [
+      `🏆 ${tournamentName}`,
+      round ? round : null,
+      ``,
+      `*FULL-TIME*`,
+      `*${scoreline}*`,
+      ``,
+      `🔗 Match details:`,
+      shareUrl,
+    ]
+      .filter((line) => line !== null)
+      .join("\n");
+    return `https://wa.me/?text=${encodeURIComponent(shareText)}`;
+  }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
     setSuccess(false);
+    setSavedScores(null);
 
     const formData = new FormData(e.currentTarget);
     formData.set("status", status);
     formData.set("motmPlayerId", motm);
 
+    const hScore = Number(formData.get("homeScore"));
+    const aScore = Number(formData.get("awayScore"));
+
     startTransition(async () => {
       const result = await updateMatchResult(matchId, formData);
       if (result.success) {
         setSuccess(true);
+        if (status === "COMPLETED") {
+          setSavedScores({ home: hScore, away: aScore });
+          // Auto-open WhatsApp with pre-filled result
+          window.open(buildWhatsAppUrl(hScore, aScore), "_blank");
+        }
         router.refresh();
       } else {
         setError(result.error ?? '');
@@ -91,9 +127,34 @@ export function MatchResultForm({
         <p className="text-sm text-destructive bg-destructive/10 p-2 rounded-md">{error}</p>
       )}
       {success && (
-        <p className="text-sm text-emerald-400 bg-emerald-400/10 p-2 rounded-md">
-          Result saved. Standings updated.
-        </p>
+        <div className="bg-emerald-400/10 border border-emerald-400/20 p-3 rounded-md space-y-2">
+          <p className="text-sm text-emerald-400 font-medium">
+            Result saved. Standings updated.
+            {savedScores && " WhatsApp opened — just tap send!"}
+          </p>
+          {savedScores && (
+            <div className="flex flex-wrap gap-2">
+              <a
+                href={buildWhatsAppUrl(savedScores.home, savedScores.away)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-green-600 hover:bg-green-700 text-white text-xs font-medium transition-colors"
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                Re-share to WhatsApp
+              </a>
+              <a
+                href={`/matches/${matchId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted hover:bg-muted/80 text-xs font-medium transition-colors"
+              >
+                <Share2 className="w-3.5 h-3.5" />
+                Share Scorecard Image
+              </a>
+            </div>
+          )}
+        </div>
       )}
 
       <div className="grid grid-cols-3 items-end gap-3">

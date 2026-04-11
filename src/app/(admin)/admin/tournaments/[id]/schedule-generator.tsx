@@ -47,6 +47,9 @@ export function ScheduleGenerator({
   const [format, setFormat] = useState<"ROUND_ROBIN" | "KNOCKOUT" | "GROUP_KNOCKOUT">("ROUND_ROBIN");
   const [seeding, setSeeding] = useState<"RANDOM" | "MANUAL" | "BY_SKILL">("RANDOM");
   const [advanceCount, setAdvanceCount] = useState(2);
+  const [deadlineMode, setDeadlineMode] = useState<"none" | "per_round" | "global">("none");
+  const [daysPerRound, setDaysPerRound] = useState(3);
+  const [globalDeadline, setGlobalDeadline] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [result, setResult] = useState<{ success: boolean; count?: number; message?: string } | null>(null);
@@ -62,6 +65,9 @@ export function ScheduleGenerator({
       seedingMethod: seeding,
       groupCount: existingGroupCount,
       advanceCount,
+      deadlineMode,
+      daysPerRound: deadlineMode === "per_round" ? daysPerRound : undefined,
+      globalDeadline: deadlineMode === "global" ? globalDeadline : undefined,
     });
     
     setIsLoading(false);
@@ -186,6 +192,47 @@ export function ScheduleGenerator({
               </SelectContent>
             </Select>
           </div>
+
+          {/* Deadline Settings */}
+          <div className="space-y-2">
+            <Label>Match Deadlines</Label>
+            <Select value={deadlineMode} onValueChange={(v) => setDeadlineMode(v as typeof deadlineMode)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No deadlines</SelectItem>
+                <SelectItem value="per_round">Per round (days after start)</SelectItem>
+                <SelectItem value="global">Global deadline</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {deadlineMode === "per_round" && (
+            <div className="space-y-2">
+              <Label>Days per round</Label>
+              <Input
+                type="number"
+                min={1}
+                value={daysPerRound}
+                onChange={(e) => setDaysPerRound(Number(e.target.value))}
+              />
+              <p className="text-xs text-muted-foreground">
+                Round 1 deadline = tournament start + N days, Round 2 = start + 2N days, etc.
+              </p>
+            </div>
+          )}
+
+          {deadlineMode === "global" && (
+            <div className="space-y-2">
+              <Label>All matches due by</Label>
+              <Input
+                type="datetime-local"
+                value={globalDeadline}
+                onChange={(e) => setGlobalDeadline(e.target.value)}
+              />
+            </div>
+          )}
 
           {/* Group Settings */}
           {format === "GROUP_KNOCKOUT" && (

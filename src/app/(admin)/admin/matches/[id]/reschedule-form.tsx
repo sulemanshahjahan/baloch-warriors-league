@@ -20,6 +20,7 @@ import { useRouter } from "next/navigation";
 interface RescheduleFormProps {
   matchId: string;
   currentScheduledAt: Date | null;
+  currentDeadline: Date | null;
   currentStatus: string;
   currentNotes: string | null;
 }
@@ -27,6 +28,7 @@ interface RescheduleFormProps {
 export function RescheduleForm({
   matchId,
   currentScheduledAt,
+  currentDeadline,
   currentStatus,
   currentNotes,
 }: RescheduleFormProps) {
@@ -39,6 +41,10 @@ export function RescheduleForm({
   const scheduledAtValue = currentScheduledAt
     ? new Date(currentScheduledAt).toISOString().slice(0, 16)
     : new Date().toISOString().slice(0, 16);
+
+  const deadlineValue = currentDeadline
+    ? new Date(currentDeadline).toISOString().slice(0, 16)
+    : "";
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -73,7 +79,7 @@ export function RescheduleForm({
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="space-y-1.5">
               <Label htmlFor="scheduledAt">Date &amp; Time</Label>
               <Input
@@ -81,6 +87,16 @@ export function RescheduleForm({
                 name="scheduledAt"
                 type="datetime-local"
                 defaultValue={scheduledAtValue}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="deadline">Deadline</Label>
+              <Input
+                id="deadline"
+                name="deadline"
+                type="datetime-local"
+                defaultValue={deadlineValue}
               />
             </div>
 

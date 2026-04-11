@@ -23,6 +23,9 @@ interface GenerateScheduleOptions {
   seedingMethod: "RANDOM" | "MANUAL" | "BY_SKILL";
   groupCount?: number; // For GROUP_KNOCKOUT
   advanceCount?: number; // How many from each group advance
+  deadlineMode?: "none" | "per_round" | "global";
+  daysPerRound?: number;
+  globalDeadline?: string; // ISO date string
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────
@@ -71,7 +74,7 @@ export async function generateSchedule(options: GenerateScheduleOptions) {
   if (!session) return { success: false, error: "Unauthorized" };
   if (!hasRole(session, "ADMIN")) return { success: false, error: "Forbidden: Admin role required" };
 
-  const { tournamentId, format, seedingMethod, groupCount = 4, advanceCount = 2 } = options;
+  const { tournamentId, format, seedingMethod, groupCount = 4, advanceCount = 2, deadlineMode = "none", daysPerRound, globalDeadline } = options;
 
   // Get tournament and participants
   const tournament = await prisma.tournament.findUnique({
@@ -110,6 +113,17 @@ export async function generateSchedule(options: GenerateScheduleOptions) {
   }
   // MANUAL keeps current order
 
+  // Compute deadline for a given round number
+  const computeDeadline = (roundNum: number): Date | null => {
+    if (deadlineMode === "global" && globalDeadline) {
+      return new Date(globalDeadline);
+    }
+    if (deadlineMode === "per_round" && daysPerRound && tournament.startDate) {
+      return new Date(tournament.startDate.getTime() + roundNum * daysPerRound * 86400000);
+    }
+    return null;
+  };
+
   // Delete existing scheduled matches
   await prisma.match.deleteMany({
     where: {
@@ -125,28 +139,31 @@ export async function generateSchedule(options: GenerateScheduleOptions) {
     const pairs = generateRoundRobinPairs(participants);
     for (let i = 0; i < pairs.length; i++) {
       const [home, away] = pairs[i];
+      const roundNum = Math.floor(i / (participants.length / 2)) + 1;
       if (isIndividual) {
         await prisma.match.create({
           data: {
             tournamentId,
-            round: `Round ${Math.floor(i / (participants.length / 2)) + 1}`,
-            roundNumber: Math.floor(i / (participants.length / 2)) + 1,
+            round: `Round ${roundNum}`,
+            roundNumber: roundNum,
             matchNumber: i + 1,
             homePlayerId: home.id,
             awayPlayerId: away.id,
             status: "SCHEDULED" as MatchStatus,
+            deadline: computeDeadline(roundNum),
           },
         });
       } else {
         await prisma.match.create({
           data: {
             tournamentId,
-            round: `Round ${Math.floor(i / (participants.length / 2)) + 1}`,
-            roundNumber: Math.floor(i / (participants.length / 2)) + 1,
+            round: `Round ${roundNum}`,
+            roundNumber: roundNum,
             matchNumber: i + 1,
             homeTeamId: home.id,
             awayTeamId: away.id,
             status: "SCHEDULED" as MatchStatus,
+            deadline: computeDeadline(roundNum),
           },
         });
       }
@@ -169,6 +186,7 @@ export async function generateSchedule(options: GenerateScheduleOptions) {
             homePlayerId: home.id,
             awayPlayerId: away?.id || null,
             status: "SCHEDULED" as MatchStatus,
+            deadline: computeDeadline(1),
           },
         });
       } else {
@@ -181,6 +199,7 @@ export async function generateSchedule(options: GenerateScheduleOptions) {
             homeTeamId: home.id,
             awayTeamId: away?.id || null,
             status: "SCHEDULED" as MatchStatus,
+            deadline: computeDeadline(1),
           },
         });
       }
@@ -247,17 +266,19 @@ export async function generateSchedule(options: GenerateScheduleOptions) {
       const pairs = generateRoundRobinPairs(groupParticipants);
       for (let j = 0; j < pairs.length; j++) {
         const [home, away] = pairs[j];
+        const groupRoundNum = Math.floor(j / (groupParticipants.length / 2)) + 1;
         if (isIndividual) {
           await prisma.match.create({
             data: {
               tournamentId,
               groupId: tournamentGroup.id,
-              round: `${tournamentGroup.name} - Round ${Math.floor(j / (groupParticipants.length / 2)) + 1}`,
-              roundNumber: Math.floor(j / (groupParticipants.length / 2)) + 1,
+              round: `${tournamentGroup.name} - Round ${groupRoundNum}`,
+              roundNumber: groupRoundNum,
               matchNumber: j + 1,
               homePlayerId: home.id,
               awayPlayerId: away.id,
               status: "SCHEDULED" as MatchStatus,
+              deadline: computeDeadline(groupRoundNum),
             },
           });
         } else {
@@ -265,12 +286,13 @@ export async function generateSchedule(options: GenerateScheduleOptions) {
             data: {
               tournamentId,
               groupId: tournamentGroup.id,
-              round: `${tournamentGroup.name} - Round ${Math.floor(j / (groupParticipants.length / 2)) + 1}`,
-              roundNumber: Math.floor(j / (groupParticipants.length / 2)) + 1,
+              round: `${tournamentGroup.name} - Round ${groupRoundNum}`,
+              roundNumber: groupRoundNum,
               matchNumber: j + 1,
               homeTeamId: home.id,
               awayTeamId: away.id,
               status: "SCHEDULED" as MatchStatus,
+              deadline: computeDeadline(groupRoundNum),
             },
           });
         }

@@ -298,6 +298,18 @@ export default function NewMatchPage() {
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="deadline">Deadline</Label>
+                <Input
+                  id="deadline"
+                  name="deadline"
+                  type="datetime-local"
+                />
+                <p className="text-xs text-muted-foreground">
+                  When must this match be completed? Auto-reminders will be sent at 24h, 2h, and 30min before.
+                </p>
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="notes">Notes</Label>
                 <Textarea id="notes" name="notes" placeholder="Optional match notes..." />
               </div>

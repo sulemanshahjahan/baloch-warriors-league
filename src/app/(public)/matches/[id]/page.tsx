@@ -15,6 +15,7 @@ import {
   MapPin,
   Star,
   Trophy,
+  Gamepad2,
   Swords,
   Target,
   HandMetal,
@@ -33,6 +34,7 @@ import {
   getRoundDisplayName,
 } from "@/lib/utils";
 import { ShareButtons } from "./share-buttons";
+import { MatchCountdown } from "@/components/public/match-countdown";
 
 interface MatchPageProps {
   params: Promise<{ id: string }>;
@@ -375,6 +377,30 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
               </div>
             )}
           </div>
+
+          {/* Deadline countdown */}
+          {match.deadline && (match.status === "SCHEDULED" || match.status === "POSTPONED") && (
+            <div className="flex justify-center mt-3">
+              <MatchCountdown deadline={match.deadline.toISOString()} />
+            </div>
+          )}
+
+          {/* Room ID for online matches */}
+          {match.roomId && (match.status === "SCHEDULED" || match.status === "LIVE") && (
+            <div className="flex justify-center mt-3">
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500/10 border border-green-500/20">
+                <Gamepad2 className="w-4 h-4 text-green-400" />
+                <span className="text-sm text-green-400">
+                  Room ID: <span className="font-mono font-bold">{match.roomId}</span>
+                </span>
+                {match.roomPassword && (
+                  <span className="text-sm text-green-400 ml-2">
+                    Password: <span className="font-mono font-bold">{match.roomPassword}</span>
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* MOTM */}
           {match.motmPlayer && (
