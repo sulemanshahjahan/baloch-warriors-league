@@ -110,6 +110,7 @@ export async function sendScheduleNotifications(tournamentId: string): Promise<{
     const result = await sendWhatsAppTemplate({
       to: player.phone,
       templateName: "fixture_summary",
+      languageCode: "en",
       parameters: [
         player.name,
         `${player.opponents.length}`,
