@@ -39,7 +39,7 @@ export interface WhatsAppResult {
 export async function sendWhatsAppTemplate({
   to,
   templateName,
-  languageCode = "en",
+  languageCode = "en_US",
   parameters,
 }: SendTemplateParams): Promise<WhatsAppResult> {
   // Check app settings
