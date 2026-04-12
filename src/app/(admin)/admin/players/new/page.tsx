@@ -213,6 +213,10 @@ export default function NewPlayerPage() {
                   <Label htmlFor="nationality">Nationality</Label>
                   <Input id="nationality" name="nationality" placeholder="e.g. Pakistani" />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">WhatsApp Number</Label>
+                  <Input id="phone" name="phone" type="tel" placeholder="+923001234567" />
+                </div>
               </div>
 
               <div className="grid grid-cols-3 gap-4">

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { notify } from "@/lib/push";
+import { sendMatchLink } from "@/lib/whatsapp";
 
 export const dynamic = "force-dynamic";
 
@@ -30,13 +31,14 @@ export async function GET(req: NextRequest) {
       tournament: { select: { name: true } },
       homeTeam: { select: { name: true } },
       awayTeam: { select: { name: true } },
-      homePlayer: { select: { name: true } },
-      awayPlayer: { select: { name: true } },
+      homePlayer: { select: { name: true, phone: true } },
+      awayPlayer: { select: { name: true, phone: true } },
     },
   });
 
   let remindersSentCount = 0;
   let overdueCount = 0;
+  let whatsappSentCount = 0;
 
   for (const match of matches) {
     const deadline = match.deadline!;
@@ -65,6 +67,40 @@ export async function GET(req: NextRequest) {
         newReminders.push(tier.key);
         remindersSentCount++;
       }
+    }
+
+    // Auto-send magic links via WhatsApp (once, when 24h reminder fires)
+    if (newReminders.includes("24h") && !sent.includes("wa")) {
+      const deadlineStr = match.deadline!.toLocaleDateString("en-GB", {
+        day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+      });
+      const baseUrl = "https://bwlleague.com";
+
+      // Send to home player
+      if (match.homePlayer?.phone && match.homeToken) {
+        const ok = await sendMatchLink(
+          match.homePlayer.phone,
+          homeName,
+          awayName,
+          deadlineStr,
+          `${baseUrl}/report/${match.homeToken}`,
+        );
+        if (ok) whatsappSentCount++;
+      }
+
+      // Send to away player
+      if (match.awayPlayer?.phone && match.awayToken) {
+        const ok = await sendMatchLink(
+          match.awayPlayer.phone,
+          awayName,
+          homeName,
+          deadlineStr,
+          `${baseUrl}/report/${match.awayToken}`,
+        );
+        if (ok) whatsappSentCount++;
+      }
+
+      newReminders.push("wa");
     }
 
     // Check if match is now overdue
@@ -140,6 +176,7 @@ export async function GET(req: NextRequest) {
     ok: true,
     processed: matches.length,
     remindersSent: remindersSentCount,
+    whatsappSent: whatsappSentCount,
     overdue: overdueCount,
     autoConfirmed: autoConfirmedCount,
     timestamp: now.toISOString(),

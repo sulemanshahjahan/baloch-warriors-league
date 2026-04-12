@@ -4,8 +4,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Link2, Copy, Check, RefreshCw } from "lucide-react";
-import { generateMatchTokens } from "@/lib/actions/score-report";
+import { Link2, Copy, Check, RefreshCw, MessageCircle } from "lucide-react";
+import { generateMatchTokens, sendMatchLinksViaWhatsApp } from "@/lib/actions/score-report";
 import { useRouter } from "next/navigation";
 
 interface MagicLinksCardProps {
@@ -37,6 +37,8 @@ export function MagicLinksCard({
   const [copiedHome, setCopiedHome] = useState(false);
   const [copiedAway, setCopiedAway] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [waSending, setWaSending] = useState(false);
+  const [waResult, setWaResult] = useState<string | null>(null);
 
   // Only show for non-completed matches
   if (matchStatus === "COMPLETED" || matchStatus === "CANCELLED") return null;
@@ -136,6 +138,39 @@ export function MagicLinksCard({
                 {pendingReport.submittedBy} reported: {pendingReport.homeScore} – {pendingReport.awayScore}
               </span>
             </div>
+          </div>
+        )}
+
+        {homeToken && (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                setWaSending(true);
+                setWaResult(null);
+                const res = await sendMatchLinksViaWhatsApp(matchId);
+                setWaSending(false);
+                if (res.success && res.data) {
+                  const { sent, errors } = res.data;
+                  setWaResult(
+                    errors.length > 0
+                      ? `Sent ${sent}, issues: ${errors.join(", ")}`
+                      : `Sent to ${sent} player(s)!`
+                  );
+                } else {
+                  setWaResult(res.error ?? "Failed");
+                }
+              }}
+              disabled={waSending}
+              className="text-xs"
+            >
+              <MessageCircle className={`w-3 h-3 ${waSending ? "animate-pulse" : ""}`} />
+              {waSending ? "Sending..." : "Send via WhatsApp"}
+            </Button>
+            {waResult && (
+              <span className="text-xs text-muted-foreground">{waResult}</span>
+            )}
           </div>
         )}
 

@@ -28,6 +28,7 @@ const playerSchema = z.object({
   skillLevel: z.coerce.number().min(0).max(99).optional().or(z.literal("")),
   bio: z.string().optional(),
   dateOfBirth: z.string().optional(),
+  phone: z.string().optional(),
 });
 
 export async function createPlayer(formData: FormData) {
@@ -58,6 +59,7 @@ export async function createPlayer(formData: FormData) {
       skillLevel: data.skillLevel ? Number(data.skillLevel) : 50,
       bio: data.bio || null,
       dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null,
+      phone: data.phone || null,
     },
   });
 
@@ -98,6 +100,7 @@ export async function updatePlayer(id: string, formData: FormData) {
       skillLevel: data.skillLevel ? Number(data.skillLevel) : 50,
       bio: data.bio || null,
       dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null,
+      phone: data.phone || null,
       suspendedUntil: raw.suspendedUntil ? new Date(raw.suspendedUntil as string) : null,
       suspensionReason: (raw.suspensionReason as string) || null,
     },

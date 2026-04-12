@@ -233,6 +233,62 @@ export async function generateMatchTokens(matchId: string) {
   return { success: true, data: undefined };
 }
 
+// ─── ADMIN: SEND MAGIC LINKS VIA WHATSAPP ───────────────────
+
+export async function sendMatchLinksViaWhatsApp(matchId: string) {
+  const session = await auth();
+  if (!session) return { success: false, error: "Unauthorized" };
+
+  const match = await prisma.match.findUnique({
+    where: { id: matchId },
+    include: {
+      tournament: { select: { name: true } },
+      homePlayer: { select: { name: true, phone: true } },
+      awayPlayer: { select: { name: true, phone: true } },
+      homeTeam: { select: { name: true } },
+      awayTeam: { select: { name: true } },
+    },
+  });
+
+  if (!match) return { success: false, error: "Match not found" };
+  if (!match.homeToken || !match.awayToken) {
+    return { success: false, error: "No magic tokens — generate them first" };
+  }
+
+  const homeName = match.homePlayer?.name ?? match.homeTeam?.name ?? "Home";
+  const awayName = match.awayPlayer?.name ?? match.awayTeam?.name ?? "Away";
+  const deadlineStr = match.deadline
+    ? match.deadline.toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+    : "No deadline set";
+  const baseUrl = "https://bwlleague.com";
+
+  let sent = 0;
+  const errors: string[] = [];
+
+  const { sendMatchLink } = await import("@/lib/whatsapp");
+
+  if (match.homePlayer?.phone) {
+    const ok = await sendMatchLink(match.homePlayer.phone, homeName, awayName, deadlineStr, `${baseUrl}/report/${match.homeToken}`);
+    if (ok) sent++;
+    else errors.push(`Failed to send to ${homeName}`);
+  } else {
+    errors.push(`${homeName} has no WhatsApp number`);
+  }
+
+  if (match.awayPlayer?.phone) {
+    const ok = await sendMatchLink(match.awayPlayer.phone, awayName, homeName, deadlineStr, `${baseUrl}/report/${match.awayToken}`);
+    if (ok) sent++;
+    else errors.push(`Failed to send to ${awayName}`);
+  } else {
+    errors.push(`${awayName} has no WhatsApp number`);
+  }
+
+  return {
+    success: true,
+    data: { sent, errors },
+  };
+}
+
 // ─── ADMIN: OVERRIDE REPORT ─────────────────────────────────
 
 export async function adminResolveReport(

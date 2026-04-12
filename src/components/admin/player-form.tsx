@@ -31,6 +31,7 @@ interface PlayerFormProps {
     nationality: string | null;
     skillLevel: number | null;
     bio: string | null;
+    phone: string | null;
     dateOfBirth: Date | null;
     isActive: boolean;
     suspendedUntil: Date | null;
@@ -125,7 +126,7 @@ export function PlayerForm({ player }: PlayerFormProps) {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-4 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="nationality">Nationality</Label>
                 <Input
@@ -133,6 +134,16 @@ export function PlayerForm({ player }: PlayerFormProps) {
                   name="nationality"
                   defaultValue={player.nationality ?? ""}
                   placeholder="e.g. Pakistani"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone">WhatsApp Number</Label>
+                <Input
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  defaultValue={player.phone ?? ""}
+                  placeholder="+923001234567"
                 />
               </div>
               <div className="space-y-2">
