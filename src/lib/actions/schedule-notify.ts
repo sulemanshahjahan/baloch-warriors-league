@@ -100,7 +100,7 @@ export async function sendScheduleNotifications(tournamentId: string): Promise<{
 
     // Build match list string with pipe separator (WhatsApp doesn't render \n in params)
     const matchList = player.opponents
-      .map((o) => `vs ${o.name} (${o.phone}) - ${o.deadline}`)
+      .map((o) => `vs ${o.name} (+${o.phone}) - ${o.deadline}`)
       .join(" | ");
 
     const fixturesUrl = player.slug
