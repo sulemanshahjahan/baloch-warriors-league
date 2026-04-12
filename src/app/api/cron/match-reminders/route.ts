@@ -127,12 +127,78 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // ── Phase 2: Auto-forfeit overdue matches ──
+  let forfeitCount = 0;
+
+  const overdueMatches = await prisma.match.findMany({
+    where: {
+      status: { in: ["SCHEDULED", "POSTPONED"] },
+      isOverdue: true,
+    },
+    include: {
+      tournament: { select: { name: true, participantType: true } },
+      homePlayer: { select: { id: true, name: true, phone: true } },
+      awayPlayer: { select: { id: true, name: true, phone: true } },
+      homeTeam: { select: { id: true, name: true } },
+      awayTeam: { select: { id: true, name: true } },
+      availabilities: true,
+    },
+  });
+
+  for (const overdueMatch of overdueMatches) {
+    const homeAvail = overdueMatch.availabilities.find((a) => a.side === "home");
+    const awayAvail = overdueMatch.availabilities.find((a) => a.side === "away");
+
+    const homeName = overdueMatch.homePlayer?.name ?? overdueMatch.homeTeam?.name ?? "Home";
+    const awayName = overdueMatch.awayPlayer?.name ?? overdueMatch.awayTeam?.name ?? "Away";
+
+    const homeReady = !!homeAvail?.isAvailable;
+    const awayReady = !!awayAvail?.isAvailable;
+
+    // One ready, one not → auto-forfeit (walkover 3-0)
+    if (homeReady && !awayReady) {
+      // Home wins, away forfeits
+      const { executeMatchCompletion } = await import("@/lib/actions/match");
+      await executeMatchCompletion(overdueMatch.id, 3, 0);
+
+      await notify({
+        title: "Match Forfeited",
+        body: `${awayName} did not respond. ${homeName} wins 3-0 walkover (${overdueMatch.tournament.name})`,
+        url: `/matches/${overdueMatch.id}`,
+        tag: `forfeit-${overdueMatch.id}`,
+      });
+      forfeitCount++;
+    } else if (!homeReady && awayReady) {
+      // Away wins, home forfeits
+      const { executeMatchCompletion } = await import("@/lib/actions/match");
+      await executeMatchCompletion(overdueMatch.id, 0, 3);
+
+      await notify({
+        title: "Match Forfeited",
+        body: `${homeName} did not respond. ${awayName} wins 3-0 walkover (${overdueMatch.tournament.name})`,
+        url: `/matches/${overdueMatch.id}`,
+        tag: `forfeit-${overdueMatch.id}`,
+      });
+      forfeitCount++;
+    } else if (!homeReady && !awayReady) {
+      // Neither responded — notify admin only (don't auto-forfeit both)
+      await notify({
+        title: "Both Players Unresponsive",
+        body: `${homeName} vs ${awayName} — neither player responded. Admin action needed. (${overdueMatch.tournament.name})`,
+        url: `/admin/matches/${overdueMatch.id}`,
+        tag: `both-unresponsive-${overdueMatch.id}`,
+      });
+    }
+    // Both ready but overdue → match stays open, admin enters score manually
+  }
+
   return NextResponse.json({
     ok: true,
     processed: matches.length,
     remindersSent: remindersSentCount,
     whatsappSent: whatsappSentCount,
     overdue: overdueCount,
+    forfeited: forfeitCount,
     timestamp: now.toISOString(),
   });
 }
