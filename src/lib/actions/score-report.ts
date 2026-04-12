@@ -268,17 +268,17 @@ export async function sendMatchLinksViaWhatsApp(matchId: string) {
   const { sendMatchLink } = await import("@/lib/whatsapp");
 
   if (match.homePlayer?.phone) {
-    const ok = await sendMatchLink(match.homePlayer.phone, homeName, awayName, deadlineStr, `${baseUrl}/report/${match.homeToken}`);
-    if (ok) sent++;
-    else errors.push(`Failed to send to ${homeName}`);
+    const result = await sendMatchLink(match.homePlayer.phone, homeName, awayName, deadlineStr, `${baseUrl}/report/${match.homeToken}`);
+    if (result.ok && !result.error) sent++;
+    else errors.push(`${homeName}: ${result.error || "Unknown error"}`);
   } else {
     errors.push(`${homeName} has no WhatsApp number`);
   }
 
   if (match.awayPlayer?.phone) {
-    const ok = await sendMatchLink(match.awayPlayer.phone, awayName, homeName, deadlineStr, `${baseUrl}/report/${match.awayToken}`);
-    if (ok) sent++;
-    else errors.push(`Failed to send to ${awayName}`);
+    const result = await sendMatchLink(match.awayPlayer.phone, awayName, homeName, deadlineStr, `${baseUrl}/report/${match.awayToken}`);
+    if (result.ok && !result.error) sent++;
+    else errors.push(`${awayName}: ${result.error || "Unknown error"}`);
   } else {
     errors.push(`${awayName} has no WhatsApp number`);
   }

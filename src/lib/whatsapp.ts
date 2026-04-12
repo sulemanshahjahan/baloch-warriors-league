@@ -28,36 +28,40 @@ interface SendTemplateParams {
   parameters: string[]; // Template variable values in order
 }
 
+export interface WhatsAppResult {
+  ok: boolean;
+  error?: string;
+}
+
 /**
  * Send a WhatsApp template message via Meta Cloud API.
- * Returns true if sent successfully, false otherwise.
  */
 export async function sendWhatsAppTemplate({
   to,
   templateName,
   languageCode = "en",
   parameters,
-}: SendTemplateParams): Promise<boolean> {
+}: SendTemplateParams): Promise<WhatsAppResult> {
   // Check app settings
   try {
     const { getSettings } = await import("@/lib/settings");
     const settings = await getSettings();
     if (settings.testMode) {
       console.log("[WhatsApp] SKIPPED (test mode on)", to, templateName);
-      return true;
+      return { ok: true, error: "Skipped (test mode)" };
     }
     // Check per-type WhatsApp toggle based on template name
-    if (templateName.includes("reminder") && !settings.waMatchReminders) return true;
-    if (templateName.includes("score") && !settings.waScoreSubmissions) return true;
-    if (templateName.includes("result") && !settings.waMatchResults) return true;
-    if (templateName.includes("room") && !settings.waRoomId) return true;
+    if (templateName.includes("reminder") && !settings.waMatchReminders) return { ok: true, error: "Skipped (reminders disabled)" };
+    if (templateName.includes("score") && !settings.waScoreSubmissions) return { ok: true, error: "Skipped (score submissions disabled)" };
+    if (templateName.includes("result") && !settings.waMatchResults) return { ok: true, error: "Skipped (results disabled)" };
+    if (templateName.includes("room") && !settings.waRoomId) return { ok: true, error: "Skipped (room ID disabled)" };
   } catch {
     // Fail open — send if settings check fails
   }
 
   if (process.env.NOTIFICATIONS_ENABLED === "false") {
     console.log("[WhatsApp] SKIPPED (env var)", to, templateName);
-    return true;
+    return { ok: true, error: "Skipped (env disabled)" };
   }
 
   const token = process.env.WHATSAPP_TOKEN;
@@ -65,7 +69,7 @@ export async function sendWhatsAppTemplate({
 
   if (!token || !phoneId) {
     console.warn("[WhatsApp] Missing WHATSAPP_TOKEN or WHATSAPP_PHONE_ID — skipping");
-    return false;
+    return { ok: false, error: "Missing WHATSAPP_TOKEN or WHATSAPP_PHONE_ID env vars" };
   }
 
   // Strip + and spaces from phone number
@@ -101,15 +105,16 @@ export async function sendWhatsAppTemplate({
     });
 
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      console.error("[WhatsApp] Send failed:", res.status, err);
-      return false;
+      const err = await res.json().catch(() => ({ error: { message: `HTTP ${res.status}` } }));
+      const errMsg = err?.error?.message || err?.error?.error_data?.details || `HTTP ${res.status}`;
+      console.error("[WhatsApp] Send failed:", res.status, JSON.stringify(err));
+      return { ok: false, error: errMsg };
     }
 
-    return true;
+    return { ok: true };
   } catch (err) {
     console.error("[WhatsApp] Network error:", err);
-    return false;
+    return { ok: false, error: err instanceof Error ? err.message : "Network error" };
   }
 }
 
@@ -121,18 +126,16 @@ export async function sendWhatsAppTemplate({
 export async function sendWhatsAppText(
   to: string,
   text: string,
-): Promise<boolean> {
+): Promise<WhatsAppResult> {
   if (process.env.NOTIFICATIONS_ENABLED === "false") {
-    console.log("[WhatsApp] Text SKIPPED (NOTIFICATIONS_ENABLED=false)", to);
-    return true;
+    return { ok: true, error: "Skipped (env disabled)" };
   }
 
   const token = process.env.WHATSAPP_TOKEN;
   const phoneId = process.env.WHATSAPP_PHONE_ID;
 
   if (!token || !phoneId) {
-    console.warn("[WhatsApp] Missing WHATSAPP_TOKEN or WHATSAPP_PHONE_ID — skipping");
-    return false;
+    return { ok: false, error: "Missing WHATSAPP_TOKEN or WHATSAPP_PHONE_ID" };
   }
 
   const cleanPhone = to.replace(/[+\s\-()]/g, "");
@@ -153,15 +156,16 @@ export async function sendWhatsAppText(
     });
 
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      console.error("[WhatsApp] Text send failed:", res.status, err);
-      return false;
+      const err = await res.json().catch(() => ({ error: { message: `HTTP ${res.status}` } }));
+      const errMsg = err?.error?.message || `HTTP ${res.status}`;
+      console.error("[WhatsApp] Text send failed:", res.status, JSON.stringify(err));
+      return { ok: false, error: errMsg };
     }
 
-    return true;
+    return { ok: true };
   } catch (err) {
     console.error("[WhatsApp] Network error:", err);
-    return false;
+    return { ok: false, error: err instanceof Error ? err.message : "Network error" };
   }
 }
 
@@ -174,7 +178,7 @@ export async function sendMatchLink(
   opponentName: string,
   deadline: string,
   magicLinkUrl: string,
-): Promise<boolean> {
+): Promise<WhatsAppResult> {
   const templateName = process.env.WHATSAPP_TEMPLATE_NAME || "match_reminder";
   return sendWhatsAppTemplate({
     to: phone,

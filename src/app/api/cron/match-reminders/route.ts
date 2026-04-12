@@ -78,26 +78,26 @@ export async function GET(req: NextRequest) {
 
       // Send to home player
       if (match.homePlayer?.phone && match.homeToken) {
-        const ok = await sendMatchLink(
+        const result = await sendMatchLink(
           match.homePlayer.phone,
           homeName,
           awayName,
           deadlineStr,
           `${baseUrl}/report/${match.homeToken}`,
         );
-        if (ok) whatsappSentCount++;
+        if (result.ok) whatsappSentCount++;
       }
 
       // Send to away player
       if (match.awayPlayer?.phone && match.awayToken) {
-        const ok = await sendMatchLink(
+        const result = await sendMatchLink(
           match.awayPlayer.phone,
           awayName,
           homeName,
           deadlineStr,
           `${baseUrl}/report/${match.awayToken}`,
         );
-        if (ok) whatsappSentCount++;
+        if (result.ok) whatsappSentCount++;
       }
 
       newReminders.push("wa");
