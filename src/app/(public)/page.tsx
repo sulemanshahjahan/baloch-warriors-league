@@ -3,7 +3,7 @@ export const revalidate = 300; // 5 minutes
 import Link from "next/link";
 import Image from "next/image";
 import { prisma } from "@/lib/db";
-import { Trophy, Swords, Users, ChevronRight, Star } from "lucide-react";
+import { Trophy, Swords, Users, ChevronRight, Star, Target } from "lucide-react";
 import { DownloadAppButton } from "@/components/public/download-app-button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -77,14 +77,14 @@ async function getHomeData() {
       }),
       prisma.$transaction([
         prisma.tournament.count(),
-        prisma.team.count({ where: { isActive: true } }),
         prisma.player.count({ where: { isActive: true } }),
         prisma.match.count({ where: { status: "COMPLETED" } }),
-      ]).then(([tournaments, teams, players, matches]) => ({
+        prisma.matchEvent.count({ where: { type: "GOAL" } }),
+      ]).then(([tournaments, players, matches, goals]) => ({
         tournaments,
-        teams,
         players,
         matches,
+        goals,
       })),
     ]);
 
@@ -170,9 +170,9 @@ export default async function HomePage() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 text-center">
             {[
               { label: "Tournaments", value: stats.tournaments, icon: Trophy },
-              { label: "Teams", value: stats.teams, icon: Users },
               { label: "Players", value: stats.players, icon: Users },
               { label: "Matches Played", value: stats.matches, icon: Swords },
+              { label: "Goals Scored", value: stats.goals, icon: Target },
             ].map((stat) => (
               <div key={stat.label}>
                 <div className="text-3xl font-black text-foreground">
