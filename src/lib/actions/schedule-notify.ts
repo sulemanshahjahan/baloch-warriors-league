@@ -2,11 +2,16 @@
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { sendScheduleMessage } from "@/lib/whatsapp";
+import { sendWhatsAppTemplate } from "@/lib/whatsapp";
 
 /**
- * After schedule generation, send each player a WhatsApp message
- * for every match they have, including opponent name + phone number.
+ * After schedule generation, send ONE WhatsApp message per player
+ * with a summary of all their matches (opponent names + phones).
+ *
+ * Uses template: fixture_summary
+ * Params: playerName, matchCount, matchList, fixturesUrl
+ *
+ * This batches ~120 messages down to ~24 (one per player).
  */
 export async function sendScheduleNotifications(tournamentId: string): Promise<{
   success: boolean;
@@ -16,7 +21,13 @@ export async function sendScheduleNotifications(tournamentId: string): Promise<{
   const session = await auth();
   if (!session) return { success: false, sent: 0, errors: ["Unauthorized"] };
 
-  // Fetch all scheduled matches with player/team details
+  const tournament = await prisma.tournament.findUnique({
+    where: { id: tournamentId },
+    select: { name: true, slug: true },
+  });
+  if (!tournament) return { success: false, sent: 0, errors: ["Tournament not found"] };
+
+  // Fetch all scheduled matches with player details
   const matches = await prisma.match.findMany({
     where: { tournamentId, status: "SCHEDULED" },
     orderBy: [{ scheduledAt: "asc" }, { roundNumber: "asc" }, { matchNumber: "asc" }],
@@ -28,50 +39,82 @@ export async function sendScheduleNotifications(tournamentId: string): Promise<{
     },
   });
 
-  let sent = 0;
-  const errors: string[] = [];
+  // Group matches by player
+  const playerMatches = new Map<string, {
+    name: string;
+    phone: string | null;
+    opponents: { name: string; phone: string; deadline: string }[];
+  }>();
 
   for (const match of matches) {
     const homeName = match.homePlayer?.name ?? match.homeTeam?.name ?? "TBD";
     const awayName = match.awayPlayer?.name ?? match.awayTeam?.name ?? "TBD";
+    const homeId = match.homePlayer?.id ?? match.homeTeam?.id ?? "";
+    const awayId = match.awayPlayer?.id ?? match.awayTeam?.id ?? "";
     const homePhone = match.homePlayer?.phone;
     const awayPhone = match.awayPlayer?.phone;
 
     const deadlineStr = match.deadline
-      ? match.deadline.toLocaleDateString("en-GB", {
-          day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
-        })
+      ? match.deadline.toLocaleDateString("en-GB", { day: "numeric", month: "short" })
       : match.scheduledAt
-        ? match.scheduledAt.toLocaleDateString("en-GB", {
-            day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
-          })
-        : "To be confirmed";
+        ? match.scheduledAt.toLocaleDateString("en-GB", { day: "numeric", month: "short" })
+        : "TBC";
 
-    // Send to home player
-    if (homePhone) {
-      const result = await sendScheduleMessage(
-        homePhone,
-        homeName,
-        awayName,
-        awayPhone ?? "N/A",
-        deadlineStr,
-      );
-      if (result.ok && !result.error) sent++;
-      else errors.push(`${homeName}: ${result.error || "Failed"}`);
+    // Add to home player's list
+    if (homeId) {
+      if (!playerMatches.has(homeId)) {
+        playerMatches.set(homeId, { name: homeName, phone: homePhone ?? null, opponents: [] });
+      }
+      playerMatches.get(homeId)!.opponents.push({
+        name: awayName,
+        phone: awayPhone ? awayPhone.replace(/[+\s\-()]/g, "") : "N/A",
+        deadline: deadlineStr,
+      });
     }
 
-    // Send to away player
-    if (awayPhone) {
-      const result = await sendScheduleMessage(
-        awayPhone,
-        awayName,
-        homeName,
-        homePhone ?? "N/A",
-        deadlineStr,
-      );
-      if (result.ok && !result.error) sent++;
-      else errors.push(`${awayName}: ${result.error || "Failed"}`);
+    // Add to away player's list
+    if (awayId) {
+      if (!playerMatches.has(awayId)) {
+        playerMatches.set(awayId, { name: awayName, phone: awayPhone ?? null, opponents: [] });
+      }
+      playerMatches.get(awayId)!.opponents.push({
+        name: homeName,
+        phone: homePhone ? homePhone.replace(/[+\s\-()]/g, "") : "N/A",
+        deadline: deadlineStr,
+      });
     }
+  }
+
+  let sent = 0;
+  const errors: string[] = [];
+
+  // Send one message per player
+  for (const [, player] of playerMatches) {
+    if (!player.phone) {
+      errors.push(`${player.name}: No WhatsApp number`);
+      continue;
+    }
+
+    // Build match list string: "vs Ali (923xx) - 15 Apr\nvs Ahmed (923xx) - 16 Apr"
+    const matchList = player.opponents
+      .map((o) => `vs ${o.name} (${o.phone}) - ${o.deadline}`)
+      .join("\n");
+
+    const fixturesUrl = `https://bwlleague.com/tournaments/${tournament.slug}`;
+
+    const result = await sendWhatsAppTemplate({
+      to: player.phone,
+      templateName: "fixture_summary",
+      parameters: [
+        player.name,
+        `${player.opponents.length}`,
+        matchList,
+        fixturesUrl,
+      ],
+    });
+
+    if (result.ok && !result.error) sent++;
+    else errors.push(`${player.name}: ${result.error || "Failed"}`);
   }
 
   return { success: true, sent, errors };
