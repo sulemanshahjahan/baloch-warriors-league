@@ -19,6 +19,7 @@ import {
   MapPin,
   Calendar,
   ShieldCheck,
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -85,6 +86,11 @@ const navItems = [
     label: "Admin Users",
     href: "/admin/users",
     icon: ShieldCheck,
+  },
+  {
+    label: "Settings",
+    href: "/admin/settings",
+    icon: Settings,
   },
 ];
 

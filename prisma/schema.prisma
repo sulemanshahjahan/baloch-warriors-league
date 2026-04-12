@@ -649,6 +649,37 @@ model Notification {
 }
 
 // ─────────────────────────────────────────────────────────────
+// APP SETTINGS (single-row global config)
+// ─────────────────────────────────────────────────────────────
+
+model AppSettings {
+  id        String   @id @default("global")
+
+  // Global kill switch
+  testMode  Boolean  @default(false)
+
+  // Push notification toggles (Web Push + FCM)
+  pushMatchReminders         Boolean @default(true)
+  pushScoreSubmissions       Boolean @default(true)
+  pushMatchResults           Boolean @default(true)
+  pushTournamentUpdates      Boolean @default(true)
+  pushRoomId                 Boolean @default(true)
+  pushAdminAlerts            Boolean @default(true)
+
+  // WhatsApp notification toggles
+  waMatchReminders           Boolean @default(true)
+  waScoreSubmissions         Boolean @default(true)
+  waMatchResults             Boolean @default(true)
+  waTournamentUpdates        Boolean @default(true)
+  waRoomId                   Boolean @default(true)
+  waAdminAlerts              Boolean @default(true)
+
+  updatedAt DateTime @updatedAt
+
+  @@map("app_settings")
+}
+
+// ─────────────────────────────────────────────────────────────
 // SCORE SELF-REPORTING
 // ─────────────────────────────────────────────────────────────
 

@@ -38,9 +38,26 @@ export async function sendWhatsAppTemplate({
   languageCode = "en",
   parameters,
 }: SendTemplateParams): Promise<boolean> {
+  // Check app settings
+  try {
+    const { getSettings } = await import("@/lib/settings");
+    const settings = await getSettings();
+    if (settings.testMode) {
+      console.log("[WhatsApp] SKIPPED (test mode on)", to, templateName);
+      return true;
+    }
+    // Check per-type WhatsApp toggle based on template name
+    if (templateName.includes("reminder") && !settings.waMatchReminders) return true;
+    if (templateName.includes("score") && !settings.waScoreSubmissions) return true;
+    if (templateName.includes("result") && !settings.waMatchResults) return true;
+    if (templateName.includes("room") && !settings.waRoomId) return true;
+  } catch {
+    // Fail open — send if settings check fails
+  }
+
   if (process.env.NOTIFICATIONS_ENABLED === "false") {
-    console.log("[WhatsApp] SKIPPED (NOTIFICATIONS_ENABLED=false)", to, templateName, parameters);
-    return true; // Return true so calling code treats it as "sent" during testing
+    console.log("[WhatsApp] SKIPPED (env var)", to, templateName);
+    return true;
   }
 
   const token = process.env.WHATSAPP_TOKEN;

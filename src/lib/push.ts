@@ -81,7 +81,30 @@ interface NotifyPayload {
 export async function notify(payload: NotifyPayload): Promise<void> {
   console.log("notify() called:", payload.title, "-", payload.body);
 
-  // Skip all external notifications when disabled (testing mode)
+  // Check app settings for test mode and per-type toggles
+  try {
+    const { getSettings } = await import("@/lib/settings");
+    const settings = await getSettings();
+
+    if (settings.testMode) {
+      console.log("notify: SKIPPED (test mode on)", payload.title);
+      return;
+    }
+
+    // Check per-type push toggles based on notification tag
+    const tag = payload.tag || "";
+    if (tag.startsWith("deadline-") && !settings.pushMatchReminders) return;
+    if (tag.startsWith("match-result-") && !settings.pushMatchResults) return;
+    if (tag.startsWith("score-report-") && !settings.pushScoreSubmissions) return;
+    if (tag.startsWith("room-id-") && !settings.pushRoomId) return;
+    if ((tag.startsWith("dispute-") || tag.startsWith("overdue-")) && !settings.pushAdminAlerts) return;
+    if ((tag.startsWith("draw-") || tag.startsWith("tournament-")) && !settings.pushTournamentUpdates) return;
+    if (tag.startsWith("auto-confirm-") && !settings.pushScoreSubmissions) return;
+  } catch {
+    // If settings check fails, proceed with sending (fail open)
+  }
+
+  // Also respect env var override
   if (process.env.NOTIFICATIONS_ENABLED === "false") {
     console.log("notify: SKIPPED (NOTIFICATIONS_ENABLED=false)");
     return;
