@@ -76,15 +76,8 @@ export async function markAvailable(
     );
   }
 
-  // Also send push notification
-  import("@/lib/push").then(({ sendPushToAll }) =>
-    sendPushToAll({
-      title: "Player Available!",
-      body: `${playerName} is ready for ${playerName} vs ${opponentName} (${match.tournament.name})`,
-      url: `/matches/${match.id}`,
-      tag: `available-${match.id}`,
-    })
-  ).catch(() => {});
+  // WhatsApp only — no broadcast push notification for availability
+  // (opponent already gets a targeted WhatsApp message above)
 
   revalidatePath(`/report/${token}`);
   revalidatePath(`/matches/${match.id}`);
