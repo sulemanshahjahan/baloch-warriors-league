@@ -32,8 +32,8 @@ export async function sendScheduleNotifications(tournamentId: string): Promise<{
     where: { tournamentId, status: "SCHEDULED" },
     orderBy: [{ scheduledAt: "asc" }, { roundNumber: "asc" }, { matchNumber: "asc" }],
     include: {
-      homePlayer: { select: { id: true, name: true, phone: true } },
-      awayPlayer: { select: { id: true, name: true, phone: true } },
+      homePlayer: { select: { id: true, name: true, phone: true, slug: true } },
+      awayPlayer: { select: { id: true, name: true, phone: true, slug: true } },
       homeTeam: { select: { id: true, name: true } },
       awayTeam: { select: { id: true, name: true } },
     },
@@ -43,6 +43,7 @@ export async function sendScheduleNotifications(tournamentId: string): Promise<{
   const playerMatches = new Map<string, {
     name: string;
     phone: string | null;
+    slug: string | null;
     opponents: { name: string; phone: string; deadline: string }[];
   }>();
 
@@ -53,6 +54,8 @@ export async function sendScheduleNotifications(tournamentId: string): Promise<{
     const awayId = match.awayPlayer?.id ?? match.awayTeam?.id ?? "";
     const homePhone = match.homePlayer?.phone;
     const awayPhone = match.awayPlayer?.phone;
+    const homeSlug = match.homePlayer?.slug ?? null;
+    const awaySlug = match.awayPlayer?.slug ?? null;
 
     const deadlineStr = match.deadline
       ? match.deadline.toLocaleDateString("en-GB", { day: "numeric", month: "short" })
@@ -63,7 +66,7 @@ export async function sendScheduleNotifications(tournamentId: string): Promise<{
     // Add to home player's list
     if (homeId) {
       if (!playerMatches.has(homeId)) {
-        playerMatches.set(homeId, { name: homeName, phone: homePhone ?? null, opponents: [] });
+        playerMatches.set(homeId, { name: homeName, phone: homePhone ?? null, slug: homeSlug, opponents: [] });
       }
       playerMatches.get(homeId)!.opponents.push({
         name: awayName,
@@ -75,7 +78,7 @@ export async function sendScheduleNotifications(tournamentId: string): Promise<{
     // Add to away player's list
     if (awayId) {
       if (!playerMatches.has(awayId)) {
-        playerMatches.set(awayId, { name: awayName, phone: awayPhone ?? null, opponents: [] });
+        playerMatches.set(awayId, { name: awayName, phone: awayPhone ?? null, slug: awaySlug, opponents: [] });
       }
       playerMatches.get(awayId)!.opponents.push({
         name: homeName,
@@ -100,7 +103,9 @@ export async function sendScheduleNotifications(tournamentId: string): Promise<{
       .map((o) => `vs ${o.name} (${o.phone}) - ${o.deadline}`)
       .join("\n");
 
-    const fixturesUrl = `https://bwlleague.com/tournaments/${tournament.slug}`;
+    const fixturesUrl = player.slug
+      ? `https://bwlleague.com/players/${player.slug}`
+      : `https://bwlleague.com/tournaments/${tournament.slug}`;
 
     const result = await sendWhatsAppTemplate({
       to: player.phone,
