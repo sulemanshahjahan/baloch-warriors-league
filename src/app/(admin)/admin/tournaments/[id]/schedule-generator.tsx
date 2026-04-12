@@ -77,11 +77,9 @@ export function ScheduleGenerator({
     
     setIsLoading(false);
     if (res.success) {
-      setResult({ success: true, count: res.count, message: `${res.count} matches created!` });
-      setTimeout(() => {
-        setOpen(false);
-        router.refresh();
-      }, 1500);
+      setResult({ success: true, count: res.count, message: `${res.count} matches created! Dates & deadlines auto-assigned.` });
+      router.refresh();
+      // Don't auto-close — let admin send WhatsApp notifications first
     } else {
       setResult({ success: false, message: res.error || "Failed to generate schedule" });
     }
@@ -343,15 +341,17 @@ export function ScheduleGenerator({
             </Button>
           )}
           <div className="flex items-center gap-2 ml-auto">
-            <Button variant="outline" onClick={() => setOpen(false)}>
-              Cancel
+            <Button variant="outline" onClick={() => { setOpen(false); setResult(null); setWaResult(null); }}>
+              {result?.success ? "Done" : "Cancel"}
             </Button>
-            <Button 
-              onClick={handleGenerate} 
-              disabled={isLoading || participantCount < 2 || (format === "GROUP_KNOCKOUT" && !hasGroups)}
-            >
-              {isLoading ? "Generating..." : "Generate Schedule"}
-            </Button>
+            {!result?.success && (
+              <Button
+                onClick={handleGenerate}
+                disabled={isLoading || participantCount < 2 || (format === "GROUP_KNOCKOUT" && !hasGroups)}
+              >
+                {isLoading ? "Generating..." : "Generate Schedule"}
+              </Button>
+            )}
           </div>
         </DialogFooter>
       </DialogContent>
