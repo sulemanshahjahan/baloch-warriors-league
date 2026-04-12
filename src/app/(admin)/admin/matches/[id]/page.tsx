@@ -11,6 +11,7 @@ import { DeleteMatchButton } from "./delete-match-button";
 import { RescheduleForm } from "./reschedule-form";
 import { RoomIdForm } from "./room-id-form";
 import { MagicLinksCard } from "./magic-links-card";
+import { getAvailabilityStatus } from "@/lib/actions/availability";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -34,6 +35,7 @@ export default async function MatchDetailPage({ params }: MatchDetailPageProps) 
 
   // Check if this is a PUBG match
   const isPUBG = match.tournament.gameCategory === "PUBG";
+  const availability = await getAvailabilityStatus(match.id);
 
   // Handle both team matches and individual player matches
   const homeTeamPlayers =
@@ -100,6 +102,11 @@ export default async function MatchDetailPage({ params }: MatchDetailPageProps) 
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-destructive/10 text-destructive">
                 <AlertTriangle className="w-3 h-3" />
                 OVERDUE
+              </span>
+            )}
+            {match.status !== "COMPLETED" && (availability.home || availability.away) && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-400">
+                {availability.home && availability.away ? "Both Ready" : availability.home ? `${homeName} Ready` : `${awayName} Ready`}
               </span>
             )}
           </div>

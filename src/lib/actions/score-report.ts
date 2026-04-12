@@ -18,8 +18,8 @@ export async function getMatchByToken(token: string) {
       tournament: { select: { id: true, name: true, slug: true, gameCategory: true } },
       homeTeam: { select: { id: true, name: true, shortName: true, logoUrl: true } },
       awayTeam: { select: { id: true, name: true, shortName: true, logoUrl: true } },
-      homePlayer: { select: { id: true, name: true, slug: true, photoUrl: true } },
-      awayPlayer: { select: { id: true, name: true, slug: true, photoUrl: true } },
+      homePlayer: { select: { id: true, name: true, slug: true, photoUrl: true, phone: true } },
+      awayPlayer: { select: { id: true, name: true, slug: true, photoUrl: true, phone: true } },
       scoreReports: { where: { status: "PENDING" }, take: 1 },
     },
   });
@@ -32,8 +32,8 @@ export async function getMatchByToken(token: string) {
         tournament: { select: { id: true, name: true, slug: true, gameCategory: true } },
         homeTeam: { select: { id: true, name: true, shortName: true, logoUrl: true } },
         awayTeam: { select: { id: true, name: true, shortName: true, logoUrl: true } },
-        homePlayer: { select: { id: true, name: true, slug: true, photoUrl: true } },
-        awayPlayer: { select: { id: true, name: true, slug: true, photoUrl: true } },
+        homePlayer: { select: { id: true, name: true, slug: true, photoUrl: true, phone: true } },
+        awayPlayer: { select: { id: true, name: true, slug: true, photoUrl: true, phone: true } },
         scoreReports: { where: { status: "PENDING" }, take: 1 },
       },
     });

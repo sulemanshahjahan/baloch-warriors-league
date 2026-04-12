@@ -22,7 +22,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Calendar, Shuffle, Trophy, Users, AlertTriangle, Trash2 } from "lucide-react";
+import { Calendar, Shuffle, Trophy, Users, AlertTriangle, Trash2, MessageCircle } from "lucide-react";
+import { sendScheduleNotifications } from "@/lib/actions/schedule-notify";
 import { Badge } from "@/components/ui/badge";
 
 interface ScheduleGeneratorProps {
@@ -50,8 +51,11 @@ export function ScheduleGenerator({
   const [deadlineMode, setDeadlineMode] = useState<"none" | "per_round" | "global">("none");
   const [daysPerRound, setDaysPerRound] = useState(3);
   const [globalDeadline, setGlobalDeadline] = useState("");
+  const [maxMatchesPerDay, setMaxMatchesPerDay] = useState(2);
   const [isLoading, setIsLoading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isSendingWA, setIsSendingWA] = useState(false);
+  const [waResult, setWaResult] = useState<string | null>(null);
   const [result, setResult] = useState<{ success: boolean; count?: number; message?: string } | null>(null);
   const router = useRouter();
 
@@ -68,6 +72,7 @@ export function ScheduleGenerator({
       deadlineMode,
       daysPerRound: deadlineMode === "per_round" ? daysPerRound : undefined,
       globalDeadline: deadlineMode === "global" ? globalDeadline : undefined,
+      maxMatchesPerDay,
     });
     
     setIsLoading(false);
@@ -234,6 +239,21 @@ export function ScheduleGenerator({
             </div>
           )}
 
+          {/* Max matches per player per day */}
+          <div className="space-y-2">
+            <Label>Max matches per player per day</Label>
+            <Input
+              type="number"
+              min={1}
+              max={4}
+              value={maxMatchesPerDay}
+              onChange={(e) => setMaxMatchesPerDay(Number(e.target.value))}
+            />
+            <p className="text-xs text-muted-foreground">
+              Dates auto-assigned from tournament start date. Each player gets at most this many matches per day.
+            </p>
+          </div>
+
           {/* Group Settings */}
           {format === "GROUP_KNOCKOUT" && (
             <>
@@ -267,8 +287,37 @@ export function ScheduleGenerator({
 
           {/* Result Message */}
           {result && (
-            <div className={`p-3 rounded text-sm ${result.success ? "bg-green-500/10 text-green-500" : "bg-destructive/10 text-destructive"}`}>
-              {result.message}
+            <div className={`p-3 rounded text-sm space-y-2 ${result.success ? "bg-green-500/10 text-green-500" : "bg-destructive/10 text-destructive"}`}>
+              <p>{result.message}</p>
+              {result.success && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    setIsSendingWA(true);
+                    setWaResult(null);
+                    const res = await sendScheduleNotifications(tournamentId);
+                    setIsSendingWA(false);
+                    if (res.success) {
+                      setWaResult(
+                        res.errors.length > 0
+                          ? `Sent ${res.sent} messages. Issues: ${res.errors.slice(0, 3).join(", ")}`
+                          : `Sent ${res.sent} fixture notifications!`
+                      );
+                    } else {
+                      setWaResult("Failed to send notifications");
+                    }
+                  }}
+                  disabled={isSendingWA}
+                  className="text-xs"
+                >
+                  <MessageCircle className={`w-3 h-3 ${isSendingWA ? "animate-pulse" : ""}`} />
+                  {isSendingWA ? "Sending fixtures..." : "Send Fixtures via WhatsApp"}
+                </Button>
+              )}
+              {waResult && (
+                <p className="text-xs text-muted-foreground">{waResult}</p>
+              )}
             </div>
           )}
 

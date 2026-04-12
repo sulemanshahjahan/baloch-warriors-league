@@ -27,6 +27,7 @@ interface GenerateScheduleOptions {
   deadlineMode?: "none" | "per_round" | "global";
   daysPerRound?: number;
   globalDeadline?: string; // ISO date string
+  maxMatchesPerDay?: number; // Auto-date assignment: max matches per player per day (default 2)
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────
@@ -310,9 +311,73 @@ export async function generateSchedule(options: GenerateScheduleOptions) {
     }
   }
 
+  // ── Auto-assign dates (1-2 matches per player per day) ──
+  if (tournament.startDate && createdMatches > 0) {
+    const maxPerDay = options.maxMatchesPerDay ?? 2;
+
+    // Fetch all SCHEDULED matches for this tournament
+    const scheduledMatches = await prisma.match.findMany({
+      where: { tournamentId, status: "SCHEDULED" as MatchStatus },
+      orderBy: [{ roundNumber: "asc" }, { matchNumber: "asc" }],
+      select: { id: true, homePlayerId: true, awayPlayerId: true, homeTeamId: true, awayTeamId: true },
+    });
+
+    // Greedy slot-filling: find earliest day where both players have < maxPerDay matches
+    const playerDayCount = new Map<string, Map<number, number>>();
+
+    const getCount = (playerId: string, day: number) =>
+      playerDayCount.get(playerId)?.get(day) ?? 0;
+
+    const increment = (playerId: string, day: number) => {
+      if (!playerDayCount.has(playerId)) playerDayCount.set(playerId, new Map());
+      playerDayCount.get(playerId)!.set(day, getCount(playerId, day) + 1);
+    };
+
+    const updates: { id: string; scheduledAt: Date; deadline: Date }[] = [];
+
+    for (const m of scheduledMatches) {
+      const homeId = m.homePlayerId ?? m.homeTeamId ?? "";
+      const awayId = m.awayPlayerId ?? m.awayTeamId ?? "";
+
+      let dayOffset = 0;
+      while (dayOffset < 365) { // safety cap
+        const homeCount = homeId ? getCount(homeId, dayOffset) : 0;
+        const awayCount = awayId ? getCount(awayId, dayOffset) : 0;
+
+        if (homeCount < maxPerDay && awayCount < maxPerDay) {
+          const scheduledAt = new Date(tournament.startDate!);
+          scheduledAt.setDate(scheduledAt.getDate() + dayOffset);
+          scheduledAt.setHours(18, 0, 0, 0); // Default 6 PM
+
+          const deadline = new Date(scheduledAt);
+          deadline.setHours(deadline.getHours() + 24); // Deadline = scheduledAt + 24h
+
+          updates.push({ id: m.id, scheduledAt, deadline });
+
+          if (homeId) increment(homeId, dayOffset);
+          if (awayId) increment(awayId, dayOffset);
+          break;
+        }
+        dayOffset++;
+      }
+    }
+
+    // Batch update all matches with assigned dates
+    if (updates.length > 0) {
+      await prisma.$transaction(
+        updates.map((u) =>
+          prisma.match.update({
+            where: { id: u.id },
+            data: { scheduledAt: u.scheduledAt, deadline: u.deadline },
+          })
+        )
+      );
+    }
+  }
+
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath("/admin/matches");
-  
+
   return { success: true, count: createdMatches };
 }
 

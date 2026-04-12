@@ -71,7 +71,7 @@ export function MagicLinksCard({
         <CardTitle className="text-base flex items-center justify-between">
           <span className="flex items-center gap-2">
             <Link2 className="w-4 h-4 text-blue-400" />
-            Player Score Report Links
+            Player Match Links
           </span>
           <Button
             variant="ghost"
@@ -175,7 +175,7 @@ export function MagicLinksCard({
         )}
 
         <p className="text-xs text-muted-foreground">
-          Share these links with players. They can submit and confirm scores without an account.
+          Share these links with players to mark availability and coordinate matches.
         </p>
       </CardContent>
     </Card>

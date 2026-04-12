@@ -257,6 +257,7 @@ model Player {
   standings       Standing[]
   eloHistory      EloHistory[]
   eloAsOpponent   EloHistory[]       @relation("EloOpponent")
+  availabilities  MatchAvailability[]
 
   @@index([isActive])
   @@map("players")
@@ -426,6 +427,7 @@ model Match {
   previousMatches Match[]           @relation("KnockoutProgression")
   eloHistory      EloHistory[]
   scoreReports    ScoreReport[]
+  availabilities  MatchAvailability[]
 
   @@index([tournamentId])
   @@index([status])
@@ -677,6 +679,27 @@ model AppSettings {
   updatedAt DateTime @updatedAt
 
   @@map("app_settings")
+}
+
+// ─────────────────────────────────────────────────────────────
+// MATCH AVAILABILITY (player readiness tracking)
+// ─────────────────────────────────────────────────────────────
+
+model MatchAvailability {
+  id            String    @id @default(cuid())
+  matchId       String
+  playerId      String
+  side          String    // "home" or "away"
+  isAvailable   Boolean   @default(true)
+  preferredTime DateTime?
+  markedAt      DateTime  @default(now())
+
+  match  Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [playerId], references: [id])
+
+  @@unique([matchId, side])
+  @@index([matchId])
+  @@map("match_availabilities")
 }
 
 // ─────────────────────────────────────────────────────────────

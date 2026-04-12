@@ -170,7 +170,8 @@ export async function sendWhatsAppText(
 }
 
 /**
- * Send match magic link to a player via WhatsApp template message.
+ * Send match reminder with availability link (24h before match).
+ * Template: match_reminder — params: playerName, opponentName, deadline, availabilityLink
  */
 export async function sendMatchLink(
   phone: string,
@@ -184,5 +185,41 @@ export async function sendMatchLink(
     to: phone,
     templateName,
     parameters: [playerName, opponentName, deadline, magicLinkUrl],
+  });
+}
+
+/**
+ * Send fixture notification after schedule generation.
+ * Template: match_schedule — params: playerName, opponentName, opponentPhone, deadline
+ */
+export async function sendScheduleMessage(
+  phone: string,
+  playerName: string,
+  opponentName: string,
+  opponentPhone: string,
+  deadline: string,
+): Promise<WhatsAppResult> {
+  return sendWhatsAppTemplate({
+    to: phone,
+    templateName: "match_schedule",
+    parameters: [playerName, opponentName, opponentPhone, deadline],
+  });
+}
+
+/**
+ * Notify player that opponent is ready to play.
+ * Template: opponent_ready — params: playerName, opponentName, preferredTime, matchLink
+ */
+export async function sendOpponentReady(
+  phone: string,
+  playerName: string,
+  opponentName: string,
+  preferredTime: string,
+  matchLink: string,
+): Promise<WhatsAppResult> {
+  return sendWhatsAppTemplate({
+    to: phone,
+    templateName: "opponent_ready",
+    parameters: [playerName, opponentName, preferredTime, matchLink],
   });
 }

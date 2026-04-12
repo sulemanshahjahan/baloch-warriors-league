@@ -1,10 +1,10 @@
 import { getMatchByToken } from "@/lib/actions/score-report";
-import { notFound } from "next/navigation";
-import { SubmitScoreForm } from "./submit-score-form";
-import { ConfirmScoreForm } from "./confirm-score-form";
+import { getAvailabilityStatus } from "@/lib/actions/availability";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { gameLabel } from "@/lib/utils";
+import { gameLabel, formatDateTime } from "@/lib/utils";
+import { AvailabilityForm } from "./availability-form";
+import { Check, Clock } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -22,19 +22,20 @@ export default async function ReportPage({ params }: Props) {
         <CardContent className="pt-6 text-center">
           <p className="text-lg font-semibold text-destructive">Invalid Link</p>
           <p className="text-sm text-muted-foreground mt-2">
-            This score report link is invalid or has expired.
+            This match link is invalid or has expired.
           </p>
         </CardContent>
       </Card>
     );
   }
 
-  const { match, side, pendingReport } = result;
+  const { match, side } = result;
   const homeName = match.homePlayer?.name ?? match.homeTeam?.name ?? "TBD";
   const awayName = match.awayPlayer?.name ?? match.awayTeam?.name ?? "TBD";
   const yourSide = side === "home" ? homeName : awayName;
+  const opponentName = side === "home" ? awayName : homeName;
 
-  // Match is already completed — show final result
+  // Match is completed — show final result
   if (match.status === "COMPLETED") {
     return (
       <Card className="mt-6">
@@ -46,15 +47,11 @@ export default async function ReportPage({ params }: Props) {
             <p className="text-sm text-muted-foreground">{match.round}</p>
           )}
           <div className="flex items-center justify-center gap-6">
-            <div className="text-center">
-              <p className="text-lg font-bold">{homeName}</p>
-            </div>
+            <p className="text-lg font-bold">{homeName}</p>
             <div className="text-4xl font-black tracking-tight">
               {match.homeScore} <span className="text-muted-foreground mx-1">–</span> {match.awayScore}
             </div>
-            <div className="text-center">
-              <p className="text-lg font-bold">{awayName}</p>
-            </div>
+            <p className="text-lg font-bold">{awayName}</p>
           </div>
           <Badge variant="outline" className="text-emerald-400 border-emerald-400/30">
             Completed
@@ -64,7 +61,12 @@ export default async function ReportPage({ params }: Props) {
     );
   }
 
-  // Match header (shared by submit and confirm views)
+  // Get availability status
+  const availability = await getAvailabilityStatus(match.id);
+  const myAvailability = side === "home" ? availability.home : availability.away;
+  const opponentAvailability = side === "home" ? availability.away : availability.home;
+
+  // Match header
   const matchHeader = (
     <div className="text-center space-y-2 mb-6">
       <p className="text-xs text-muted-foreground uppercase tracking-wider">
@@ -81,64 +83,93 @@ export default async function ReportPage({ params }: Props) {
       <p className="text-xs text-muted-foreground">
         You are: <span className="font-semibold text-foreground">{yourSide}</span> ({side})
       </p>
+      {match.scheduledAt && (
+        <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+          <Clock className="w-3 h-3" />
+          Scheduled: {formatDateTime(match.scheduledAt)}
+        </p>
+      )}
+      {match.deadline && (
+        <p className="text-xs text-amber-400 flex items-center justify-center gap-1">
+          <Clock className="w-3 h-3" />
+          Deadline: {formatDateTime(match.deadline)}
+        </p>
+      )}
     </div>
   );
 
-  // Pending report exists — show appropriate view
-  if (pendingReport) {
-    // Submitter sees waiting state
-    if (pendingReport.submittedBy === side) {
-      return (
-        <Card className="mt-6">
-          <CardContent className="pt-6 space-y-4">
-            {matchHeader}
-            <div className="text-center p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
-              <p className="text-sm font-medium text-amber-400">Waiting for opponent to confirm</p>
-              <p className="text-3xl font-black mt-2">
-                {pendingReport.homeScore} <span className="text-muted-foreground mx-1">–</span> {pendingReport.awayScore}
-              </p>
-              <p className="text-xs text-muted-foreground mt-2">
-                Auto-confirms in {Math.max(0, Math.round((new Date(pendingReport.autoConfirmAt).getTime() - Date.now()) / 3600000))} hours if no response
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      );
-    }
-
-    // Opponent sees confirm/dispute form
+  // Both players available
+  if (myAvailability?.isAvailable && opponentAvailability?.isAvailable) {
     return (
       <Card className="mt-6">
         <CardContent className="pt-6 space-y-4">
           {matchHeader}
-          <ConfirmScoreForm
+          <div className="text-center p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+            <Check className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
+            <p className="text-sm font-medium text-emerald-400">Both players are ready!</p>
+            <p className="text-xs text-muted-foreground mt-2">
+              Contact your opponent and play the match. The admin will enter the final score.
+            </p>
+            {opponentAvailability.preferredTime && (
+              <p className="text-xs text-foreground mt-2">
+                {opponentName} is available at: <strong>{formatDateTime(opponentAvailability.preferredTime)}</strong>
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // I'm already available, waiting for opponent
+  if (myAvailability?.isAvailable && !opponentAvailability?.isAvailable) {
+    return (
+      <Card className="mt-6">
+        <CardContent className="pt-6 space-y-4">
+          {matchHeader}
+          <div className="text-center p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
+            <Clock className="w-6 h-6 text-amber-400 mx-auto mb-2" />
+            <p className="text-sm font-medium text-amber-400">Waiting for {opponentName}</p>
+            <p className="text-xs text-muted-foreground mt-2">
+              You're marked as available
+              {myAvailability.preferredTime && ` at ${formatDateTime(myAvailability.preferredTime)}`}.
+              Your opponent has been notified.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Opponent is available, I'm not yet
+  if (!myAvailability?.isAvailable && opponentAvailability?.isAvailable) {
+    return (
+      <Card className="mt-6">
+        <CardContent className="pt-6 space-y-4">
+          {matchHeader}
+          <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-center mb-4">
+            <p className="text-sm text-emerald-400">
+              {opponentName} is ready to play
+              {opponentAvailability.preferredTime && ` at ${formatDateTime(opponentAvailability.preferredTime)}`}!
+            </p>
+          </div>
+          <AvailabilityForm
             token={token}
-            reportId={pendingReport.id}
-            homeScore={pendingReport.homeScore}
-            awayScore={pendingReport.awayScore}
-            homeName={homeName}
-            awayName={awayName}
-            tournamentName={match.tournament.name}
-            matchId={match.id}
-            round={match.round}
-            matchNumber={match.matchNumber}
-            homePhoto={match.homePlayer?.photoUrl ?? match.homeTeam?.logoUrl ?? null}
-            awayPhoto={match.awayPlayer?.photoUrl ?? match.awayTeam?.logoUrl ?? null}
+            scheduledAt={match.scheduledAt?.toISOString() ?? null}
           />
         </CardContent>
       </Card>
     );
   }
 
-  // No pending report — show submit form
+  // Neither available — show availability form
   return (
     <Card className="mt-6">
       <CardContent className="pt-6 space-y-4">
         {matchHeader}
-        <SubmitScoreForm
+        <AvailabilityForm
           token={token}
-          homeName={homeName}
-          awayName={awayName}
+          scheduledAt={match.scheduledAt?.toISOString() ?? null}
         />
       </CardContent>
     </Card>
