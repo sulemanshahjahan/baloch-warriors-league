@@ -81,6 +81,12 @@ interface NotifyPayload {
 export async function notify(payload: NotifyPayload): Promise<void> {
   console.log("notify() called:", payload.title, "-", payload.body);
 
+  // Skip all external notifications when disabled (testing mode)
+  if (process.env.NOTIFICATIONS_ENABLED === "false") {
+    console.log("notify: SKIPPED (NOTIFICATIONS_ENABLED=false)");
+    return;
+  }
+
   try {
     // 1. Save to DB
     await prisma.notification.create({

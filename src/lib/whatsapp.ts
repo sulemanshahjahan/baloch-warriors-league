@@ -38,6 +38,11 @@ export async function sendWhatsAppTemplate({
   languageCode = "en",
   parameters,
 }: SendTemplateParams): Promise<boolean> {
+  if (process.env.NOTIFICATIONS_ENABLED === "false") {
+    console.log("[WhatsApp] SKIPPED (NOTIFICATIONS_ENABLED=false)", to, templateName, parameters);
+    return true; // Return true so calling code treats it as "sent" during testing
+  }
+
   const token = process.env.WHATSAPP_TOKEN;
   const phoneId = process.env.WHATSAPP_PHONE_ID;
 
@@ -100,6 +105,11 @@ export async function sendWhatsAppText(
   to: string,
   text: string,
 ): Promise<boolean> {
+  if (process.env.NOTIFICATIONS_ENABLED === "false") {
+    console.log("[WhatsApp] Text SKIPPED (NOTIFICATIONS_ENABLED=false)", to);
+    return true;
+  }
+
   const token = process.env.WHATSAPP_TOKEN;
   const phoneId = process.env.WHATSAPP_PHONE_ID;
 
