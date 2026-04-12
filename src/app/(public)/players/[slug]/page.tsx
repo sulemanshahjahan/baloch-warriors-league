@@ -169,6 +169,26 @@ async function getPlayerRecentMatches(playerId: string) {
   });
 }
 
+async function getPlayerUpcomingMatches(playerId: string) {
+  return prisma.match.findMany({
+    where: {
+      status: { in: ["SCHEDULED", "POSTPONED"] },
+      OR: [
+        { homePlayerId: playerId },
+        { awayPlayerId: playerId },
+      ],
+    },
+    orderBy: { scheduledAt: "asc" },
+    include: {
+      tournament: { select: { name: true, slug: true, gameCategory: true } },
+      homePlayer: { select: { id: true, name: true, slug: true } },
+      awayPlayer: { select: { id: true, name: true, slug: true } },
+      homeTeam: { select: { id: true, name: true, slug: true } },
+      awayTeam: { select: { id: true, name: true, slug: true } },
+    },
+  });
+}
+
 const AWARD_TYPE_LABELS: Record<string, string> = {
   GOLDEN_BOOT: "Golden Boot",
   TOP_ASSISTS: "Top Assists",
@@ -186,9 +206,10 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
 
   if (!player) notFound();
 
-  const [stats, recentMatches] = await Promise.all([
+  const [stats, recentMatches, upcomingMatches] = await Promise.all([
     getPlayerStats(player.id),
     getPlayerRecentMatches(player.id),
+    getPlayerUpcomingMatches(player.id),
   ]);
   const currentTeam = player.teams.find((t) => !t.leftAt)?.team;
 
@@ -339,6 +360,77 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Upcoming Matches */}
+            {upcomingMatches.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-blue-400" />
+                    Upcoming Matches
+                    <span className="text-xs font-normal text-muted-foreground ml-auto">
+                      {upcomingMatches.length} match{upcomingMatches.length !== 1 ? "es" : ""}
+                    </span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {upcomingMatches.map((match) => {
+                      const isHome = match.homePlayer?.id === player.id;
+                      const opponent = isHome
+                        ? (match.awayPlayer ?? match.awayTeam)
+                        : (match.homePlayer ?? match.homeTeam);
+                      const opponentId = isHome
+                        ? (match.awayPlayer?.id ?? match.awayTeam?.id)
+                        : (match.homePlayer?.id ?? match.homeTeam?.id);
+                      const opponentType = match.awayPlayer || match.homePlayer ? "player" : "team";
+
+                      return (
+                        <Link
+                          key={match.id}
+                          href={`/matches/${match.id}`}
+                          className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            {opponentId ? (
+                              <SmartAvatar
+                                type={opponentType}
+                                id={opponentId}
+                                name={(opponent as { name: string } | null)?.name ?? "?"}
+                                className="h-8 w-8"
+                                fallbackClassName="text-xs"
+                              />
+                            ) : (
+                              <Avatar className="h-8 w-8">
+                                <AvatarFallback className="text-xs">?</AvatarFallback>
+                              </Avatar>
+                            )}
+                            <div>
+                              <p className="font-medium text-sm">
+                                vs {(opponent as { name: string } | null)?.name ?? "TBD"}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {match.tournament.name}{match.round ? ` — ${match.round}` : ""}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {match.deadline && (
+                              <span className="text-xs text-amber-400">
+                                {new Date(match.deadline).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                              </span>
+                            )}
+                            <span className="text-xs font-medium px-2 py-0.5 rounded bg-blue-500/20 text-blue-400">
+                              {match.status === "POSTPONED" ? "Postponed" : "Scheduled"}
+                            </span>
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Recent Matches */}
             {recentMatches.length > 0 && (
