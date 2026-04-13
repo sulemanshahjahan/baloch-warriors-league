@@ -3,7 +3,7 @@ export const revalidate = 300; // 5 minutes
 import Link from "next/link";
 import Image from "next/image";
 import { prisma } from "@/lib/db";
-import { Trophy, Swords, Users, ChevronRight, Star, Target, Crown, TrendingUp, Crosshair, BarChart3 } from "lucide-react";
+import { Trophy, Swords, Users, ChevronRight, Star, Target, Crown, TrendingUp, Crosshair, BarChart3, ShieldCheck } from "lucide-react";
 import { DownloadAppButton } from "@/components/public/download-app-button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -131,21 +131,25 @@ async function getHomeData() {
       select: { id: true, name: true, slug: true, eloRating: true },
     }).then((res) => res[0] ? { ...res[0], value: res[0].eloRating, label: "ELO" } : null),
 
-    // Top rated (avg player rating from CUSTOM events)
-    prisma.matchEvent.groupBy({
-      by: ["playerId"],
-      where: { type: "CUSTOM", description: "PLAYER_RATING", playerId: { not: null }, value: { not: null } },
-      _avg: { value: true },
-      _count: { value: true },
-      orderBy: { _avg: { value: "desc" } },
-      take: 1,
-    }).then(async (res) => {
-      if (!res[0]?.playerId || !res[0]._avg.value) return null;
-      const player = await prisma.player.findUnique({
-        where: { id: res[0].playerId },
-        select: { name: true, slug: true, id: true },
-      });
-      return player ? { ...player, value: Math.round(res[0]._avg.value * 10) / 10, label: "Avg Rating" } : null;
+    // Most clean sheets (matches where opponent scored 0)
+    prisma.player.findMany({
+      where: { isActive: true },
+      select: {
+        id: true, name: true, slug: true,
+        homeMatches: { where: { status: "COMPLETED" }, select: { awayScore: true } },
+        awayMatches: { where: { status: "COMPLETED" }, select: { homeScore: true } },
+      },
+    }).then((players) => {
+      let best: { id: string; name: string; slug: string; value: number; label: string } | null = null;
+      for (const p of players) {
+        let cleanSheets = 0;
+        for (const m of p.homeMatches) { if ((m.awayScore ?? 0) === 0) cleanSheets++; }
+        for (const m of p.awayMatches) { if ((m.homeScore ?? 0) === 0) cleanSheets++; }
+        if (cleanSheets > 0 && (!best || cleanSheets > best.value)) {
+          best = { id: p.id, name: p.name, slug: p.slug, value: cleanSheets, label: "Clean Sheets" };
+        }
+      }
+      return best;
     }),
   ]);
 
@@ -264,6 +268,7 @@ export default async function HomePage() {
                 const icon = mvp.label === "Goals" ? <Crosshair className="w-4 h-4 text-primary" />
                   : mvp.label === "Win Rate" ? <TrendingUp className="w-4 h-4 text-emerald-400" />
                   : mvp.label === "ELO" ? <BarChart3 className="w-4 h-4 text-blue-400" />
+                  : mvp.label === "Clean Sheets" ? <ShieldCheck className="w-4 h-4 text-cyan-400" />
                   : <Star className="w-4 h-4 text-amber-400" />;
 
                 return (
