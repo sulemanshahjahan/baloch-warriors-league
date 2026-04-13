@@ -3,7 +3,7 @@ export const revalidate = 300; // 5 minutes
 import Link from "next/link";
 import Image from "next/image";
 import { prisma } from "@/lib/db";
-import { Trophy, Swords, Users, ChevronRight, Star, Target } from "lucide-react";
+import { Trophy, Swords, Users, ChevronRight, Star, Target, Crown, TrendingUp, Crosshair, BarChart3 } from "lucide-react";
 import { DownloadAppButton } from "@/components/public/download-app-button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -88,11 +88,74 @@ async function getHomeData() {
       })),
     ]);
 
-  return { featuredTournaments, recentResults, upcomingMatches, stats };
+  // MVP stats — top performers across all data
+  const [topScorer, topWinRate, biggestEloJump, topRated] = await Promise.all([
+    // Top scorer
+    prisma.matchEvent.groupBy({
+      by: ["playerId"],
+      where: { type: "GOAL", playerId: { not: null } },
+      _count: { type: true },
+      orderBy: { _count: { type: "desc" } },
+      take: 1,
+    }).then(async (res) => {
+      if (!res[0]?.playerId) return null;
+      const player = await prisma.player.findUnique({
+        where: { id: res[0].playerId },
+        select: { name: true, slug: true, id: true },
+      });
+      return player ? { ...player, value: res[0]._count.type, label: "Goals" } : null;
+    }),
+
+    // Best win rate (min 3 matches)
+    prisma.player.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, slug: true, homeMatches: { where: { status: "COMPLETED" }, select: { homeScore: true, awayScore: true } }, awayMatches: { where: { status: "COMPLETED" }, select: { homeScore: true, awayScore: true } } },
+    }).then((players) => {
+      let best: { id: string; name: string; slug: string; value: number; total: number; label: string } | null = null;
+      for (const p of players) {
+        let wins = 0, total = 0;
+        for (const m of p.homeMatches) { total++; if ((m.homeScore ?? 0) > (m.awayScore ?? 0)) wins++; }
+        for (const m of p.awayMatches) { total++; if ((m.awayScore ?? 0) > (m.homeScore ?? 0)) wins++; }
+        if (total < 3) continue;
+        const rate = Math.round((wins / total) * 100);
+        if (!best || rate > best.value) best = { id: p.id, name: p.name, slug: p.slug, value: rate, total, label: "Win Rate" };
+      }
+      return best;
+    }),
+
+    // Biggest ELO jump
+    prisma.player.findMany({
+      where: { isActive: true, eloRating: { gt: 100 } },
+      orderBy: { eloRating: "desc" },
+      take: 1,
+      select: { id: true, name: true, slug: true, eloRating: true },
+    }).then((res) => res[0] ? { ...res[0], value: res[0].eloRating, label: "ELO" } : null),
+
+    // Top rated (avg player rating from CUSTOM events)
+    prisma.matchEvent.groupBy({
+      by: ["playerId"],
+      where: { type: "CUSTOM", description: "PLAYER_RATING", playerId: { not: null }, value: { not: null } },
+      _avg: { value: true },
+      _count: { value: true },
+      orderBy: { _avg: { value: "desc" } },
+      take: 1,
+    }).then(async (res) => {
+      if (!res[0]?.playerId || !res[0]._avg.value) return null;
+      const player = await prisma.player.findUnique({
+        where: { id: res[0].playerId },
+        select: { name: true, slug: true, id: true },
+      });
+      return player ? { ...player, value: Math.round(res[0]._avg.value * 10) / 10, label: "Avg Rating" } : null;
+    }),
+  ]);
+
+  const mvpStats = [topScorer, topWinRate, biggestEloJump, topRated].filter(Boolean);
+
+  return { featuredTournaments, recentResults, upcomingMatches, stats, mvpStats };
 }
 
 export default async function HomePage() {
-  const { featuredTournaments, recentResults, upcomingMatches, stats } =
+  const { featuredTournaments, recentResults, upcomingMatches, stats, mvpStats } =
     await getHomeData();
 
   return (
@@ -186,6 +249,49 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* MVP Area */}
+      {mvpStats.length > 0 && (
+        <section className="border-b border-border/50 bg-card/30">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="flex items-center justify-center gap-2 mb-6">
+              <Crown className="w-5 h-5 text-amber-400" />
+              <h2 className="text-lg font-bold">Top Performers</h2>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {mvpStats.map((mvp) => {
+                if (!mvp) return null;
+                const icon = mvp.label === "Goals" ? <Crosshair className="w-4 h-4 text-primary" />
+                  : mvp.label === "Win Rate" ? <TrendingUp className="w-4 h-4 text-emerald-400" />
+                  : mvp.label === "ELO" ? <BarChart3 className="w-4 h-4 text-blue-400" />
+                  : <Star className="w-4 h-4 text-amber-400" />;
+
+                return (
+                  <Link key={mvp.label} href={`/players/${mvp.slug}`}>
+                    <div className="flex flex-col items-center gap-2 p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors text-center">
+                      <SmartAvatar
+                        type="player"
+                        id={mvp.id}
+                        name={mvp.name}
+                        className="h-14 w-14"
+                        fallbackClassName="text-lg"
+                      />
+                      <div>
+                        <p className="font-semibold text-sm">{mvp.name}</p>
+                        <div className="flex items-center justify-center gap-1 mt-1">
+                          {icon}
+                          <span className="text-lg font-black">{mvp.value}{mvp.label === "Win Rate" ? "%" : ""}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">{mvp.label}{(mvp as { total?: number }).total ? ` (${(mvp as { total?: number }).total} matches)` : ""}</p>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 space-y-16">
         {/* Active / Upcoming Tournaments */}
