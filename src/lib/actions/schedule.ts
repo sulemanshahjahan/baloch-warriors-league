@@ -322,8 +322,11 @@ export async function generateSchedule(options: GenerateScheduleOptions) {
       select: { id: true, homePlayerId: true, awayPlayerId: true, homeTeamId: true, awayTeamId: true },
     });
 
-    // Greedy slot-filling: find earliest day where both players have < maxPerDay matches
+    // Smart scheduling: greedy slot-filling with rest day preference
+    // - Max N matches per player per day
+    // - Prefer a gap day after a player's last match (avoid back-to-back)
     const playerDayCount = new Map<string, Map<number, number>>();
+    const playerLastDay = new Map<string, number>(); // last assigned day per player
 
     const getCount = (playerId: string, day: number) =>
       playerDayCount.get(playerId)?.get(day) ?? 0;
@@ -331,6 +334,12 @@ export async function generateSchedule(options: GenerateScheduleOptions) {
     const increment = (playerId: string, day: number) => {
       if (!playerDayCount.has(playerId)) playerDayCount.set(playerId, new Map());
       playerDayCount.get(playerId)!.set(day, getCount(playerId, day) + 1);
+      playerLastDay.set(playerId, Math.max(playerLastDay.get(playerId) ?? -1, day));
+    };
+
+    const isRestDay = (playerId: string, day: number) => {
+      const last = playerLastDay.get(playerId) ?? -99;
+      return day - last <= 1; // played yesterday or today already
     };
 
     const updates: { id: string; scheduledAt: Date; deadline: Date }[] = [];
@@ -339,26 +348,47 @@ export async function generateSchedule(options: GenerateScheduleOptions) {
       const homeId = m.homePlayerId ?? m.homeTeamId ?? "";
       const awayId = m.awayPlayerId ?? m.awayTeamId ?? "";
 
-      let dayOffset = 0;
-      while (dayOffset < 365) { // safety cap
-        const homeCount = homeId ? getCount(homeId, dayOffset) : 0;
-        const awayCount = awayId ? getCount(awayId, dayOffset) : 0;
+      let bestDay = -1;
 
-        if (homeCount < maxPerDay && awayCount < maxPerDay) {
-          const scheduledAt = new Date(tournament.startDate!);
-          scheduledAt.setDate(scheduledAt.getDate() + dayOffset);
-          scheduledAt.setHours(18, 0, 0, 0); // Default 6 PM
+      // Pass 1: find a day with rest (gap after last match) for both players
+      for (let d = 0; d < 365; d++) {
+        const homeCount = homeId ? getCount(homeId, d) : 0;
+        const awayCount = awayId ? getCount(awayId, d) : 0;
+        if (homeCount >= maxPerDay || awayCount >= maxPerDay) continue;
 
-          const deadline = new Date(scheduledAt);
-          deadline.setHours(deadline.getHours() + 24); // Deadline = scheduledAt + 24h
+        const homeNeedsRest = homeId ? isRestDay(homeId, d) : false;
+        const awayNeedsRest = awayId ? isRestDay(awayId, d) : false;
 
-          updates.push({ id: m.id, scheduledAt, deadline });
-
-          if (homeId) increment(homeId, dayOffset);
-          if (awayId) increment(awayId, dayOffset);
+        if (!homeNeedsRest && !awayNeedsRest) {
+          bestDay = d;
           break;
         }
-        dayOffset++;
+      }
+
+      // Pass 2: if no rest-day slot found, fall back to first available day
+      if (bestDay === -1) {
+        for (let d = 0; d < 365; d++) {
+          const homeCount = homeId ? getCount(homeId, d) : 0;
+          const awayCount = awayId ? getCount(awayId, d) : 0;
+          if (homeCount < maxPerDay && awayCount < maxPerDay) {
+            bestDay = d;
+            break;
+          }
+        }
+      }
+
+      if (bestDay >= 0) {
+        const scheduledAt = new Date(tournament.startDate!);
+        scheduledAt.setDate(scheduledAt.getDate() + bestDay);
+        scheduledAt.setHours(18, 0, 0, 0);
+
+        const deadline = new Date(scheduledAt);
+        deadline.setHours(deadline.getHours() + 24);
+
+        updates.push({ id: m.id, scheduledAt, deadline });
+
+        if (homeId) increment(homeId, bestDay);
+        if (awayId) increment(awayId, bestDay);
       }
     }
 

@@ -21,6 +21,7 @@ import {
   ShieldCheck,
   Settings,
   Zap,
+  UserPlus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -87,6 +88,11 @@ const navItems = [
     label: "Seasons",
     href: "/admin/seasons",
     icon: Calendar,
+  },
+  {
+    label: "Registrations",
+    href: "/admin/registrations",
+    icon: UserPlus,
   },
   {
     label: "Admin Users",

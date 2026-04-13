@@ -240,6 +240,7 @@ model Player {
   eloRating   Int       @default(100)
   bio              String?   @db.Text
   isActive         Boolean   @default(true)
+  registrationStatus String  @default("APPROVED") // PENDING, APPROVED, REJECTED
   suspendedUntil   DateTime?
   suspensionReason String?
   createdAt        DateTime  @default(now())
