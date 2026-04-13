@@ -20,6 +20,7 @@ import {
   Calendar,
   ShieldCheck,
   Settings,
+  Zap,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,11 @@ const navItems = [
     href: "/admin",
     icon: LayoutDashboard,
     exact: true,
+  },
+  {
+    label: "Match Day",
+    href: "/admin/match-day",
+    icon: Zap,
   },
   {
     label: "Tournaments",
