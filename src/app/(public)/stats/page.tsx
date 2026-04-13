@@ -6,7 +6,7 @@ import { getOverallStats } from "@/lib/actions/stats";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, Trophy, Target, TrendingUp, Swords, Users, Crosshair, Calendar } from "lucide-react";
+import { BarChart3, Trophy, Target, TrendingUp, Swords, Users, Crosshair, Calendar, ShieldCheck, ArrowUpDown } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { getInitials, gameLabel } from "@/lib/utils";
 import { SmartAvatar } from "@/components/public/smart-avatar";
@@ -168,19 +168,41 @@ export default async function StatsPage({ searchParams }: StatsPageProps) {
         })()}
 
         <Tabs key={gameCategory} defaultValue={gameCategory === "PUBG" ? "kills" : (gameCategory === "SNOOKER" || gameCategory === "CHECKERS") ? "frames" : "scorers"} className="space-y-6">
-          <TabsList className="bg-muted/50">
+          <TabsList className="bg-muted/50 flex-wrap h-auto gap-1">
             <TabsTrigger value="scorers">
               <Target className="w-4 h-4 mr-2" />
               Top Scorers
             </TabsTrigger>
-            <TabsTrigger value="assists">
-              <TrendingUp className="w-4 h-4 mr-2" />
-              Top Assists
-            </TabsTrigger>
-            <TabsTrigger value="motm">
-              <Trophy className="w-4 h-4 mr-2" />
-              Most MOTM
-            </TabsTrigger>
+            {gameCategory !== "EFOOTBALL" && (
+              <TabsTrigger value="assists">
+                <TrendingUp className="w-4 h-4 mr-2" />
+                Top Assists
+              </TabsTrigger>
+            )}
+            {gameCategory !== "EFOOTBALL" && (
+              <TabsTrigger value="motm">
+                <Trophy className="w-4 h-4 mr-2" />
+                Most MOTM
+              </TabsTrigger>
+            )}
+            {stats.bestWinRate.length > 0 && (
+              <TabsTrigger value="winrate">
+                <TrendingUp className="w-4 h-4 mr-2" />
+                Win Rate
+              </TabsTrigger>
+            )}
+            {stats.topCleanSheets.length > 0 && (
+              <TabsTrigger value="cleansheets">
+                <ShieldCheck className="w-4 h-4 mr-2" />
+                Clean Sheets
+              </TabsTrigger>
+            )}
+            {stats.topGoalDiff.length > 0 && (
+              <TabsTrigger value="goaldiff">
+                <ArrowUpDown className="w-4 h-4 mr-2" />
+                Goal Diff
+              </TabsTrigger>
+            )}
             {stats.seasonMVP.length > 0 && (
               <TabsTrigger value="mvp">
                 <BarChart3 className="w-4 h-4 mr-2" />
@@ -224,6 +246,41 @@ export default async function StatsPage({ searchParams }: StatsPageProps) {
               color="text-blue-400"
             />
           </TabsContent>
+
+          {stats.bestWinRate.length > 0 && (
+            <TabsContent value="winrate" className="mt-0">
+              <LeaderboardCard
+                title="Best Win Rate"
+                data={stats.bestWinRate.map((s) => ({ ...s, count: s.count }))}
+                icon={TrendingUp}
+                color="text-emerald-400"
+                suffix="%"
+              />
+            </TabsContent>
+          )}
+
+          {stats.topCleanSheets.length > 0 && (
+            <TabsContent value="cleansheets" className="mt-0">
+              <LeaderboardCard
+                title="Most Clean Sheets"
+                data={stats.topCleanSheets}
+                icon={ShieldCheck}
+                color="text-cyan-400"
+              />
+            </TabsContent>
+          )}
+
+          {stats.topGoalDiff.length > 0 && (
+            <TabsContent value="goaldiff" className="mt-0">
+              <LeaderboardCard
+                title="Best Goal Difference"
+                data={stats.topGoalDiff}
+                icon={ArrowUpDown}
+                color="text-amber-400"
+                prefix="+"
+              />
+            </TabsContent>
+          )}
 
           <TabsContent value="motm" className="mt-0">
             <LeaderboardCard
@@ -338,11 +395,15 @@ function LeaderboardCard({
   data,
   icon: Icon,
   color,
+  suffix,
+  prefix,
 }: {
   title: string;
   data: Array<{ player: { id: string; name: string; slug: string } | undefined; count: number; matches: number }>;
   icon: React.ComponentType<{ className?: string }>;
   color: string;
+  suffix?: string;
+  prefix?: string;
 }) {
   return (
     <Card>
@@ -382,7 +443,7 @@ function LeaderboardCard({
                   </div>
                   <div className="flex items-center gap-2">
                     <Icon className={`w-4 h-4 ${color}`} />
-                    <span className="text-xl font-bold">{item.count}</span>
+                    <span className="text-xl font-bold">{prefix && item.count > 0 ? prefix : ""}{item.count}{suffix ?? ""}</span>
                   </div>
                 </Link>
               ) : null

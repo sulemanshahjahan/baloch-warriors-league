@@ -56,12 +56,14 @@ export async function getOverallStats(gameCategory?: string, seasonId?: string) 
       prisma.matchEvent.count({ where: { type: "RED_CARD", ...gameCategoryFilter } }),
       prisma.matchEvent.count({ where: { type: "MOTM", ...gameCategoryFilter } }),
     ]),
-    // All completed individual matches for calculating matches played
+    // All completed individual matches for calculating matches played + win rate + clean sheets
     prisma.match.findMany({
       where: { status: "COMPLETED", homePlayerId: { not: null }, ...(hasTournamentFilter ? { tournament: tournamentFilter } : {}) },
       select: {
         homePlayerId: true,
         awayPlayerId: true,
+        homeScore: true,
+        awayScore: true,
       },
     }),
     // Top frame winners (Snooker/Checkers)
@@ -218,6 +220,46 @@ export async function getOverallStats(gameCategory?: string, seasonId?: string) 
       dinners: data.dinners,
       matches: data.matches,
     })).filter(s => s.player),
+    // Win rate, clean sheets, goal diff — computed from individual match scores
+    ...(() => {
+      const pStats = new Map<string, { wins: number; total: number; cleanSheets: number; goalsFor: number; goalsAgainst: number }>();
+      const ensure = (id: string) => {
+        if (!pStats.has(id)) pStats.set(id, { wins: 0, total: 0, cleanSheets: 0, goalsFor: 0, goalsAgainst: 0 });
+        return pStats.get(id)!;
+      };
+      for (const m of allMatches) {
+        const hs = m.homeScore ?? 0, as2 = m.awayScore ?? 0;
+        if (m.homePlayerId) {
+          const s = ensure(m.homePlayerId);
+          s.total++; if (hs > as2) s.wins++; if (as2 === 0) s.cleanSheets++;
+          s.goalsFor += hs; s.goalsAgainst += as2;
+        }
+        if (m.awayPlayerId) {
+          const s = ensure(m.awayPlayerId);
+          s.total++; if (as2 > hs) s.wins++; if (hs === 0) s.cleanSheets++;
+          s.goalsFor += as2; s.goalsAgainst += hs;
+        }
+      }
+      const entries = [...pStats.entries()].filter(([, s]) => s.total >= 3);
+      return {
+        bestWinRate: entries
+          .map(([id, s]) => ({ player: playerMap.get(id), count: Math.round((s.wins / s.total) * 100), matches: s.total }))
+          .filter((s) => s.player)
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 20),
+        topCleanSheets: [...pStats.entries()]
+          .filter(([, s]) => s.cleanSheets > 0)
+          .map(([id, s]) => ({ player: playerMap.get(id), count: s.cleanSheets, matches: s.total }))
+          .filter((s) => s.player)
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 20),
+        topGoalDiff: entries
+          .map(([id, s]) => ({ player: playerMap.get(id), count: s.goalsFor - s.goalsAgainst, matches: s.total }))
+          .filter((s) => s.player)
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 20),
+      };
+    })(),
     pubgTotals: {
       kills: pubgTotalKills,
       dinners: pubgTotalDinners,
