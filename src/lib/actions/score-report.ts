@@ -239,7 +239,7 @@ export async function sendMatchLinksViaWhatsApp(matchId: string) {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };
 
-  const match = await prisma.match.findUnique({
+  let match = await prisma.match.findUnique({
     where: { id: matchId },
     include: {
       tournament: { select: { name: true } },
@@ -251,8 +251,28 @@ export async function sendMatchLinksViaWhatsApp(matchId: string) {
   });
 
   if (!match) return { success: false, error: "Match not found" };
+
+  // Auto-generate tokens if they don't exist
   if (!match.homeToken || !match.awayToken) {
-    return { success: false, error: "No magic tokens — generate them first" };
+    const { randomUUID } = await import("crypto");
+    await prisma.match.update({
+      where: { id: matchId },
+      data: {
+        homeToken: match.homeToken || randomUUID(),
+        awayToken: match.awayToken || randomUUID(),
+      },
+    });
+    match = await prisma.match.findUnique({
+      where: { id: matchId },
+      include: {
+        tournament: { select: { name: true } },
+        homePlayer: { select: { name: true, phone: true } },
+        awayPlayer: { select: { name: true, phone: true } },
+        homeTeam: { select: { name: true } },
+        awayTeam: { select: { name: true } },
+      },
+    });
+    if (!match) return { success: false, error: "Match not found" };
   }
 
   const homeName = match.homePlayer?.name ?? match.homeTeam?.name ?? "Home";
