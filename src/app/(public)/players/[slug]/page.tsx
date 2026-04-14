@@ -107,14 +107,22 @@ async function getPlayerStats(playerId: string) {
         { awayPlayerId: playerId },
       ],
     },
-    select: { id: true, homePlayerId: true, homeScore: true, awayScore: true },
+    select: { id: true, homePlayerId: true, homeScore: true, awayScore: true, leg2HomeScore: true, leg2AwayScore: true, leg3HomeScore: true, leg3AwayScore: true },
   });
 
-  // Combine and deduplicate using Set
-  const allMatchIds = new Set([
-    ...eventAppearances.map((e) => e.matchId),
-    ...individualMatches.map((m) => m.id),
-  ]);
+  // Count appearances: each leg = 1 match played
+  let totalAppearances = 0;
+  for (const m of individualMatches) {
+    totalAppearances += 1 + (m.leg2HomeScore != null ? 1 : 0) + (m.leg3HomeScore != null ? 1 : 0);
+  }
+
+  // Also count from events (for team matches where player had events)
+  const eventMatchIds = new Set(eventAppearances.map((e) => e.matchId));
+  const individualMatchIds = new Set(individualMatches.map((m) => m.id));
+  // Event-only appearances (team matches not counted above)
+  for (const eid of eventMatchIds) {
+    if (!individualMatchIds.has(eid)) totalAppearances++;
+  }
 
   // Average player rating from CUSTOM events with description "PLAYER_RATING"
   const ratingEvents = await prisma.matchEvent.findMany({
@@ -125,13 +133,18 @@ async function getPlayerStats(playerId: string) {
     ? Math.round((ratingEvents.reduce((sum, e) => sum + (e.value ?? 0), 0) / ratingEvents.length) * 10) / 10
     : null;
 
-  // Count wins
+  // Count wins (each leg separately)
   let wins = 0;
   for (const m of individualMatches) {
     const isHome = m.homePlayerId === playerId;
-    const myScore = isHome ? (m.homeScore ?? 0) : (m.awayScore ?? 0);
-    const oppScore = isHome ? (m.awayScore ?? 0) : (m.homeScore ?? 0);
-    if (myScore > oppScore) wins++;
+    const legs: { h: number; a: number }[] = [{ h: m.homeScore ?? 0, a: m.awayScore ?? 0 }];
+    if (m.leg2HomeScore != null) legs.push({ h: m.leg2HomeScore ?? 0, a: m.leg2AwayScore ?? 0 });
+    if (m.leg3HomeScore != null) legs.push({ h: m.leg3HomeScore ?? 0, a: m.leg3AwayScore ?? 0 });
+    for (const leg of legs) {
+      const my = isHome ? leg.h : leg.a;
+      const opp = isHome ? leg.a : leg.h;
+      if (my > opp) wins++;
+    }
   }
 
   return {
@@ -142,7 +155,7 @@ async function getPlayerStats(playerId: string) {
     redCards: statsMap["RED_CARD"] ?? 0,
     motm: statsMap["MOTM"] ?? 0,
     kills: statsMap["KILL"] ?? 0,
-    appearances: allMatchIds.size,
+    appearances: totalAppearances,
     avgRating,
     ratingCount: ratingEvents.length,
   };

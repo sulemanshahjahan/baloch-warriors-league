@@ -64,6 +64,10 @@ export async function getOverallStats(gameCategory?: string, seasonId?: string) 
         awayPlayerId: true,
         homeScore: true,
         awayScore: true,
+        leg2HomeScore: true,
+        leg2AwayScore: true,
+        leg3HomeScore: true,
+        leg3AwayScore: true,
       },
     }),
     // Top frame winners (Snooker/Checkers)
@@ -97,14 +101,15 @@ export async function getOverallStats(gameCategory?: string, seasonId?: string) 
       : Promise.resolve([]),
   ]);
 
-  // Calculate matches played per player
+  // Calculate matches played per player (2-legged = 2 matches, 3-legged = 3)
   const matchCounts = new Map<string, number>();
   for (const match of allMatches) {
+    const legCount = 1 + (match.leg2HomeScore != null ? 1 : 0) + (match.leg3HomeScore != null ? 1 : 0);
     if (match.homePlayerId) {
-      matchCounts.set(match.homePlayerId, (matchCounts.get(match.homePlayerId) || 0) + 1);
+      matchCounts.set(match.homePlayerId, (matchCounts.get(match.homePlayerId) || 0) + legCount);
     }
     if (match.awayPlayerId) {
-      matchCounts.set(match.awayPlayerId, (matchCounts.get(match.awayPlayerId) || 0) + 1);
+      matchCounts.set(match.awayPlayerId, (matchCounts.get(match.awayPlayerId) || 0) + legCount);
     }
   }
 
@@ -228,16 +233,22 @@ export async function getOverallStats(gameCategory?: string, seasonId?: string) 
         return pStats.get(id)!;
       };
       for (const m of allMatches) {
-        const hs = m.homeScore ?? 0, as2 = m.awayScore ?? 0;
-        if (m.homePlayerId) {
-          const s = ensure(m.homePlayerId);
-          s.total++; if (hs > as2) s.wins++; if (as2 === 0) s.cleanSheets++;
-          s.goalsFor += hs; s.goalsAgainst += as2;
-        }
-        if (m.awayPlayerId) {
-          const s = ensure(m.awayPlayerId);
-          s.total++; if (as2 > hs) s.wins++; if (hs === 0) s.cleanSheets++;
-          s.goalsFor += as2; s.goalsAgainst += hs;
+        // Process each leg as a separate match
+        const legs: { h: number; a: number }[] = [{ h: m.homeScore ?? 0, a: m.awayScore ?? 0 }];
+        if (m.leg2HomeScore != null) legs.push({ h: m.leg2HomeScore ?? 0, a: m.leg2AwayScore ?? 0 });
+        if (m.leg3HomeScore != null) legs.push({ h: m.leg3HomeScore ?? 0, a: m.leg3AwayScore ?? 0 });
+
+        for (const leg of legs) {
+          if (m.homePlayerId) {
+            const s = ensure(m.homePlayerId);
+            s.total++; if (leg.h > leg.a) s.wins++; if (leg.a === 0) s.cleanSheets++;
+            s.goalsFor += leg.h; s.goalsAgainst += leg.a;
+          }
+          if (m.awayPlayerId) {
+            const s = ensure(m.awayPlayerId);
+            s.total++; if (leg.a > leg.h) s.wins++; if (leg.h === 0) s.cleanSheets++;
+            s.goalsFor += leg.a; s.goalsAgainst += leg.h;
+          }
         }
       }
       const entries = [...pStats.entries()].filter(([, s]) => s.total >= 3);

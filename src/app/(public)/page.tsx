@@ -111,14 +111,24 @@ async function getHomeData() {
     // Best win rate (min 3 matches) — rotates among tied players
     prisma.player.findMany({
       where: { isActive: true },
-      select: { id: true, name: true, slug: true, homeMatches: { where: { status: "COMPLETED" }, select: { homeScore: true, awayScore: true } }, awayMatches: { where: { status: "COMPLETED" }, select: { homeScore: true, awayScore: true } } },
+      select: { id: true, name: true, slug: true, homeMatches: { where: { status: "COMPLETED" }, select: { homeScore: true, awayScore: true, leg2HomeScore: true, leg2AwayScore: true, leg3HomeScore: true, leg3AwayScore: true } }, awayMatches: { where: { status: "COMPLETED" }, select: { homeScore: true, awayScore: true, leg2HomeScore: true, leg2AwayScore: true, leg3HomeScore: true, leg3AwayScore: true } } },
     }).then((players) => {
       let bestRate = 0;
       const candidates: { id: string; name: string; slug: string; value: number; total: number; label: string }[] = [];
       for (const p of players) {
         let wins = 0, total = 0;
-        for (const m of p.homeMatches) { total++; if ((m.homeScore ?? 0) > (m.awayScore ?? 0)) wins++; }
-        for (const m of p.awayMatches) { total++; if ((m.awayScore ?? 0) > (m.homeScore ?? 0)) wins++; }
+        for (const m of p.homeMatches) {
+          const legs: { h: number; a: number }[] = [{ h: m.homeScore ?? 0, a: m.awayScore ?? 0 }];
+          if (m.leg2HomeScore != null) legs.push({ h: m.leg2HomeScore ?? 0, a: m.leg2AwayScore ?? 0 });
+          if (m.leg3HomeScore != null) legs.push({ h: m.leg3HomeScore ?? 0, a: m.leg3AwayScore ?? 0 });
+          for (const l of legs) { total++; if (l.h > l.a) wins++; }
+        }
+        for (const m of p.awayMatches) {
+          const legs: { h: number; a: number }[] = [{ h: m.homeScore ?? 0, a: m.awayScore ?? 0 }];
+          if (m.leg2HomeScore != null) legs.push({ h: m.leg2HomeScore ?? 0, a: m.leg2AwayScore ?? 0 });
+          if (m.leg3HomeScore != null) legs.push({ h: m.leg3HomeScore ?? 0, a: m.leg3AwayScore ?? 0 });
+          for (const l of legs) { total++; if (l.a > l.h) wins++; }
+        }
         if (total < 3) continue;
         const rate = Math.round((wins / total) * 100);
         if (rate > bestRate) {
@@ -142,20 +152,28 @@ async function getHomeData() {
       select: { id: true, name: true, slug: true, eloRating: true },
     }).then((res) => res[0] ? { ...res[0], value: res[0].eloRating, label: "ELO" } : null),
 
-    // Most clean sheets (matches where opponent scored 0)
+    // Most clean sheets (each leg where opponent scored 0)
     prisma.player.findMany({
       where: { isActive: true },
       select: {
         id: true, name: true, slug: true,
-        homeMatches: { where: { status: "COMPLETED" }, select: { awayScore: true } },
-        awayMatches: { where: { status: "COMPLETED" }, select: { homeScore: true } },
+        homeMatches: { where: { status: "COMPLETED" }, select: { awayScore: true, leg2AwayScore: true, leg3AwayScore: true } },
+        awayMatches: { where: { status: "COMPLETED" }, select: { homeScore: true, leg2HomeScore: true, leg3HomeScore: true } },
       },
     }).then((players) => {
       let best: { id: string; name: string; slug: string; value: number; label: string } | null = null;
       for (const p of players) {
         let cleanSheets = 0;
-        for (const m of p.homeMatches) { if ((m.awayScore ?? 0) === 0) cleanSheets++; }
-        for (const m of p.awayMatches) { if ((m.homeScore ?? 0) === 0) cleanSheets++; }
+        for (const m of p.homeMatches) {
+          if ((m.awayScore ?? 0) === 0) cleanSheets++;
+          if (m.leg2AwayScore != null && m.leg2AwayScore === 0) cleanSheets++;
+          if (m.leg3AwayScore != null && m.leg3AwayScore === 0) cleanSheets++;
+        }
+        for (const m of p.awayMatches) {
+          if ((m.homeScore ?? 0) === 0) cleanSheets++;
+          if (m.leg2HomeScore != null && m.leg2HomeScore === 0) cleanSheets++;
+          if (m.leg3HomeScore != null && m.leg3HomeScore === 0) cleanSheets++;
+        }
         if (cleanSheets > 0 && (!best || cleanSheets > best.value)) {
           best = { id: p.id, name: p.name, slug: p.slug, value: cleanSheets, label: "Clean Sheets" };
         }
