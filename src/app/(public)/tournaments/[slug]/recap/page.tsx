@@ -253,6 +253,9 @@ export default async function RecapPage({ params }: RecapPageProps) {
                       const homeName = m.homePlayer?.name ?? "TBD";
                       const awayName = m.awayPlayer?.name ?? "TBD";
                       const isCompleted = m.status === "COMPLETED";
+                      const has2Legs = m.leg2HomeScore != null;
+                      const displayHome = has2Legs ? (m.homeScore ?? 0) + (m.leg2HomeScore ?? 0) : (m.homeScore ?? 0);
+                      const displayAway = has2Legs ? (m.awayScore ?? 0) + (m.leg2AwayScore ?? 0) : (m.awayScore ?? 0);
                       return (
                         <Link key={m.id} href={`/matches/${m.id}`} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-border/50">
                           <div className="flex items-center gap-2">
@@ -264,7 +267,10 @@ export default async function RecapPage({ params }: RecapPageProps) {
                             <span className={`text-sm font-medium ${homeName === "TBD" ? "text-muted-foreground" : ""}`}>{homeName}</span>
                           </div>
                           {isCompleted ? (
-                            <span className="text-sm font-black">{m.homeScore} - {m.awayScore}</span>
+                            <div className="text-center">
+                              <span className="text-sm font-black">{displayHome} - {displayAway}</span>
+                              {has2Legs && <p className="text-[10px] text-muted-foreground">Agg</p>}
+                            </div>
                           ) : (
                             <span className="text-xs text-muted-foreground">vs</span>
                           )}

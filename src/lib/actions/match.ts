@@ -724,13 +724,16 @@ async function recomputeTeamStandings(tournamentId: string, gameCategory: string
   const rules = SCORING_RULES[gameCategory] ?? SCORING_RULES.FOOTBALL;
   const isPUBG = gameCategory === "PUBG";
 
-  // PUBG: fetch all completed matches (no homeTeam filter — uses MatchParticipant)
-  // Others: only matches with both home/away teams set
+  // Fetch only GROUP STAGE matches for standings (exclude knockout)
   const matches = await prisma.match.findMany({
     where: {
       tournamentId,
       status: "COMPLETED",
       ...(isPUBG ? {} : { homeTeamId: { not: null }, awayTeamId: { not: null } }),
+      OR: [
+        { groupId: { not: null } },
+        { round: { not: { in: ["Round of 16", "Round of 32", "Quarter-finals", "Semi-finals", "Final"] } }, groupId: null },
+      ],
     },
     select: {
       id: true,
@@ -884,13 +887,18 @@ async function recomputeIndividualStandings(tournamentId: string, gameCategory: 
   const rules = SCORING_RULES[gameCategory] ?? SCORING_RULES.FOOTBALL;
   const isPUBG = gameCategory === "PUBG";
 
-  // PUBG: fetch all completed matches (no homePlayer filter — uses MatchParticipant)
-  // Others: only matches with both home/away players set
+  // Fetch only GROUP STAGE matches for standings (exclude knockout)
+  // Knockout matches (no groupId + round like "Round of 16") don't count in standings
   const matches = await prisma.match.findMany({
     where: {
       tournamentId,
       status: "COMPLETED",
       ...(isPUBG ? {} : { homePlayerId: { not: null }, awayPlayerId: { not: null } }),
+      // Exclude knockout: only include matches that have a groupId OR are from round-robin (no groupId but part of league)
+      OR: [
+        { groupId: { not: null } }, // Group stage matches
+        { round: { not: { in: ["Round of 16", "Round of 32", "Quarter-finals", "Semi-finals", "Final"] } }, groupId: null }, // League/round-robin without groups
+      ],
     },
     select: {
       id: true,
