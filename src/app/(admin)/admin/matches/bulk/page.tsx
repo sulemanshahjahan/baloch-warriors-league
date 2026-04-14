@@ -32,8 +32,8 @@ export default function BulkMatchEntryPage() {
   useEffect(() => {
     fetch("/api/matches?status=SCHEDULED&limit=50")
       .then((r) => r.json())
-      .then((data) => {
-        // Filter to only scheduled matches
+      .then((res) => {
+        const data = res.matches ?? res;
         const pending = (data as PendingMatch[]).filter(
           (m: any) => m.status === "SCHEDULED"
         );
