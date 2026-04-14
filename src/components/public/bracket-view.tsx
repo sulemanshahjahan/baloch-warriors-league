@@ -198,7 +198,7 @@ function MobileBracket({ rounds, matchesByRound, participantType }: BracketViewP
   const isIndividual = participantType === "INDIVIDUAL";
 
   return (
-    <div className="sm:hidden space-y-6">
+    <div className="sm:hidden space-y-8">
       {[...rounds].reverse().map((roundNum) => {
         const matches = matchesByRound[roundNum];
         const roundName = getRoundName(roundNum, matches.length, matchesByRound);
@@ -206,10 +206,10 @@ function MobileBracket({ rounds, matchesByRound, participantType }: BracketViewP
 
         return (
           <div key={roundNum}>
-            <h3 className="text-sm font-semibold mb-3 text-muted-foreground px-1">
+            <h3 className="text-sm font-semibold mb-3 text-primary px-1">
               {roundName}
             </h3>
-            <div className="space-y-2">
+            <div className="space-y-3">
               {matches.map((match) => {
                 const isCompleted = match.status === "COMPLETED";
                 const { homeScore, awayScore, homeWon: hw, awayWon: aw, isAgg } = getDisplayScores(match);
