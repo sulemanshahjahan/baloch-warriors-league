@@ -17,11 +17,9 @@ export async function GET(req: NextRequest) {
     const [matches, total] = await Promise.all([
       prisma.match.findMany({
         where,
-        orderBy: [
-          { roundNumber: "asc" },
-          { round: "asc" },
-          { matchNumber: "asc" },
-        ],
+        orderBy: status === "COMPLETED"
+          ? [{ completedAt: "desc" }]
+          : [{ scheduledAt: "asc" }, { roundNumber: "asc" }, { matchNumber: "asc" }],
         skip,
         take: Math.min(limit, 50),
         select: {
@@ -36,6 +34,12 @@ export async function GET(req: NextRequest) {
           awayScore: true,
           homeScorePens: true,
           awayScorePens: true,
+          leg2HomeScore: true,
+          leg2AwayScore: true,
+          leg3HomeScore: true,
+          leg3AwayScore: true,
+          leg3HomePens: true,
+          leg3AwayPens: true,
           tournament: {
             select: { name: true, slug: true, gameCategory: true },
           },

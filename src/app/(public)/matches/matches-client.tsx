@@ -27,6 +27,13 @@ type Match = {
   awayScore: number | null;
   homeScorePens: number | null;
   awayScorePens: number | null;
+  leg2HomeScore: number | null;
+  leg2AwayScore: number | null;
+  leg3HomeScore: number | null;
+  leg3AwayScore: number | null;
+  leg3HomePens: number | null;
+  leg3AwayPens: number | null;
+  completedAt: string | null;
   tournament: { name: string; slug: string; gameCategory: string };
   homeTeam: { id: string; name: string; shortName: string | null } | null;
   awayTeam: { id: string; name: string; shortName: string | null } | null;
@@ -50,6 +57,7 @@ function MatchCard({ match }: { match: Match }) {
   const isCompleted = match.status === "COMPLETED";
   const isLive = match.status === "LIVE";
   const hasPens = match.homeScorePens != null && match.awayScorePens != null;
+  const has2Legs = match.leg2HomeScore != null;
 
   const homeName = match.homePlayer?.name ?? match.homeTeam?.name ?? "TBD";
   const awayName = match.awayPlayer?.name ?? match.awayTeam?.name ?? "TBD";
@@ -95,11 +103,22 @@ function MatchCard({ match }: { match: Match }) {
             <div className="text-center min-w-[80px] shrink-0">
               {isCompleted || isLive ? (
                 <div>
-                  <span className="text-2xl font-black">
-                    {match.homeScore ?? 0} - {match.awayScore ?? 0}
-                  </span>
-                  {hasPens && (
-                    <p className="text-xs text-muted-foreground">({match.homeScorePens}–{match.awayScorePens} pens)</p>
+                  {has2Legs ? (
+                    <>
+                      <span className="text-2xl font-black">
+                        {(match.homeScore ?? 0) + (match.leg2HomeScore ?? 0)} - {(match.awayScore ?? 0) + (match.leg2AwayScore ?? 0)}
+                      </span>
+                      <p className="text-[10px] text-muted-foreground">Agg</p>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-2xl font-black">
+                        {match.homeScore ?? 0} - {match.awayScore ?? 0}
+                      </span>
+                      {hasPens && (
+                        <p className="text-xs text-muted-foreground">({match.homeScorePens}–{match.awayScorePens} pens)</p>
+                      )}
+                    </>
                   )}
                 </div>
               ) : (
