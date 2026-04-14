@@ -525,6 +525,43 @@ async function advanceKnockoutWinner(matchId: string, tournamentId: string) {
       },
     });
   }
+
+  // Auto-send WhatsApp to both players when next match has both assigned
+  const nextMatch = await prisma.match.findFirst({
+    where: { tournamentId, roundNumber: nextRound, matchNumber: nextMatchNumber },
+    include: {
+      tournament: { select: { name: true } },
+      homePlayer: { select: { name: true, phone: true } },
+      awayPlayer: { select: { name: true, phone: true } },
+    },
+  });
+
+  if (nextMatch?.homePlayerId && nextMatch?.awayPlayerId && nextMatch.homePlayer?.phone && nextMatch.awayPlayer?.phone) {
+    const homeName = nextMatch.homePlayer.name;
+    const awayName = nextMatch.awayPlayer.name;
+    const deadlineStr = nextMatch.deadline
+      ? nextMatch.deadline.toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+      : "To be confirmed";
+
+    import("@/lib/whatsapp").then(async ({ sendScheduleMessage }) => {
+      // Notify home player
+      await sendScheduleMessage(
+        nextMatch.homePlayer!.phone!,
+        homeName,
+        awayName,
+        nextMatch.awayPlayer!.phone!.replace(/[+\s\-()]/g, ""),
+        deadlineStr,
+      );
+      // Notify away player
+      await sendScheduleMessage(
+        nextMatch.awayPlayer!.phone!,
+        awayName,
+        homeName,
+        nextMatch.homePlayer!.phone!.replace(/[+\s\-()]/g, ""),
+        deadlineStr,
+      );
+    }).catch(() => {});
+  }
 }
 
 export async function addMatchEvent(formData: FormData) {
