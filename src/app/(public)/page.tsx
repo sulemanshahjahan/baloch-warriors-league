@@ -108,21 +108,30 @@ async function getHomeData() {
       return player ? { ...player, value: res[0]._count.type, label: "Goals" } : null;
     }),
 
-    // Best win rate (min 3 matches)
+    // Best win rate (min 3 matches) — rotates among tied players
     prisma.player.findMany({
       where: { isActive: true },
       select: { id: true, name: true, slug: true, homeMatches: { where: { status: "COMPLETED" }, select: { homeScore: true, awayScore: true } }, awayMatches: { where: { status: "COMPLETED" }, select: { homeScore: true, awayScore: true } } },
     }).then((players) => {
-      let best: { id: string; name: string; slug: string; value: number; total: number; label: string } | null = null;
+      let bestRate = 0;
+      const candidates: { id: string; name: string; slug: string; value: number; total: number; label: string }[] = [];
       for (const p of players) {
         let wins = 0, total = 0;
         for (const m of p.homeMatches) { total++; if ((m.homeScore ?? 0) > (m.awayScore ?? 0)) wins++; }
         for (const m of p.awayMatches) { total++; if ((m.awayScore ?? 0) > (m.homeScore ?? 0)) wins++; }
         if (total < 3) continue;
         const rate = Math.round((wins / total) * 100);
-        if (!best || rate > best.value) best = { id: p.id, name: p.name, slug: p.slug, value: rate, total, label: "Win Rate" };
+        if (rate > bestRate) {
+          bestRate = rate;
+          candidates.length = 0;
+          candidates.push({ id: p.id, name: p.name, slug: p.slug, value: rate, total, label: "Win Rate" });
+        } else if (rate === bestRate) {
+          candidates.push({ id: p.id, name: p.name, slug: p.slug, value: rate, total, label: "Win Rate" });
+        }
       }
-      return best;
+      if (candidates.length === 0) return null;
+      // Rotate based on current minute so it changes every minute
+      return candidates[Math.floor(Date.now() / 60000) % candidates.length];
     }),
 
     // Biggest ELO jump
