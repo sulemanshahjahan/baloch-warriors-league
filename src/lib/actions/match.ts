@@ -172,10 +172,27 @@ export async function executeMatchCompletion(
   const awayName = currentMatch.awayPlayerId
     ? (await prisma.player.findUnique({ where: { id: currentMatch.awayPlayerId }, select: { name: true } }))?.name
     : (await prisma.team.findUnique({ where: { id: currentMatch.awayTeamId! }, select: { name: true } }))?.name;
+  // Build notification body with leg scores if 2-legged
+  const updatedMatch = await prisma.match.findUnique({
+    where: { id: matchId },
+    select: { leg2HomeScore: true, leg2AwayScore: true, leg3HomeScore: true, leg3AwayScore: true, leg3HomePens: true, leg3AwayPens: true, groupId: true },
+  });
+  let notifBody = `${homeName ?? "Home"} ${homeScore} - ${awayScore} ${awayName ?? "Away"}`;
+  if (updatedMatch?.leg2HomeScore != null) {
+    const aggH = homeScore + (updatedMatch.leg2HomeScore ?? 0);
+    const aggA = awayScore + (updatedMatch.leg2AwayScore ?? 0);
+    notifBody = `Leg 1: ${homeScore}-${awayScore} | Leg 2: ${updatedMatch.leg2HomeScore}-${updatedMatch.leg2AwayScore ?? 0} | Agg: ${aggH}-${aggA}`;
+    if (updatedMatch.leg3HomeScore != null) {
+      notifBody += ` | Decider: ${updatedMatch.leg3HomeScore}-${updatedMatch.leg3AwayScore ?? 0}`;
+      if (updatedMatch.leg3HomePens != null) notifBody += ` (${updatedMatch.leg3HomePens}-${updatedMatch.leg3AwayPens ?? 0} pens)`;
+    }
+    notifBody = `${homeName ?? "Home"} vs ${awayName ?? "Away"} — ${notifBody}`;
+  }
+
   import("@/lib/push").then(({ sendPushToAll }) =>
     sendPushToAll({
       title: `${match.tournament.name} — Result`,
-      body: `${homeName ?? "Home"} ${homeScore} - ${awayScore} ${awayName ?? "Away"}`,
+      body: notifBody,
       url: `/matches/${matchId}`,
       tag: `match-result-${matchId}`,
     })

@@ -14,6 +14,13 @@ export interface ScorecardData {
   matchNumber: number | null;
   homePhoto?: string | null;
   awayPhoto?: string | null;
+  // 2-legged knockout
+  leg2HomeScore?: number | null;
+  leg2AwayScore?: number | null;
+  leg3HomeScore?: number | null;
+  leg3AwayScore?: number | null;
+  leg3HomePens?: number | null;
+  leg3AwayPens?: number | null;
 }
 
 function formatMatchInfo(round: string | null, matchNumber: number | null): string {
@@ -28,13 +35,32 @@ function formatMatchInfo(round: string | null, matchNumber: number | null): stri
 function buildShareText(data: ScorecardData): string {
   const matchInfo = formatMatchInfo(data.round, data.matchNumber);
   const shareUrl = `https://bwlleague.com/matches/${data.matchId}`;
-  const scoreline = `${data.homeName} ${data.homeScore}–${data.awayScore} ${data.awayName}`;
+  const has2Legs = data.leg2HomeScore != null;
+
+  let scoreLines: (string | null)[];
+  if (has2Legs) {
+    const aggH = data.homeScore + (data.leg2HomeScore ?? 0);
+    const aggA = data.awayScore + (data.leg2AwayScore ?? 0);
+    scoreLines = [
+      `*FULL-TIME*`,
+      `*${data.homeName} ${aggH}–${aggA} ${data.awayName} (Agg)*`,
+      `Leg 1: ${data.homeScore}–${data.awayScore} | Leg 2: ${data.leg2HomeScore}–${data.leg2AwayScore ?? 0}`,
+      data.leg3HomeScore != null
+        ? `Decider: ${data.leg3HomeScore}–${data.leg3AwayScore ?? 0}${data.leg3HomePens != null ? ` (${data.leg3HomePens}–${data.leg3AwayPens ?? 0} pens)` : ""}`
+        : null,
+    ];
+  } else {
+    scoreLines = [
+      `*FULL-TIME*`,
+      `*${data.homeName} ${data.homeScore}–${data.awayScore} ${data.awayName}*`,
+    ];
+  }
+
   return [
     `🏆 ${data.tournamentName}`,
     matchInfo || null,
     ``,
-    `*FULL-TIME*`,
-    `*${scoreline}*`,
+    ...scoreLines,
     ``,
     `🔗 Match details:`,
     shareUrl,
@@ -174,13 +200,45 @@ export async function generateAndShareScorecard(
   drawAvatar(homeImg, 200, 370, data.homeName);
   drawAvatar(awayImg, 600, 370, data.awayName);
 
-  // Score
-  ctx.fillStyle = "#ef4444";
-  ctx.font = "bold 80px system-ui";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(`${data.homeScore} - ${data.awayScore}`, size / 2, 370);
-  ctx.textBaseline = "alphabetic";
+  // Score — show aggregate for 2-legged, single score otherwise
+  const has2Legs = data.leg2HomeScore != null;
+
+  if (has2Legs) {
+    // Aggregate score (large)
+    const aggH = data.homeScore + (data.leg2HomeScore ?? 0);
+    const aggA = data.awayScore + (data.leg2AwayScore ?? 0);
+    ctx.fillStyle = "#ef4444";
+    ctx.font = "bold 64px system-ui";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(`${aggH} - ${aggA}`, size / 2, 350);
+    ctx.textBaseline = "alphabetic";
+
+    // "Aggregate" label
+    ctx.fillStyle = "rgba(255,255,255,0.4)";
+    ctx.font = "500 14px system-ui";
+    ctx.fillText("AGGREGATE", size / 2, 390);
+
+    // Leg scores below
+    ctx.fillStyle = "rgba(255,255,255,0.6)";
+    ctx.font = "500 18px system-ui";
+    ctx.fillText(`Leg 1: ${data.homeScore} - ${data.awayScore}   |   Leg 2: ${data.leg2HomeScore} - ${data.leg2AwayScore ?? 0}`, size / 2, 420);
+
+    // Decider if exists
+    if (data.leg3HomeScore != null) {
+      let deciderText = `Decider: ${data.leg3HomeScore} - ${data.leg3AwayScore ?? 0}`;
+      if (data.leg3HomePens != null) deciderText += ` (${data.leg3HomePens} - ${data.leg3AwayPens ?? 0} pens)`;
+      ctx.fillText(deciderText, size / 2, 448);
+    }
+  } else {
+    // Single match score
+    ctx.fillStyle = "#ef4444";
+    ctx.font = "bold 80px system-ui";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(`${data.homeScore} - ${data.awayScore}`, size / 2, 370);
+    ctx.textBaseline = "alphabetic";
+  }
 
   // Divider
   ctx.strokeStyle = "#222";

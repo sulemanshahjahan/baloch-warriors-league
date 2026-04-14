@@ -449,6 +449,12 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
                 matchNumber={match.matchNumber}
                 homePhoto={match.homePlayer?.photoUrl ?? match.homeTeam?.logoUrl ?? null}
                 awayPhoto={match.awayPlayer?.photoUrl ?? match.awayTeam?.logoUrl ?? null}
+                leg2HomeScore={match.leg2HomeScore}
+                leg2AwayScore={match.leg2AwayScore}
+                leg3HomeScore={match.leg3HomeScore}
+                leg3AwayScore={match.leg3AwayScore}
+                leg3HomePens={match.leg3HomePens}
+                leg3AwayPens={match.leg3AwayPens}
               />
             </div>
           )}

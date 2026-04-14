@@ -97,17 +97,33 @@ export function MatchResultForm({
   const [success, setSuccess] = useState(false);
   const [savedScores, setSavedScores] = useState<{ home: number; away: number } | null>(null);
 
+  function getLegScoresFromForm(): Partial<{ leg2HomeScore: number; leg2AwayScore: number; leg3HomeScore: number; leg3AwayScore: number; leg3HomePens: number; leg3AwayPens: number }> {
+    const getVal = (id: string) => {
+      const el = document.getElementById(id) as HTMLInputElement | null;
+      return el?.value ? Number(el.value) : undefined;
+    };
+    return {
+      leg2HomeScore: getVal("leg2HomeScore"),
+      leg2AwayScore: getVal("leg2AwayScore"),
+      leg3HomeScore: getVal("leg3HomeScore"),
+      leg3AwayScore: getVal("leg3AwayScore"),
+      leg3HomePens: getVal("leg3HomePens"),
+      leg3AwayPens: getVal("leg3AwayPens"),
+    };
+  }
+
   async function autoShareScorecard(hScore: number, aScore: number) {
     const canvas = canvasRef.current;
     if (!canvas) return;
+    const legs = getLegScoresFromForm();
     try {
       await generateAndShareScorecard(canvas, {
         homeName, awayName, homeScore: hScore, awayScore: aScore,
         tournamentName, matchId, round, matchNumber,
         homePhoto, awayPhoto,
+        ...legs,
       });
     } catch {
-      // Fallback: open WhatsApp with text only
       const shareUrl = `https://bwlleague.com/matches/${matchId}`;
       const scoreline = `${homeName} ${hScore}–${aScore} ${awayName}`;
       const shareText = [

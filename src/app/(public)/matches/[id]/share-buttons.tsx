@@ -14,6 +14,12 @@ interface ShareButtonsProps {
   matchNumber: number | null;
   homePhoto?: string | null;
   awayPhoto?: string | null;
+  leg2HomeScore?: number | null;
+  leg2AwayScore?: number | null;
+  leg3HomeScore?: number | null;
+  leg3AwayScore?: number | null;
+  leg3HomePens?: number | null;
+  leg3AwayPens?: number | null;
 }
 
 export function ShareButtons({
@@ -27,6 +33,12 @@ export function ShareButtons({
   matchNumber,
   homePhoto,
   awayPhoto,
+  leg2HomeScore,
+  leg2AwayScore,
+  leg3HomeScore,
+  leg3AwayScore,
+  leg3HomePens,
+  leg3AwayPens,
 }: ShareButtonsProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -44,18 +56,31 @@ export function ShareButtons({
   const shareUrl = `https://bwlleague.com/matches/${matchId}`;
   const scoreline = `${homeName} ${homeScore}–${awayScore} ${awayName}`;
 
-  const shareText = [
+  const has2Legs = leg2HomeScore != null;
+  const shareTextLines: (string | null)[] = [
     `🏆 ${tournamentName}`,
     matchInfo ? matchInfo : null,
     ``,
-    `*FULL-TIME*`,
-    `*${scoreline}*`,
-    ``,
-    `🔗 Match details:`,
-    shareUrl,
-  ]
-    .filter((line) => line !== null)
-    .join("\n");
+  ];
+
+  if (has2Legs) {
+    const aggH = homeScore + (leg2HomeScore ?? 0);
+    const aggA = awayScore + (leg2AwayScore ?? 0);
+    shareTextLines.push(
+      `*FULL-TIME*`,
+      `*${homeName} ${aggH}–${aggA} ${awayName} (Agg)*`,
+      `Leg 1: ${homeScore}–${awayScore} | Leg 2: ${leg2HomeScore}–${leg2AwayScore ?? 0}`,
+      leg3HomeScore != null
+        ? `Decider: ${leg3HomeScore}–${leg3AwayScore ?? 0}${leg3HomePens != null ? ` (${leg3HomePens}–${leg3AwayPens ?? 0} pens)` : ""}`
+        : null,
+    );
+  } else {
+    shareTextLines.push(`*FULL-TIME*`, `*${scoreline}*`);
+  }
+
+  shareTextLines.push(``, `🔗 Match details:`, shareUrl);
+
+  const shareText = shareTextLines.filter((line) => line !== null).join("\n");
 
   const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
 
@@ -63,6 +88,9 @@ export function ShareButtons({
     homeName, awayName, homeScore, awayScore,
     tournamentName, matchId, round, matchNumber,
     homePhoto, awayPhoto,
+    leg2HomeScore, leg2AwayScore,
+    leg3HomeScore, leg3AwayScore,
+    leg3HomePens, leg3AwayPens,
   };
 
   const handleShare = async () => {
