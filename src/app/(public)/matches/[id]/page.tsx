@@ -287,30 +287,40 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
             <div className="text-center shrink-0 px-4">
               {showScore ? (
                 <>
-                  <div className="text-5xl font-black tabular-nums">
-                    {match.homeScore ?? 0}
-                    <span className="text-muted-foreground mx-2 font-light text-3xl">–</span>
-                    {match.awayScore ?? 0}
-                  </div>
-                  {(match.homeScorePens != null || match.awayScorePens != null) && (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      ({match.homeScorePens ?? 0} – {match.awayScorePens ?? 0} pens)
-                    </p>
-                  )}
-                  {/* 2-Leg knockout scores */}
-                  {match.leg2HomeScore != null && (
-                    <div className="mt-2 space-y-1 text-xs text-muted-foreground">
-                      <p>Leg 1: {match.homeScore ?? 0} – {match.awayScore ?? 0}</p>
-                      <p>Leg 2: {match.leg2HomeScore} – {match.leg2AwayScore ?? 0}</p>
-                      <p className="font-semibold text-foreground text-sm">
-                        Agg: {(match.homeScore ?? 0) + (match.leg2HomeScore ?? 0)} – {(match.awayScore ?? 0) + (match.leg2AwayScore ?? 0)}
-                      </p>
-                      {match.leg3HomeScore != null && (
-                        <p>Decider: {match.leg3HomeScore} – {match.leg3AwayScore ?? 0}
-                          {match.leg3HomePens != null && ` (${match.leg3HomePens} – ${match.leg3AwayPens ?? 0} pens)`}
+                  {match.leg2HomeScore != null ? (
+                    <>
+                      {/* 2-Leg: Show aggregate as the big score */}
+                      <div className="text-5xl font-black tabular-nums">
+                        {(match.homeScore ?? 0) + (match.leg2HomeScore ?? 0)}
+                        <span className="text-muted-foreground mx-2 font-light text-3xl">–</span>
+                        {(match.awayScore ?? 0) + (match.leg2AwayScore ?? 0)}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1 font-medium">Aggregate</p>
+                      <div className="mt-2 space-y-0.5 text-xs text-muted-foreground">
+                        <p>Leg 1: {match.homeScore ?? 0} – {match.awayScore ?? 0}</p>
+                        <p>Leg 2: {match.leg2HomeScore} – {match.leg2AwayScore ?? 0}</p>
+                        {match.leg3HomeScore != null && (
+                          <p className="text-foreground font-medium">
+                            Decider: {match.leg3HomeScore} – {match.leg3AwayScore ?? 0}
+                            {match.leg3HomePens != null && ` (${match.leg3HomePens} – ${match.leg3AwayPens ?? 0} pens)`}
+                          </p>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* Single match score */}
+                      <div className="text-5xl font-black tabular-nums">
+                        {match.homeScore ?? 0}
+                        <span className="text-muted-foreground mx-2 font-light text-3xl">–</span>
+                        {match.awayScore ?? 0}
+                      </div>
+                      {(match.homeScorePens != null || match.awayScorePens != null) && (
+                        <p className="text-sm text-muted-foreground mt-1">
+                          ({match.homeScorePens ?? 0} – {match.awayScorePens ?? 0} pens)
                         </p>
                       )}
-                    </div>
+                    </>
                   )}
                 </>
               ) : (
