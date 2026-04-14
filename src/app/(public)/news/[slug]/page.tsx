@@ -7,8 +7,9 @@ import { prisma } from "@/lib/db";
 export const revalidate = 300;
 export const dynamicParams = true;
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, Calendar } from "lucide-react";
+import { ArrowLeft, Calendar, Share2 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
+import { ShareNewsButton } from "./share-news-button";
 
 interface NewsPostPageProps {
   params: Promise<{ slug: string }>;
@@ -70,10 +71,23 @@ export default async function NewsPostPage({ params }: NewsPostPageProps) {
         <h1 className="text-3xl sm:text-4xl font-black tracking-tight mb-6">{post.title}</h1>
 
         {post.excerpt && (
-          <p className="text-lg text-muted-foreground mb-8 border-l-2 border-primary pl-4">
+          <p className="text-lg text-muted-foreground mb-6 border-l-2 border-primary pl-4">
             {post.excerpt}
           </p>
         )}
+
+        {/* Share buttons */}
+        <div className="flex items-center gap-3 mb-8">
+          <span className="text-xs text-muted-foreground flex items-center gap-1">
+            <Share2 className="w-3 h-3" />
+            Share:
+          </span>
+          <ShareNewsButton
+            title={post.title}
+            excerpt={post.excerpt ?? ""}
+            slug={post.slug}
+          />
+        </div>
 
         <Card>
           <CardContent className="pt-6">
