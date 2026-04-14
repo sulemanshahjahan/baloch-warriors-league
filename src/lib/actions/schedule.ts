@@ -521,9 +521,10 @@ export async function generateKnockoutFromGroups(
   // B1 vs C4, B2 vs C3, B3 vs C2, B4 vs C1
   // This ensures top seeds face bottom seeds from opposite groups
 
+  // Pair adjacent groups: A↔B, C↔D, E↔F, etc.
   const pairedGroups: [number, number][] = [];
-  for (let i = 0; i < Math.floor(groupCount / 2); i++) {
-    pairedGroups.push([i, groupCount - 1 - i]);
+  for (let i = 0; i < groupCount - 1; i += 2) {
+    pairedGroups.push([i, i + 1]);
   }
 
   for (const [gIdxA, gIdxB] of pairedGroups) {
