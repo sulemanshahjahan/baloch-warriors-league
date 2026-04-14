@@ -110,10 +110,25 @@ export async function updateEloAfterMatch(matchId: string): Promise<void> {
     resultAway = "DRAW";
   }
 
-  // Delete existing ELO records for this match (idempotency)
+  // Check for existing ELO records for this match (re-edit scenario)
+  // If they exist, revert ratings BEFORE deleting, to avoid double-inflation
+  const existingElo = await prisma.eloHistory.findMany({ where: { matchId } });
+  if (existingElo.length > 0) {
+    // Revert each player's rating to what it was before this match
+    await prisma.$transaction(
+      existingElo.map((e) =>
+        prisma.player.update({
+          where: { id: e.playerId },
+          data: { eloRating: e.ratingBefore },
+        })
+      )
+    );
+  }
+
+  // Delete existing ELO records for this match
   await prisma.eloHistory.deleteMany({ where: { matchId } });
 
-  // Get current ratings
+  // Get current ratings (now correctly reverted if this is a re-edit)
   const [homePlayer, awayPlayer] = await Promise.all([
     prisma.player.findUnique({ where: { id: homeId }, select: { eloRating: true } }),
     prisma.player.findUnique({ where: { id: awayId }, select: { eloRating: true } }),

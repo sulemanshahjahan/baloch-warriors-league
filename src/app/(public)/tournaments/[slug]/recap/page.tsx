@@ -94,6 +94,28 @@ export default async function RecapPage({ params }: RecapPageProps) {
     .sort((a, b) => (a.goalsAgainst / a.played) - (b.goalsAgainst / b.played))
     .slice(0, 5);
 
+  // Knockout matches (if any exist)
+  const knockoutMatches = await prisma.match.findMany({
+    where: {
+      tournamentId: tournament.id,
+      groupId: null,
+      round: { not: { contains: "Group" } },
+    },
+    orderBy: [{ roundNumber: "asc" }, { matchNumber: "asc" }],
+    include: {
+      homePlayer: { select: { id: true, name: true, slug: true } },
+      awayPlayer: { select: { id: true, name: true, slug: true } },
+    },
+  });
+
+  // Group knockout matches by round name
+  const knockoutRounds = new Map<string, typeof knockoutMatches>();
+  for (const m of knockoutMatches) {
+    const roundName = m.round ?? `Round ${m.roundNumber}`;
+    if (!knockoutRounds.has(roundName)) knockoutRounds.set(roundName, []);
+    knockoutRounds.get(roundName)!.push(m);
+  }
+
   // Qualifiers: top 4 per group
   const qualifiers: typeof standings = [];
   const eliminated: typeof standings = [];
@@ -212,6 +234,57 @@ export default async function RecapPage({ params }: RecapPageProps) {
             </CardContent>
           </Card>
         ))}
+
+        {/* Knockout Bracket */}
+        {knockoutRounds.size > 0 && (
+          <Card className="border-primary/20">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-primary" />
+                Knockout Stage
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {[...knockoutRounds.entries()].map(([roundName, matches]) => (
+                <div key={roundName}>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">{roundName}</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {matches.map((m) => {
+                      const homeName = m.homePlayer?.name ?? "TBD";
+                      const awayName = m.awayPlayer?.name ?? "TBD";
+                      const isCompleted = m.status === "COMPLETED";
+                      return (
+                        <Link key={m.id} href={`/matches/${m.id}`} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors border border-border/50">
+                          <div className="flex items-center gap-2">
+                            {m.homePlayer ? (
+                              <SmartAvatar type="player" id={m.homePlayer.id} name={homeName} className="h-7 w-7" fallbackClassName="text-[10px]" />
+                            ) : (
+                              <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-[10px] text-muted-foreground">?</div>
+                            )}
+                            <span className={`text-sm font-medium ${homeName === "TBD" ? "text-muted-foreground" : ""}`}>{homeName}</span>
+                          </div>
+                          {isCompleted ? (
+                            <span className="text-sm font-black">{m.homeScore} - {m.awayScore}</span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">vs</span>
+                          )}
+                          <div className="flex items-center gap-2">
+                            <span className={`text-sm font-medium ${awayName === "TBD" ? "text-muted-foreground" : ""}`}>{awayName}</span>
+                            {m.awayPlayer ? (
+                              <SmartAvatar type="player" id={m.awayPlayer.id} name={awayName} className="h-7 w-7" fallbackClassName="text-[10px]" />
+                            ) : (
+                              <div className="h-7 w-7 rounded-full bg-muted flex items-center justify-center text-[10px] text-muted-foreground">?</div>
+                            )}
+                          </div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Top Scorers */}
         <Card>
