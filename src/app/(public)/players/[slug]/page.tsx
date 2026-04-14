@@ -458,18 +458,21 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                   <div className="space-y-3">
                     {recentMatches.map((match) => {
                       const isHome = match.homePlayer?.name === player.name || match.homeTeam?.name === player.name;
-                      const opponent = isHome 
+                      const opponent = isHome
                         ? (match.awayPlayer ?? match.awayTeam)
                         : (match.homePlayer ?? match.homeTeam);
-                      const playerScore = isHome ? match.homeScore : match.awayScore;
-                      const opponentScore = isHome ? match.awayScore : match.homeScore;
-                      
+                      const has2Legs = match.leg2HomeScore != null;
+                      const totalHome = (match.homeScore ?? 0) + (has2Legs ? (match.leg2HomeScore ?? 0) : 0) + (match.leg3HomeScore != null ? (match.leg3HomeScore ?? 0) : 0);
+                      const totalAway = (match.awayScore ?? 0) + (has2Legs ? (match.leg2AwayScore ?? 0) : 0) + (match.leg3AwayScore != null ? (match.leg3AwayScore ?? 0) : 0);
+                      const playerScore = isHome ? totalHome : totalAway;
+                      const opponentScore = isHome ? totalAway : totalHome;
+
                       let result = "D";
                       let resultColor = "bg-yellow-500/20 text-yellow-500";
-                      if (playerScore! > opponentScore!) {
+                      if (playerScore > opponentScore) {
                         result = "W";
                         resultColor = "bg-green-500/20 text-green-500";
-                      } else if (playerScore! < opponentScore!) {
+                      } else if (playerScore < opponentScore) {
                         result = "L";
                         resultColor = "bg-red-500/20 text-red-500";
                       }
