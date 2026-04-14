@@ -127,6 +127,8 @@ export function TournamentForm({ tournament }: TournamentFormProps) {
     (tournament?.participantType as ParticipantType) ?? "TEAM"
   );
   const [status, setStatus] = useState(tournament?.status ?? "DRAFT");
+  const [eFootballMode, setEFootballMode] = useState(tournament?.eFootballMode ?? "1v1");
+  const [eFootballType, setEFootballType] = useState(tournament?.eFootballType ?? "DREAM");
 
   // Get current game config
   const gameConfig = GAME_CONFIGS[gameCategory];
@@ -149,6 +151,10 @@ export function TournamentForm({ tournament }: TournamentFormProps) {
     formData.set("format", format);
     formData.set("participantType", participantType);
     formData.set("status", status);
+    if (gameCategory === "EFOOTBALL") {
+      formData.set("eFootballMode", eFootballMode);
+      formData.set("eFootballType", eFootballType);
+    }
 
     startTransition(async () => {
       const result = tournament
@@ -279,6 +285,49 @@ export function TournamentForm({ tournament }: TournamentFormProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* eFootball Options */}
+      {gameCategory === "EFOOTBALL" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">eFootball Options</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Match Mode</Label>
+                <Select value={eFootballMode} onValueChange={setEFootballMode}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1v1">1v1 (Solo)</SelectItem>
+                    <SelectItem value="2v2">2v2 (Co-op)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {eFootballMode === "2v2" ? "2 players per side — assists & MOTM tracked" : "1 player per side — individual stats only"}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label>Tournament Type</Label>
+                <Select value={eFootballType} onValueChange={setEFootballType}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="DREAM">Dream Team</SelectItem>
+                    <SelectItem value="AUTHENTIC">Authentic Team</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {eFootballType === "DREAM" ? "Custom-built team from player market" : "Real club teams — must select a club"}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Dates & Settings */}
       <Card>

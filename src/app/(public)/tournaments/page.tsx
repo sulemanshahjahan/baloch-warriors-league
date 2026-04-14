@@ -64,6 +64,8 @@ function TournamentCard({
     startDate: Date | null;
     endDate: Date | null;
     isFeatured: boolean;
+    eFootballMode: string | null;
+    eFootballType: string | null;
     _count: { teams: number; players: number; matches: number };
   };
 }) {
@@ -93,6 +95,16 @@ function TournamentCard({
               >
                 {statusLabel(tournament.status)}
               </span>
+              {tournament.eFootballType && (
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${tournament.eFootballType === "DREAM" ? "bg-purple-500/10 text-purple-400" : "bg-amber-500/10 text-amber-400"}`}>
+                  {tournament.eFootballType === "DREAM" ? "Dream" : "Authentic"}
+                </span>
+              )}
+              {tournament.eFootballMode === "2v2" && (
+                <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-blue-500/10 text-blue-400">
+                  2v2
+                </span>
+              )}
             </div>
             {tournament.isFeatured && (
               <Badge variant="secondary" className="text-xs">

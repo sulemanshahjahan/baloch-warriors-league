@@ -173,13 +173,13 @@ export default async function StatsPage({ searchParams }: StatsPageProps) {
               <Target className="w-4 h-4 mr-2" />
               Top Scorers
             </TabsTrigger>
-            {gameCategory !== "EFOOTBALL" && (
+            {stats.topAssists.length > 0 && (
               <TabsTrigger value="assists">
                 <TrendingUp className="w-4 h-4 mr-2" />
                 Top Assists
               </TabsTrigger>
             )}
-            {gameCategory !== "EFOOTBALL" && (
+            {stats.mostMOTM.length > 0 && (
               <TabsTrigger value="motm">
                 <Trophy className="w-4 h-4 mr-2" />
                 Most MOTM

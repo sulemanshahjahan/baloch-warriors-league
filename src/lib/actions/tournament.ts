@@ -81,6 +81,8 @@ export async function createTournament(
       bannerUrl: data.bannerUrl || null,
       logoUrl: data.logoUrl || null,
       isFeatured: data.isFeatured ?? false,
+      eFootballMode: data.eFootballMode || null,
+      eFootballType: data.eFootballType || null,
       ...(data.seasonId ? { season: { connect: { id: data.seasonId } } } : {}),
     },
   });
@@ -154,6 +156,8 @@ export async function updateTournament(
       bannerUrl: data.bannerUrl || null,
       logoUrl: data.logoUrl || null,
       isFeatured: data.isFeatured ?? false,
+      eFootballMode: data.eFootballMode || null,
+      eFootballType: data.eFootballType || null,
       seasonId: data.seasonId || null,
     },
   });

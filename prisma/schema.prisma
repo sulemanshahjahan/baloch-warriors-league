@@ -156,6 +156,9 @@ model Tournament {
   rules           String?          @db.Text
   prizeInfo       String?
   isFeatured      Boolean          @default(false)
+  // eFootball-specific
+  eFootballMode   String?          // "1v1" or "2v2" (only for EFOOTBALL)
+  eFootballType   String?          // "AUTHENTIC" or "DREAM" (only for EFOOTBALL)
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 

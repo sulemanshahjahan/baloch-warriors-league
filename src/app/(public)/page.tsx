@@ -33,6 +33,8 @@ async function getHomeData() {
           status: true,
           isFeatured: true,
           participantType: true,
+          eFootballMode: true,
+          eFootballType: true,
           // bannerUrl intentionally omitted — base64 stored images would bloat ISR payload
           _count: { select: { teams: true, players: true, matches: true } },
         },
@@ -327,6 +329,16 @@ export default async function HomePage() {
                         >
                           {statusLabel(t.status)}
                         </span>
+                        {t.eFootballType && (
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${t.eFootballType === "DREAM" ? "bg-purple-500/10 text-purple-400" : "bg-amber-500/10 text-amber-400"}`}>
+                            {t.eFootballType === "DREAM" ? "Dream" : "Authentic"}
+                          </span>
+                        )}
+                        {t.eFootballMode === "2v2" && (
+                          <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-blue-500/10 text-blue-400">
+                            2v2
+                          </span>
+                        )}
                       </div>
                       <h3 className="font-semibold text-sm line-clamp-2 mb-2">
                         {t.name}

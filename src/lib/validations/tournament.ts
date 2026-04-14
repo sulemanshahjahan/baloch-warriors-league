@@ -16,6 +16,8 @@ export const tournamentSchema = z.object({
   logoUrl: z.string().url().optional().or(z.literal("")),
   isFeatured: z.boolean().optional(),
   seasonId: z.string().optional(),
+  eFootballMode: z.enum(["1v1", "2v2"]).optional(),
+  eFootballType: z.enum(["AUTHENTIC", "DREAM"]).optional(),
 });
 
 export type TournamentInput = z.infer<typeof tournamentSchema>;
