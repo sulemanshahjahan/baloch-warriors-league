@@ -515,34 +515,41 @@ export async function generateKnockoutFromGroups(
   // Match 3: Group B 1st vs Group A 2nd
   // Match 4: Group D 1st vs Group C 2nd
   
-  // Create proper cross-group pairings
-  for (let i = 0; i < groupCount; i++) {
-    const groupA = advancingByGroup[i];
-    const groupB = advancingByGroup[groupCount - 1 - i]; // Opposite group
-    
+  // Create proper cross-group pairings for RO16 (4 groups, 4 per group = 16 players)
+  // Pairing: Group X position N vs Group Y position (advanceCount + 1 - N)
+  // A1 vs D4, A2 vs D3, A3 vs D2, A4 vs D1
+  // B1 vs C4, B2 vs C3, B3 vs C2, B4 vs C1
+  // This ensures top seeds face bottom seeds from opposite groups
+
+  const pairedGroups: [number, number][] = [];
+  for (let i = 0; i < Math.floor(groupCount / 2); i++) {
+    pairedGroups.push([i, groupCount - 1 - i]);
+  }
+
+  for (const [gIdxA, gIdxB] of pairedGroups) {
+    const groupA = advancingByGroup[gIdxA];
+    const groupB = advancingByGroup[gIdxB];
     if (!groupA || !groupB) continue;
-    
-    const groupA1st = groupA.participants.find(p => p.position === 1);
-    const groupA2nd = groupA.participants.find(p => p.position === 2);
-    const groupB1st = groupB.participants.find(p => p.position === 1);
-    const groupB2nd = groupB.participants.find(p => p.position === 2);
-    
-    // Cross pairing: Group X 1st vs Group Y 2nd
-    if (groupA1st && groupB2nd) {
-      bracket.push({
-        home: { id: groupA1st.id, name: groupA1st.name },
-        away: { id: groupB2nd.id, name: groupB2nd.name },
-        roundName: firstRoundName,
-        roundNumber: 1,
-      });
-    } else if (groupA1st) {
-      // Bye for A1st
-      bracket.push({
-        home: { id: groupA1st.id, name: groupA1st.name },
-        away: null,
-        roundName: firstRoundName,
-        roundNumber: 1,
-      });
+
+    for (let pos = 1; pos <= advanceCount; pos++) {
+      const playerA = groupA.participants.find(p => p.position === pos);
+      const playerB = groupB.participants.find(p => p.position === (advanceCount + 1 - pos));
+
+      if (playerA && playerB) {
+        bracket.push({
+          home: { id: playerA.id, name: playerA.name },
+          away: { id: playerB.id, name: playerB.name },
+          roundName: firstRoundName,
+          roundNumber: 1,
+        });
+      } else if (playerA) {
+        bracket.push({
+          home: { id: playerA.id, name: playerA.name },
+          away: null,
+          roundName: firstRoundName,
+          roundNumber: 1,
+        });
+      }
     }
   }
 
@@ -582,6 +589,54 @@ export async function generateKnockoutFromGroups(
       });
     }
     createdMatches++;
+  }
+
+  // Auto-assign dates to knockout matches
+  if (tournament.startDate && createdMatches > 0) {
+    const koMatches = await prisma.match.findMany({
+      where: { tournamentId, status: "SCHEDULED" as MatchStatus, groupId: null },
+      orderBy: [{ roundNumber: "asc" }, { matchNumber: "asc" }],
+      select: { id: true, homePlayerId: true, awayPlayerId: true, homeTeamId: true, awayTeamId: true },
+    });
+
+    // Find the latest date from group stage matches to start knockout after
+    const lastGroupMatch = await prisma.match.findFirst({
+      where: { tournamentId, groupId: { not: null }, status: "COMPLETED" },
+      orderBy: { completedAt: "desc" },
+      select: { completedAt: true },
+    });
+    const koStartDate = lastGroupMatch?.completedAt
+      ? new Date(Math.max(lastGroupMatch.completedAt.getTime(), tournament.startDate.getTime()))
+      : tournament.startDate;
+    // Add 1 day gap after group stage
+    koStartDate.setDate(koStartDate.getDate() + 1);
+
+    const koUpdates: { id: string; scheduledAt: Date; deadline: Date }[] = [];
+    let dayOffset = 0;
+
+    for (const m of koMatches) {
+      const scheduledAt = new Date(koStartDate);
+      scheduledAt.setDate(scheduledAt.getDate() + dayOffset);
+      scheduledAt.setHours(18, 0, 0, 0);
+
+      const deadline = new Date(scheduledAt);
+      deadline.setHours(deadline.getHours() + 24);
+
+      koUpdates.push({ id: m.id, scheduledAt, deadline });
+      // For RO16: 2 matches per day
+      if ((koUpdates.length % 2) === 0) dayOffset++;
+    }
+
+    if (koUpdates.length > 0) {
+      await prisma.$transaction(
+        koUpdates.map((u) =>
+          prisma.match.update({
+            where: { id: u.id },
+            data: { scheduledAt: u.scheduledAt, deadline: u.deadline },
+          })
+        )
+      );
+    }
   }
 
   revalidatePath(`/admin/tournaments/${tournamentId}`);

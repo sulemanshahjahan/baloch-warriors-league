@@ -397,17 +397,23 @@ export function GenerateKnockoutButton({
   groupCount: number;
 }) {
   const [open, setOpen] = useState(false);
-  const [advanceCount, setAdvanceCount] = useState(2);
+  const [advanceCount, setAdvanceCount] = useState(4);
   const [isLoading, setIsLoading] = useState(false);
+  const [koResult, setKoResult] = useState<{ success: boolean; count?: number; message?: string } | null>(null);
+  const [isSendingKoWA, setIsSendingKoWA] = useState(false);
+  const [koWaResult, setKoWaResult] = useState<string | null>(null);
   const router = useRouter();
 
   const handleGenerate = async () => {
     setIsLoading(true);
+    setKoResult(null);
     const res = await generateKnockoutFromGroups(tournamentId, advanceCount);
     setIsLoading(false);
     if (res.success) {
-      setOpen(false);
+      setKoResult({ success: true, count: res.count, message: `${res.count} knockout matches created! Dates auto-assigned.` });
       router.refresh();
+    } else {
+      setKoResult({ success: false, message: res.error || "Failed" });
     }
   };
 
@@ -427,8 +433,38 @@ export function GenerateKnockoutButton({
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
+          {koResult && (
+            <div className={`p-3 rounded text-sm space-y-2 ${koResult.success ? "bg-green-500/10 text-green-500" : "bg-destructive/10 text-destructive"}`}>
+              <p>{koResult.message}</p>
+              {koResult.success && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    setIsSendingKoWA(true);
+                    setKoWaResult(null);
+                    const res = await sendScheduleNotifications(tournamentId);
+                    setIsSendingKoWA(false);
+                    if (res.success) {
+                      setKoWaResult(res.errors.length > 0
+                        ? `Sent ${res.sent} messages. Issues: ${res.errors.slice(0, 3).join(", ")}`
+                        : `Sent ${res.sent} fixture notifications!`);
+                    } else {
+                      setKoWaResult("Failed to send");
+                    }
+                  }}
+                  disabled={isSendingKoWA}
+                  className="text-xs"
+                >
+                  <MessageCircle className={`w-3 h-3 ${isSendingKoWA ? "animate-pulse" : ""}`} />
+                  {isSendingKoWA ? "Sending..." : "Send Fixtures via WhatsApp"}
+                </Button>
+              )}
+              {koWaResult && <p className="text-xs text-muted-foreground">{koWaResult}</p>}
+            </div>
+          )}
           <div className="space-y-2">
-            <Label>Teams advancing per group</Label>
+            <Label>Players advancing per group</Label>
             <Input
               type="number"
               min={1}
@@ -442,12 +478,14 @@ export function GenerateKnockoutButton({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
-            Cancel
+          <Button variant="outline" onClick={() => { setOpen(false); setKoResult(null); setKoWaResult(null); }}>
+            {koResult?.success ? "Done" : "Cancel"}
           </Button>
-          <Button onClick={handleGenerate} disabled={isLoading}>
-            {isLoading ? "Creating..." : "Create Knockout"}
-          </Button>
+          {!koResult?.success && (
+            <Button onClick={handleGenerate} disabled={isLoading}>
+              {isLoading ? "Creating..." : "Create Knockout"}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
