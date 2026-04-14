@@ -3,7 +3,7 @@ export const revalidate = 300; // 5 minutes
 import Link from "next/link";
 import Image from "next/image";
 import { prisma } from "@/lib/db";
-import { Trophy, Swords, Users, ChevronRight, Star, Target, Crown, TrendingUp, Crosshair, BarChart3, ShieldCheck } from "lucide-react";
+import { Trophy, Swords, Users, ChevronRight, Star, Target, Crown, TrendingUp, Crosshair, BarChart3, ShieldCheck, Newspaper, Calendar } from "lucide-react";
 import { DownloadAppButton } from "@/components/public/download-app-button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -166,11 +166,18 @@ async function getHomeData() {
 
   const mvpStats = [topScorer, topWinRate, biggestEloJump, topRated].filter(Boolean);
 
-  return { featuredTournaments, recentResults, upcomingMatches, stats, mvpStats };
+  const latestNews = await prisma.newsPost.findMany({
+    where: { isPublished: true },
+    orderBy: { publishedAt: "desc" },
+    take: 3,
+    select: { id: true, title: true, slug: true, excerpt: true, publishedAt: true },
+  });
+
+  return { featuredTournaments, recentResults, upcomingMatches, stats, mvpStats, latestNews };
 }
 
 export default async function HomePage() {
-  const { featuredTournaments, recentResults, upcomingMatches, stats, mvpStats } =
+  const { featuredTournaments, recentResults, upcomingMatches, stats, mvpStats, latestNews } =
     await getHomeData();
 
   return (
@@ -537,6 +544,49 @@ export default async function HomePage() {
             </section>
           )}
         </div>
+
+        {/* Latest News */}
+        {latestNews.length > 0 && (
+          <section>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold flex items-center gap-2">
+                <Newspaper className="w-5 h-5 text-primary" />
+                Latest News
+              </h2>
+              <Link
+                href="/news"
+                className="flex items-center gap-1 text-sm text-primary hover:underline"
+              >
+                All news <ChevronRight className="w-4 h-4" />
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {latestNews.map((post) => (
+                <Link key={post.id} href={`/news/${post.slug}`}>
+                  <Card className="hover:border-primary/50 transition-all hover:-translate-y-0.5 cursor-pointer h-full">
+                    <CardContent className="p-5">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Newspaper className="w-4 h-4 text-primary shrink-0" />
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Calendar className="w-3 h-3" />
+                          {post.publishedAt ? formatDate(post.publishedAt) : ""}
+                        </span>
+                      </div>
+                      <h3 className="font-bold text-sm line-clamp-2 mb-2 group-hover:text-primary">
+                        {post.title}
+                      </h3>
+                      {post.excerpt && (
+                        <p className="text-xs text-muted-foreground line-clamp-3">
+                          {post.excerpt}
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );
