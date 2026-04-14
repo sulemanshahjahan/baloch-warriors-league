@@ -82,53 +82,50 @@ export async function updateEloAfterMatch(matchId: string): Promise<void> {
   const homeId = match.homePlayerId;
   const awayId = match.awayPlayerId;
 
-  // Determine result — check penalty shootout if regular time is drawn
-  const homeScore = match.homeScore ?? 0;
-  const awayScore = match.awayScore ?? 0;
-  let homeActual: number; // 1.0 = win, 0.5 = draw, 0.0 = loss
-  let awayActual: number;
-  let resultHome: string;
-  let resultAway: string;
+  // Build list of legs to process (each leg = separate ELO calculation)
+  const legs: { hScore: number; aScore: number; label: string }[] = [];
 
-  if (homeScore !== awayScore) {
-    // Clear winner in regular time
-    homeActual = homeScore > awayScore ? 1.0 : 0.0;
-    awayActual = 1.0 - homeActual;
-    resultHome = homeScore > awayScore ? "WIN" : "LOSS";
-    resultAway = homeScore > awayScore ? "LOSS" : "WIN";
-  } else if (match.homeScorePens != null && match.awayScorePens != null) {
-    // Penalty shootout decides
-    homeActual = match.homeScorePens > match.awayScorePens ? 1.0 : 0.0;
-    awayActual = 1.0 - homeActual;
-    resultHome = match.homeScorePens > match.awayScorePens ? "WIN" : "LOSS";
-    resultAway = match.homeScorePens > match.awayScorePens ? "LOSS" : "WIN";
-  } else {
-    // True draw
-    homeActual = 0.5;
-    awayActual = 0.5;
-    resultHome = "DRAW";
-    resultAway = "DRAW";
+  // Leg 1
+  legs.push({ hScore: match.homeScore ?? 0, aScore: match.awayScore ?? 0, label: "Leg 1" });
+
+  // Leg 2 (if 2-legged knockout)
+  if (match.leg2HomeScore != null) {
+    legs.push({ hScore: match.leg2HomeScore ?? 0, aScore: match.leg2AwayScore ?? 0, label: "Leg 2" });
+  }
+
+  // Leg 3 / Decider (if aggregate was tied)
+  if (match.leg3HomeScore != null) {
+    const l3h = match.leg3HomeScore ?? 0;
+    const l3a = match.leg3AwayScore ?? 0;
+    // If decider was decided by pens, it's a draw in regular time + pen winner
+    if (l3h === l3a && match.leg3HomePens != null) {
+      // Decider drawn + pens = treat as draw for ELO (pens are luck)
+      legs.push({ hScore: l3h, aScore: l3a, label: "Decider" });
+    } else {
+      legs.push({ hScore: l3h, aScore: l3a, label: "Decider" });
+    }
   }
 
   // Check for existing ELO records for this match (re-edit scenario)
-  // If they exist, revert ratings BEFORE deleting, to avoid double-inflation
-  const existingElo = await prisma.eloHistory.findMany({ where: { matchId } });
+  // If they exist, revert to the FIRST entry's ratingBefore to avoid double-inflation
+  const existingElo = await prisma.eloHistory.findMany({
+    where: { matchId },
+    orderBy: { createdAt: "asc" },
+  });
   if (existingElo.length > 0) {
-    // Revert each player's rating to what it was before this match
-    await prisma.$transaction(
-      existingElo.map((e) =>
-        prisma.player.update({
-          where: { id: e.playerId },
-          data: { eloRating: e.ratingBefore },
-        })
-      )
-    );
+    // Find the earliest ratingBefore for each player
+    const firstHome = existingElo.find((e) => e.playerId === homeId);
+    const firstAway = existingElo.find((e) => e.playerId === awayId);
+    const revertOps = [];
+    if (firstHome) revertOps.push(prisma.player.update({ where: { id: homeId }, data: { eloRating: firstHome.ratingBefore } }));
+    if (firstAway) revertOps.push(prisma.player.update({ where: { id: awayId }, data: { eloRating: firstAway.ratingBefore } }));
+    if (revertOps.length > 0) await prisma.$transaction(revertOps);
   }
 
-  // Delete existing ELO records for this match
+  // Delete all existing ELO records for this match
   await prisma.eloHistory.deleteMany({ where: { matchId } });
 
-  // Get current ratings (now correctly reverted if this is a re-edit)
+  // Get current ratings (correctly reverted)
   const [homePlayer, awayPlayer] = await Promise.all([
     prisma.player.findUnique({ where: { id: homeId }, select: { eloRating: true } }),
     prisma.player.findUnique({ where: { id: awayId }, select: { eloRating: true } }),
@@ -136,66 +133,74 @@ export async function updateEloAfterMatch(matchId: string): Promise<void> {
 
   if (!homePlayer || !awayPlayer) return;
 
-  const homeRating = homePlayer.eloRating;
-  const awayRating = awayPlayer.eloRating;
+  let currentHomeRating = homePlayer.eloRating;
+  let currentAwayRating = awayPlayer.eloRating;
 
-  // Get match counts for K-factor
-  const [homeCount, awayCount] = await Promise.all([
-    countPlayerMatches(homeId, matchId),
-    countPlayerMatches(awayId, matchId),
-  ]);
+  // Process each leg as a separate ELO calculation
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const allOps: any[] = [];
 
-  const homeK = getKFactor(homeCount);
-  const awayK = getKFactor(awayCount);
+  for (const leg of legs) {
+    const homeCount = await countPlayerMatches(homeId, matchId);
+    const awayCount = await countPlayerMatches(awayId, matchId);
+    const homeK = getKFactor(homeCount + legs.indexOf(leg)); // account for legs already processed
+    const awayK = getKFactor(awayCount + legs.indexOf(leg));
 
-  // Calculate new ratings
-  const homeExpected = expectedScore(homeRating, awayRating);
-  const awayExpected = expectedScore(awayRating, homeRating);
+    let homeActual: number, awayActual: number, resultHome: string, resultAway: string;
 
-  const homeNewRating = newRating(homeRating, homeExpected, homeActual, homeK);
-  const awayNewRating = newRating(awayRating, awayExpected, awayActual, awayK);
+    if (leg.hScore !== leg.aScore) {
+      homeActual = leg.hScore > leg.aScore ? 1.0 : 0.0;
+      awayActual = 1.0 - homeActual;
+      resultHome = leg.hScore > leg.aScore ? "WIN" : "LOSS";
+      resultAway = leg.hScore > leg.aScore ? "LOSS" : "WIN";
+    } else {
+      homeActual = 0.5;
+      awayActual = 0.5;
+      resultHome = "DRAW";
+      resultAway = "DRAW";
+    }
 
-  const homeChange = homeNewRating - homeRating;
-  const awayChange = awayNewRating - awayRating;
+    const homeExp = expectedScore(currentHomeRating, currentAwayRating);
+    const awayExp = expectedScore(currentAwayRating, currentHomeRating);
+    const homeNew = newRating(currentHomeRating, homeExp, homeActual, homeK);
+    const awayNew = newRating(currentAwayRating, awayExp, awayActual, awayK);
 
-  // Save in a transaction
-  await prisma.$transaction([
-    // ELO history for home player
-    prisma.eloHistory.create({
-      data: {
-        playerId: homeId,
-        matchId,
-        ratingBefore: homeRating,
-        ratingAfter: homeNewRating,
-        change: homeChange,
-        opponentId: awayId,
-        opponentRatingBefore: awayRating,
-        result: resultHome,
-        kFactor: homeK,
-      },
-    }),
-    // ELO history for away player
-    prisma.eloHistory.create({
-      data: {
-        playerId: awayId,
-        matchId,
-        ratingBefore: awayRating,
-        ratingAfter: awayNewRating,
-        change: awayChange,
-        opponentId: homeId,
-        opponentRatingBefore: homeRating,
-        result: resultAway,
-        kFactor: awayK,
-      },
-    }),
-    // Update player ratings
+    allOps.push(
+      prisma.eloHistory.create({
+        data: {
+          playerId: homeId, matchId,
+          ratingBefore: currentHomeRating, ratingAfter: homeNew,
+          change: homeNew - currentHomeRating,
+          opponentId: awayId, opponentRatingBefore: currentAwayRating,
+          result: resultHome, kFactor: homeK,
+        },
+      }),
+      prisma.eloHistory.create({
+        data: {
+          playerId: awayId, matchId,
+          ratingBefore: currentAwayRating, ratingAfter: awayNew,
+          change: awayNew - currentAwayRating,
+          opponentId: homeId, opponentRatingBefore: currentHomeRating,
+          result: resultAway, kFactor: awayK,
+        },
+      }),
+    );
+
+    currentHomeRating = homeNew;
+    currentAwayRating = awayNew;
+  }
+
+  // Final player rating updates + all history entries
+  allOps.push(
     prisma.player.update({
       where: { id: homeId },
-      data: { eloRating: homeNewRating },
+      data: { eloRating: currentHomeRating },
     }),
     prisma.player.update({
       where: { id: awayId },
-      data: { eloRating: awayNewRating },
+      data: { eloRating: currentAwayRating },
     }),
-  ]);
+  );
+
+  await prisma.$transaction(allOps);
 }
