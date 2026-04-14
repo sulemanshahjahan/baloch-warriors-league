@@ -46,6 +46,14 @@ interface MatchResultFormProps {
   matchNumber: number | null;
   homePhoto: string | null;
   awayPhoto: string | null;
+  // Knockout leg fields
+  isKnockout: boolean;
+  leg2HomeScore: number | null;
+  leg2AwayScore: number | null;
+  leg3HomeScore: number | null;
+  leg3AwayScore: number | null;
+  leg3HomePens: number | null;
+  leg3AwayPens: number | null;
 }
 
 export function MatchResultForm({
@@ -72,6 +80,13 @@ export function MatchResultForm({
   matchNumber,
   homePhoto,
   awayPhoto,
+  isKnockout,
+  leg2HomeScore: initialLeg2Home,
+  leg2AwayScore: initialLeg2Away,
+  leg3HomeScore: initialLeg3Home,
+  leg3AwayScore: initialLeg3Away,
+  leg3HomePens: initialLeg3HomePens,
+  leg3AwayPens: initialLeg3AwayPens,
 }: MatchResultFormProps) {
   const router = useRouter();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -209,6 +224,49 @@ export function MatchResultForm({
           />
         </div>
       </div>
+
+      {/* Knockout 2-Leg Section */}
+      {isKnockout && (
+        <div className="space-y-3 p-3 rounded-lg border border-primary/20 bg-primary/5">
+          <p className="text-xs font-semibold text-primary uppercase tracking-wider">2-Leg Knockout</p>
+          <p className="text-[10px] text-muted-foreground">Leg 1 scores are the Home/Away scores above. Enter Leg 2 and Decider below.</p>
+
+          <div className="grid grid-cols-3 items-end gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="leg2HomeScore" className="text-xs">{homeName} (Leg 2)</Label>
+              <Input id="leg2HomeScore" name="leg2HomeScore" type="number" min={0} defaultValue={initialLeg2Home ?? ""} className="h-9" />
+            </div>
+            <div className="flex justify-center pb-1.5 text-muted-foreground text-sm font-bold">–</div>
+            <div className="space-y-1">
+              <Label htmlFor="leg2AwayScore" className="text-xs">{awayName} (Leg 2)</Label>
+              <Input id="leg2AwayScore" name="leg2AwayScore" type="number" min={0} defaultValue={initialLeg2Away ?? ""} className="h-9" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 items-end gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="leg3HomeScore" className="text-xs">{homeName} (Decider)</Label>
+              <Input id="leg3HomeScore" name="leg3HomeScore" type="number" min={0} defaultValue={initialLeg3Home ?? ""} className="h-9" />
+            </div>
+            <div className="flex justify-center pb-1.5 text-muted-foreground text-sm font-bold">–</div>
+            <div className="space-y-1">
+              <Label htmlFor="leg3AwayScore" className="text-xs">{awayName} (Decider)</Label>
+              <Input id="leg3AwayScore" name="leg3AwayScore" type="number" min={0} defaultValue={initialLeg3Away ?? ""} className="h-9" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="leg3HomePens" className="text-xs">Decider Pens (Home)</Label>
+              <Input id="leg3HomePens" name="leg3HomePens" type="number" min={0} defaultValue={initialLeg3HomePens ?? ""} className="h-9" />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="leg3AwayPens" className="text-xs">Decider Pens (Away)</Label>
+              <Input id="leg3AwayPens" name="leg3AwayPens" type="number" min={0} defaultValue={initialLeg3AwayPens ?? ""} className="h-9" />
+            </div>
+          </div>
+        </div>
+      )}
 
       {gameCategory === "EFOOTBALL" && (
         <>

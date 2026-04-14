@@ -370,10 +370,21 @@ model Match {
   homePlayerId  String?
   awayPlayerId  String?
 
+  // Leg 1 scores (or single match score)
   homeScore     Int?
   awayScore     Int?
   homeScorePens Int?
   awayScorePens Int?
+
+  // Leg 2 scores (knockout 2-legged ties)
+  leg2HomeScore Int?
+  leg2AwayScore Int?
+
+  // Leg 3 / Decider (if aggregate tied after 2 legs)
+  leg3HomeScore Int?
+  leg3AwayScore Int?
+  leg3HomePens  Int?
+  leg3AwayPens  Int?
 
   // In-game clubs (eFootball)
   homeClub String?

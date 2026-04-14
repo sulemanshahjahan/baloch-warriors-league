@@ -297,6 +297,21 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
                       ({match.homeScorePens ?? 0} – {match.awayScorePens ?? 0} pens)
                     </p>
                   )}
+                  {/* 2-Leg knockout scores */}
+                  {match.leg2HomeScore != null && (
+                    <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                      <p>Leg 1: {match.homeScore ?? 0} – {match.awayScore ?? 0}</p>
+                      <p>Leg 2: {match.leg2HomeScore} – {match.leg2AwayScore ?? 0}</p>
+                      <p className="font-semibold text-foreground text-sm">
+                        Agg: {(match.homeScore ?? 0) + (match.leg2HomeScore ?? 0)} – {(match.awayScore ?? 0) + (match.leg2AwayScore ?? 0)}
+                      </p>
+                      {match.leg3HomeScore != null && (
+                        <p>Decider: {match.leg3HomeScore} – {match.leg3AwayScore ?? 0}
+                          {match.leg3HomePens != null && ` (${match.leg3HomePens} – ${match.leg3AwayPens ?? 0} pens)`}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="text-3xl font-bold text-muted-foreground">vs</div>

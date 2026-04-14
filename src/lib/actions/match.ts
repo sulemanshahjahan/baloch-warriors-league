@@ -229,6 +229,14 @@ export async function updateMatchResult(
   const rivalNote = (raw.rivalNote as string) || null;
   const highlights = (raw.highlights as string) || null;
 
+  // Leg scores for knockout matches
+  const leg2HomeScore = raw.leg2HomeScore ? Number(raw.leg2HomeScore) : null;
+  const leg2AwayScore = raw.leg2AwayScore ? Number(raw.leg2AwayScore) : null;
+  const leg3HomeScore = raw.leg3HomeScore ? Number(raw.leg3HomeScore) : null;
+  const leg3AwayScore = raw.leg3AwayScore ? Number(raw.leg3AwayScore) : null;
+  const leg3HomePens = raw.leg3HomePens ? Number(raw.leg3HomePens) : null;
+  const leg3AwayPens = raw.leg3AwayPens ? Number(raw.leg3AwayPens) : null;
+
   // If status is COMPLETED, use the shared cascade
   if (data.status === "COMPLETED") {
     // First update the extra fields that executeMatchCompletion doesn't handle
@@ -237,6 +245,9 @@ export async function updateMatchResult(
       data: {
         homeScorePens: data.homeScorePens ? Number(data.homeScorePens) : null,
         awayScorePens: data.awayScorePens ? Number(data.awayScorePens) : null,
+        leg2HomeScore, leg2AwayScore,
+        leg3HomeScore, leg3AwayScore,
+        leg3HomePens, leg3AwayPens,
         homeClub, awayClub, homeFormation, awayFormation,
         isDerby, rivalNote, highlights,
         motmPlayerId: data.motmPlayerId || null,
@@ -281,6 +292,9 @@ export async function updateMatchResult(
       awayScore: data.awayScore,
       homeScorePens: data.homeScorePens ? Number(data.homeScorePens) : null,
       awayScorePens: data.awayScorePens ? Number(data.awayScorePens) : null,
+      leg2HomeScore, leg2AwayScore,
+      leg3HomeScore, leg3AwayScore,
+      leg3HomePens, leg3AwayPens,
       homeClub, awayClub, homeFormation, awayFormation,
       isDerby, rivalNote, highlights,
       motmPlayerId: data.motmPlayerId || null,
@@ -335,23 +349,61 @@ async function advanceKnockoutWinner(matchId: string, tournamentId: string) {
   
   if (!isKnockoutMatch) return;
 
-  // Determine winner
+  // Determine winner — use aggregate for 2-legged knockout ties
   let winnerId: string | null = null;
   let isWinnerHomePlayer = false;
-  
-  const homeScore = completedMatch.homeScorePens ?? completedMatch.homeScore;
-  const awayScore = completedMatch.awayScorePens ?? completedMatch.awayScore;
-  
-  if (homeScore > awayScore) {
-    winnerId = completedMatch.homePlayerId || completedMatch.homeTeamId;
-    isWinnerHomePlayer = !!completedMatch.homePlayerId;
-  } else if (awayScore > homeScore) {
-    winnerId = completedMatch.awayPlayerId || completedMatch.awayTeamId;
-    isWinnerHomePlayer = !!completedMatch.awayPlayerId;
+
+  const leg1Home = completedMatch.homeScore ?? 0;
+  const leg1Away = completedMatch.awayScore ?? 0;
+  const leg2Home = completedMatch.leg2HomeScore ?? 0;
+  const leg2Away = completedMatch.leg2AwayScore ?? 0;
+  const has2Legs = completedMatch.leg2HomeScore != null;
+
+  if (has2Legs) {
+    // 2-legged tie — aggregate scores
+    const aggHome = leg1Home + leg2Home;
+    const aggAway = leg1Away + leg2Away;
+
+    if (aggHome !== aggAway) {
+      // Aggregate decides
+      winnerId = aggHome > aggAway
+        ? (completedMatch.homePlayerId || completedMatch.homeTeamId)
+        : (completedMatch.awayPlayerId || completedMatch.awayTeamId);
+    } else if (completedMatch.leg3HomeScore != null) {
+      // Decider match played
+      const dec3Home = completedMatch.leg3HomeScore ?? 0;
+      const dec3Away = completedMatch.leg3AwayScore ?? 0;
+
+      if (dec3Home !== dec3Away) {
+        winnerId = dec3Home > dec3Away
+          ? (completedMatch.homePlayerId || completedMatch.homeTeamId)
+          : (completedMatch.awayPlayerId || completedMatch.awayTeamId);
+      } else if (completedMatch.leg3HomePens != null) {
+        // Decider penalties
+        winnerId = (completedMatch.leg3HomePens ?? 0) > (completedMatch.leg3AwayPens ?? 0)
+          ? (completedMatch.homePlayerId || completedMatch.homeTeamId)
+          : (completedMatch.awayPlayerId || completedMatch.awayTeamId);
+      } else {
+        return; // No winner determined yet
+      }
+    } else {
+      return; // Aggregate tied, no decider yet
+    }
   } else {
-    // Draw - no winner to advance
-    return;
+    // Single match — use pens if drawn
+    const homeScore = completedMatch.homeScorePens ?? leg1Home;
+    const awayScore = completedMatch.awayScorePens ?? leg1Away;
+
+    if (homeScore > awayScore) {
+      winnerId = completedMatch.homePlayerId || completedMatch.homeTeamId;
+    } else if (awayScore > homeScore) {
+      winnerId = completedMatch.awayPlayerId || completedMatch.awayTeamId;
+    } else {
+      return; // Draw - no winner
+    }
   }
+
+  isWinnerHomePlayer = winnerId === completedMatch.homePlayerId || winnerId === completedMatch.homeTeamId;
   
   if (!winnerId) return;
 
