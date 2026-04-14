@@ -500,20 +500,29 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
           </Link>
         )}
 
-        {/* Draw Replay — show when groups have players */}
-        {tournament.groups.length >= 2 && tournament.groups.some((g) => (g as any).players?.length > 0) && (
-          <div className="mb-6">
-            <DrawReplayButton
-              groups={tournament.groups.map((g) => ({
-                id: g.id,
-                name: g.name,
-                players: (g as any).players?.map((tp: any) => ({
-                  id: tp.player?.id ?? tp.id,
-                  name: tp.player?.name ?? tp.name ?? "?",
-                  photoUrl: tp.player?.photoUrl ?? null,
-                })) ?? [],
-              }))}
-            />
+        {/* Draw Replay + Recap buttons */}
+        {tournament.groups.length >= 2 && (
+          <div className="flex items-center gap-3 mb-6">
+            {tournament.groups.some((g) => (g as any).players?.length > 0) && (
+              <DrawReplayButton
+                groups={tournament.groups.map((g) => ({
+                  id: g.id,
+                  name: g.name,
+                  players: (g as any).players?.map((tp: any) => ({
+                    id: tp.player?.id ?? tp.id,
+                    name: tp.player?.name ?? tp.name ?? "?",
+                    photoUrl: tp.player?.photoUrl ?? null,
+                  })) ?? [],
+                }))}
+              />
+            )}
+            <Link
+              href={`/tournaments/${tournament.slug}/recap`}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border bg-card hover:bg-muted transition-colors text-sm font-medium"
+            >
+              <Trophy className="w-4 h-4 text-primary" />
+              Tournament Recap
+            </Link>
           </div>
         )}
 
