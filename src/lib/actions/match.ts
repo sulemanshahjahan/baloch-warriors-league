@@ -137,21 +137,31 @@ export async function executeMatchCompletion(
     include: { tournament: true },
   });
 
-  // Auto-create goal events for individual tournaments
+  // Auto-create goal events for individual tournaments (ALL legs)
   if (currentMatch.tournament.participantType === "INDIVIDUAL") {
     await prisma.matchEvent.deleteMany({
       where: { matchId, type: "GOAL", description: { equals: "Auto-generated from match result" } },
     });
 
-    if (currentMatch.homePlayerId && homeScore > 0) {
-      for (let i = 0; i < homeScore; i++) {
+    // Refetch match to get leg scores
+    const fullMatch = await prisma.match.findUnique({
+      where: { id: matchId },
+      select: { homeScore: true, awayScore: true, leg2HomeScore: true, leg2AwayScore: true, leg3HomeScore: true, leg3AwayScore: true },
+    });
+
+    // Collect all goals across all legs
+    const homeGoals = (fullMatch?.homeScore ?? 0) + (fullMatch?.leg2HomeScore ?? 0) + (fullMatch?.leg3HomeScore ?? 0);
+    const awayGoals = (fullMatch?.awayScore ?? 0) + (fullMatch?.leg2AwayScore ?? 0) + (fullMatch?.leg3AwayScore ?? 0);
+
+    if (currentMatch.homePlayerId && homeGoals > 0) {
+      for (let i = 0; i < homeGoals; i++) {
         await prisma.matchEvent.create({
           data: { matchId, playerId: currentMatch.homePlayerId, type: "GOAL", description: "Auto-generated from match result" },
         });
       }
     }
-    if (currentMatch.awayPlayerId && awayScore > 0) {
-      for (let i = 0; i < awayScore; i++) {
+    if (currentMatch.awayPlayerId && awayGoals > 0) {
+      for (let i = 0; i < awayGoals; i++) {
         await prisma.matchEvent.create({
           data: { matchId, playerId: currentMatch.awayPlayerId, type: "GOAL", description: "Auto-generated from match result" },
         });
