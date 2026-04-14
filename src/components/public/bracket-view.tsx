@@ -19,6 +19,12 @@ interface BracketMatch {
   awayScore: number | null;
   homeScorePens: number | null;
   awayScorePens: number | null;
+  leg2HomeScore?: number | null;
+  leg2AwayScore?: number | null;
+  leg3HomeScore?: number | null;
+  leg3AwayScore?: number | null;
+  leg3HomePens?: number | null;
+  leg3AwayPens?: number | null;
   homeTeamId: string | null;
   awayTeamId: string | null;
   homePlayerId: string | null;
@@ -27,6 +33,28 @@ interface BracketMatch {
   awayTeam: { id: string; name: string; shortName: string | null } | null;
   homePlayer: { id: string; name: string } | null;
   awayPlayer: { id: string; name: string } | null;
+}
+
+function getDisplayScores(match: BracketMatch) {
+  const has2Legs = match.leg2HomeScore != null;
+  if (has2Legs) {
+    const aggHome = (match.homeScore ?? 0) + (match.leg2HomeScore ?? 0);
+    const aggAway = (match.awayScore ?? 0) + (match.leg2AwayScore ?? 0);
+    // Determine winner from aggregate, decider, or decider pens
+    let homeWon = aggHome > aggAway;
+    let awayWon = aggAway > aggHome;
+    if (!homeWon && !awayWon && match.leg3HomeScore != null) {
+      const d3h = match.leg3HomeScore ?? 0, d3a = match.leg3AwayScore ?? 0;
+      if (d3h !== d3a) { homeWon = d3h > d3a; awayWon = d3a > d3h; }
+      else if (match.leg3HomePens != null) { homeWon = (match.leg3HomePens ?? 0) > (match.leg3AwayPens ?? 0); awayWon = !homeWon; }
+    }
+    return { homeScore: aggHome, awayScore: aggAway, homeWon, awayWon, isAgg: true };
+  }
+  const hs = match.homeScore ?? 0, as2 = match.awayScore ?? 0;
+  const hasPens = match.homeScorePens != null;
+  const homeWon = hasPens ? (match.homeScorePens ?? 0) > (match.awayScorePens ?? 0) : hs > as2;
+  const awayWon = hasPens ? (match.awayScorePens ?? 0) > (match.homeScorePens ?? 0) : as2 > hs;
+  return { homeScore: hs, awayScore: as2, homeWon, awayWon, isAgg: false };
 }
 
 interface BracketViewProps {
@@ -71,7 +99,9 @@ function MatchCard({
   y: number;
 }) {
   const isCompleted = match.status === "COMPLETED";
-  const hasPens = match.homeScorePens != null && match.awayScorePens != null;
+  const { homeScore, awayScore, homeWon: hw, awayWon: aw, isAgg } = getDisplayScores(match);
+  const homeWon = isCompleted && hw;
+  const awayWon = isCompleted && aw;
 
   const homeName = isIndividual
     ? (match.homePlayer?.name ?? "TBD")
@@ -79,11 +109,6 @@ function MatchCard({
   const awayName = isIndividual
     ? (match.awayPlayer?.name ?? "TBD")
     : (match.awayTeam?.shortName ?? match.awayTeam?.name ?? "TBD");
-
-  const homeScore = match.homeScore ?? 0;
-  const awayScore = match.awayScore ?? 0;
-  const homeWon = isCompleted && (hasPens ? match.homeScorePens! > match.awayScorePens! : homeScore > awayScore);
-  const awayWon = isCompleted && (hasPens ? match.awayScorePens! > match.homeScorePens! : awayScore > homeScore);
 
   const halfH = MATCH_H / 2;
 
@@ -149,8 +174,13 @@ function MatchCard({
           </text>
         )}
 
-        {/* Penalty indicator */}
-        {hasPens && (
+        {/* Aggregate / Penalty indicator */}
+        {isCompleted && isAgg && (
+          <text x={x + MATCH_W / 2} y={y + halfH + 1} fontSize={9} fill="var(--muted-foreground)" dominantBaseline="middle" textAnchor="middle" fontFamily="system-ui">
+            Agg
+          </text>
+        )}
+        {!isAgg && match.homeScorePens != null && (
           <text x={x + MATCH_W / 2} y={y + halfH + 1} fontSize={9} fill="var(--muted-foreground)" dominantBaseline="middle" textAnchor="middle" fontFamily="system-ui">
             ({match.homeScorePens}–{match.awayScorePens} pens)
           </text>
@@ -182,31 +212,33 @@ function MobileBracket({ rounds, matchesByRound, participantType }: BracketViewP
             <div className="space-y-2">
               {matches.map((match) => {
                 const isCompleted = match.status === "COMPLETED";
-                const hasPens = match.homeScorePens != null && match.awayScorePens != null;
+                const { homeScore, awayScore, homeWon: hw, awayWon: aw, isAgg } = getDisplayScores(match);
+                const homeWon = isCompleted && hw;
+                const awayWon = isCompleted && aw;
                 const homeName = isIndividual ? (match.homePlayer?.name ?? "TBD") : (match.homeTeam?.shortName ?? match.homeTeam?.name ?? "TBD");
                 const awayName = isIndividual ? (match.awayPlayer?.name ?? "TBD") : (match.awayTeam?.shortName ?? match.awayTeam?.name ?? "TBD");
-                const homeScore = match.homeScore ?? 0;
-                const awayScore = match.awayScore ?? 0;
-                const homeWon = isCompleted && (hasPens ? match.homeScorePens! > match.awayScorePens! : homeScore > awayScore);
-                const awayWon = isCompleted && (hasPens ? match.awayScorePens! > match.homeScorePens! : awayScore > homeScore);
 
                 return (
                   <Link key={match.id} href={`/matches/${match.id}`}>
                     <div className={`bg-card border border-border rounded-lg overflow-hidden hover:border-primary/50 transition-colors ${isFinal ? "ring-1 ring-primary/30" : ""}`}>
                       {/* Home */}
-                      <div className={`flex items-center justify-between px-4 py-2.5 ${homeWon ? "bg-primary/5" : ""}`}>
+                      <div className={`flex items-center justify-between px-4 py-3 ${homeWon ? "bg-primary/5" : ""}`}>
                         <span className={`text-sm ${homeWon ? "font-bold text-primary" : "font-medium"}`}>{homeName}</span>
                         {isCompleted && <span className={`text-sm font-bold ${homeWon ? "text-primary" : "text-muted-foreground"}`}>{homeScore}</span>}
                       </div>
-                      {/* Divider */}
-                      <div className="border-t border-border/50" />
-                      {hasPens && (
-                        <div className="text-center text-[10px] text-muted-foreground py-0.5 bg-muted/30">
+                      {/* VS / Agg divider */}
+                      <div className="border-t border-border/50 flex items-center justify-center">
+                        <span className="text-[10px] text-muted-foreground py-0.5 px-2 bg-muted/30">
+                          {isCompleted && isAgg ? "Aggregate" : isCompleted ? "FT" : "vs"}
+                        </span>
+                      </div>
+                      {!isAgg && match.homeScorePens != null && (
+                        <div className="text-center text-[10px] text-muted-foreground py-0.5 bg-muted/30 border-t border-border/50">
                           Pens: {match.homeScorePens}–{match.awayScorePens}
                         </div>
                       )}
                       {/* Away */}
-                      <div className={`flex items-center justify-between px-4 py-2.5 ${awayWon ? "bg-primary/5" : ""}`}>
+                      <div className={`flex items-center justify-between px-4 py-3 ${awayWon ? "bg-primary/5" : ""}`}>
                         <span className={`text-sm ${awayWon ? "font-bold text-primary" : "font-medium"}`}>{awayName}</span>
                         {isCompleted && <span className={`text-sm font-bold ${awayWon ? "text-primary" : "text-muted-foreground"}`}>{awayScore}</span>}
                       </div>
