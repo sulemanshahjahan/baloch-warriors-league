@@ -39,13 +39,14 @@ function buildShareText(data: ScorecardData): string {
 
   let scoreLines: (string | null)[];
   if (has2Legs) {
-    const aggH = data.homeScore + (data.leg2HomeScore ?? 0);
-    const aggA = data.awayScore + (data.leg2AwayScore ?? 0);
+    const totalH = data.homeScore + (data.leg2HomeScore ?? 0) + (data.leg3HomeScore ?? 0);
+    const totalA = data.awayScore + (data.leg2AwayScore ?? 0) + (data.leg3AwayScore ?? 0);
+    const hasDecider = data.leg3HomeScore != null;
     scoreLines = [
       `*FULL-TIME*`,
-      `*${data.homeName} ${aggH}–${aggA} ${data.awayName} (Agg)*`,
+      `*${data.homeName} ${totalH}–${totalA} ${data.awayName}${hasDecider ? " (3 legs)" : " (Agg)"}*`,
       `Leg 1: ${data.homeScore}–${data.awayScore} | Leg 2: ${data.leg2HomeScore}–${data.leg2AwayScore ?? 0}`,
-      data.leg3HomeScore != null
+      hasDecider
         ? `Decider: ${data.leg3HomeScore}–${data.leg3AwayScore ?? 0}${data.leg3HomePens != null ? ` (${data.leg3HomePens}–${data.leg3AwayPens ?? 0} pens)` : ""}`
         : null,
     ];
@@ -204,20 +205,21 @@ export async function generateAndShareScorecard(
   const has2Legs = data.leg2HomeScore != null;
 
   if (has2Legs) {
-    // Aggregate score (large)
-    const aggH = data.homeScore + (data.leg2HomeScore ?? 0);
-    const aggA = data.awayScore + (data.leg2AwayScore ?? 0);
+    // Total score across all legs including decider
+    const totalH = data.homeScore + (data.leg2HomeScore ?? 0) + (data.leg3HomeScore ?? 0);
+    const totalA = data.awayScore + (data.leg2AwayScore ?? 0) + (data.leg3AwayScore ?? 0);
+    const hasDecider = data.leg3HomeScore != null;
     ctx.fillStyle = "#ef4444";
     ctx.font = "bold 64px system-ui";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(`${aggH} - ${aggA}`, size / 2, 350);
+    ctx.fillText(`${totalH} - ${totalA}`, size / 2, 350);
     ctx.textBaseline = "alphabetic";
 
-    // "Aggregate" label
+    // Label
     ctx.fillStyle = "rgba(255,255,255,0.4)";
     ctx.font = "500 14px system-ui";
-    ctx.fillText("AGGREGATE", size / 2, 390);
+    ctx.fillText(hasDecider ? "TOTAL (3 LEGS)" : "AGGREGATE", size / 2, 390);
 
     // Leg scores below
     ctx.fillStyle = "rgba(255,255,255,0.6)";
