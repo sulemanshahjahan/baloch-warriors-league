@@ -288,25 +288,33 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
               {showScore ? (
                 <>
                   {match.leg2HomeScore != null ? (
-                    <>
-                      {/* 2-Leg: Show aggregate as the big score */}
-                      <div className="text-5xl font-black tabular-nums">
-                        {(match.homeScore ?? 0) + (match.leg2HomeScore ?? 0)}
-                        <span className="text-muted-foreground mx-2 font-light text-3xl">–</span>
-                        {(match.awayScore ?? 0) + (match.leg2AwayScore ?? 0)}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1 font-medium">Aggregate</p>
-                      <div className="mt-2 space-y-0.5 text-xs text-muted-foreground">
-                        <p>Leg 1: {match.homeScore ?? 0} – {match.awayScore ?? 0}</p>
-                        <p>Leg 2: {match.leg2HomeScore} – {match.leg2AwayScore ?? 0}</p>
-                        {match.leg3HomeScore != null && (
-                          <p className="text-foreground font-medium">
-                            Decider: {match.leg3HomeScore} – {match.leg3AwayScore ?? 0}
-                            {match.leg3HomePens != null && ` (${match.leg3HomePens} – ${match.leg3AwayPens ?? 0} pens)`}
+                    (() => {
+                      const totalHome = (match.homeScore ?? 0) + (match.leg2HomeScore ?? 0) + (match.leg3HomeScore ?? 0);
+                      const totalAway = (match.awayScore ?? 0) + (match.leg2AwayScore ?? 0) + (match.leg3AwayScore ?? 0);
+                      return (
+                        <>
+                          {/* Total score across all legs */}
+                          <div className="text-5xl font-black tabular-nums">
+                            {totalHome}
+                            <span className="text-muted-foreground mx-2 font-light text-3xl">–</span>
+                            {totalAway}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1 font-medium">
+                            {match.leg3HomeScore != null ? "Total (3 legs)" : "Aggregate"}
                           </p>
-                        )}
-                      </div>
-                    </>
+                          <div className="mt-2 space-y-0.5 text-xs text-muted-foreground">
+                            <p>Leg 1: {match.homeScore ?? 0} – {match.awayScore ?? 0}</p>
+                            <p>Leg 2: {match.leg2HomeScore} – {match.leg2AwayScore ?? 0}</p>
+                            {match.leg3HomeScore != null && (
+                              <p className="text-foreground font-medium">
+                                Decider: {match.leg3HomeScore} – {match.leg3AwayScore ?? 0}
+                                {match.leg3HomePens != null && ` (${match.leg3HomePens} – ${match.leg3AwayPens ?? 0} pens)`}
+                              </p>
+                            )}
+                          </div>
+                        </>
+                      );
+                    })()
                   ) : (
                     <>
                       {/* Single match score */}
