@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useEffect, useRef, useTransition } from "react";
+import { useState, useEffect, useRef, useTransition, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Search, Loader2, Save, ExternalLink } from "lucide-react";
+import { Search, Loader2, Save, ExternalLink, Share2 } from "lucide-react";
 import { updateMatchResult } from "@/lib/actions/match";
+import { generateAndShareScorecard } from "@/lib/share-scorecard";
 import Link from "next/link";
 
 interface Player {
@@ -199,10 +200,12 @@ export function MatchFinder({ players, tournaments }: MatchFinderProps) {
 
 function MatchRow({ match }: { match: MatchResult }) {
   const router = useRouter();
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isPending, startTransition] = useTransition();
   const [homeScore, setHomeScore] = useState("");
   const [awayScore, setAwayScore] = useState("");
   const [saved, setSaved] = useState(false);
+  const [savedScores, setSavedScores] = useState<{ h: number; a: number } | null>(null);
 
   const homeName = match.homePlayer?.name ?? match.homeTeam?.name ?? "TBD";
   const awayName = match.awayPlayer?.name ?? match.awayTeam?.name ?? "TBD";
@@ -215,6 +218,18 @@ function MatchRow({ match }: { match: MatchResult }) {
   const displayAway = has2Legs
     ? (match.awayScore ?? 0) + (match.leg2AwayScore ?? 0) + (match.leg3AwayScore ?? 0)
     : (match.awayScore ?? 0);
+
+  async function shareScorecard(h: number, a: number) {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    try {
+      await generateAndShareScorecard(canvas, {
+        homeName, awayName, homeScore: h, awayScore: a,
+        tournamentName: match.tournament.name,
+        matchId: match.id, round: match.round, matchNumber: null,
+      });
+    } catch { /* share failed */ }
+  }
 
   function handleQuickScore() {
     const h = parseInt(homeScore), a = parseInt(awayScore);
@@ -229,14 +244,30 @@ function MatchRow({ match }: { match: MatchResult }) {
       const result = await updateMatchResult(match.id, fd);
       if (result.success) {
         setSaved(true);
+        setSavedScores({ h, a });
         router.refresh();
+        // Auto-open share dialog
+        shareScorecard(h, a);
       }
     });
   }
 
   if (saved) {
     return (
-      <div className="p-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 text-sm text-emerald-400">
+      <div className="p-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 space-y-2">
+        <p className="text-sm text-emerald-400">
+          {homeName} {savedScores?.h} - {savedScores?.a} {awayName} — Saved!
+        </p>
+        {savedScores && (
+          <button
+            onClick={() => shareScorecard(savedScores.h, savedScores.a)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-green-600 hover:bg-green-700 text-white text-xs font-medium transition-colors cursor-pointer"
+          >
+            <Share2 className="w-3.5 h-3.5" />
+            Re-share Scorecard
+          </button>
+        )}
+        <canvas ref={canvasRef} style={{ display: "none" }} />
         {homeName} {homeScore} - {awayScore} {awayName} — Saved!
       </div>
     );
@@ -291,6 +322,8 @@ function MatchRow({ match }: { match: MatchResult }) {
       <Link href={`/admin/matches/${match.id}`} className="shrink-0">
         <ExternalLink className="w-4 h-4 text-muted-foreground hover:text-foreground" />
       </Link>
+
+      <canvas ref={canvasRef} style={{ display: "none" }} />
     </div>
   );
 }
