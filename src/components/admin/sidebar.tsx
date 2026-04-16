@@ -22,6 +22,7 @@ import {
   Settings,
   Zap,
   UserPlus,
+  Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,11 @@ const navItems = [
     label: "Match Day",
     href: "/admin/match-day",
     icon: Zap,
+  },
+  {
+    label: "Match Finder",
+    href: "/admin/match-finder",
+    icon: Search,
   },
   {
     label: "Tournaments",

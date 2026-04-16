@@ -38,17 +38,17 @@ interface BracketMatch {
 function getDisplayScores(match: BracketMatch) {
   const has2Legs = match.leg2HomeScore != null;
   if (has2Legs) {
-    const aggHome = (match.homeScore ?? 0) + (match.leg2HomeScore ?? 0);
-    const aggAway = (match.awayScore ?? 0) + (match.leg2AwayScore ?? 0);
-    // Determine winner from aggregate, decider, or decider pens
-    let homeWon = aggHome > aggAway;
-    let awayWon = aggAway > aggHome;
-    if (!homeWon && !awayWon && match.leg3HomeScore != null) {
-      const d3h = match.leg3HomeScore ?? 0, d3a = match.leg3AwayScore ?? 0;
-      if (d3h !== d3a) { homeWon = d3h > d3a; awayWon = d3a > d3h; }
-      else if (match.leg3HomePens != null) { homeWon = (match.leg3HomePens ?? 0) > (match.leg3AwayPens ?? 0); awayWon = !homeWon; }
+    // Total across all legs including decider
+    const totalHome = (match.homeScore ?? 0) + (match.leg2HomeScore ?? 0) + (match.leg3HomeScore ?? 0);
+    const totalAway = (match.awayScore ?? 0) + (match.leg2AwayScore ?? 0) + (match.leg3AwayScore ?? 0);
+    // Determine winner from total, or pens if decider was drawn
+    let homeWon = totalHome > totalAway;
+    let awayWon = totalAway > totalHome;
+    if (!homeWon && !awayWon && match.leg3HomePens != null) {
+      homeWon = (match.leg3HomePens ?? 0) > (match.leg3AwayPens ?? 0);
+      awayWon = !homeWon;
     }
-    return { homeScore: aggHome, awayScore: aggAway, homeWon, awayWon, isAgg: true };
+    return { homeScore: totalHome, awayScore: totalAway, homeWon, awayWon, isAgg: true };
   }
   const hs = match.homeScore ?? 0, as2 = match.awayScore ?? 0;
   const hasPens = match.homeScorePens != null;
