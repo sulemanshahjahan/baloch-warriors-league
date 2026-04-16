@@ -35,8 +35,8 @@ interface MatchResult {
   scheduledAt: string | null;
   completedAt: string | null;
   tournament: { name: string };
-  homePlayer: { id: string; name: string } | null;
-  awayPlayer: { id: string; name: string } | null;
+  homePlayer: { id: string; name: string; photoUrl: string | null } | null;
+  awayPlayer: { id: string; name: string; photoUrl: string | null } | null;
   homeTeam: { id: string; name: string } | null;
   awayTeam: { id: string; name: string } | null;
 }
@@ -227,6 +227,8 @@ function MatchRow({ match }: { match: MatchResult }) {
         homeName, awayName, homeScore: h, awayScore: a,
         tournamentName: match.tournament.name,
         matchId: match.id, round: match.round, matchNumber: null,
+        homePhoto: match.homePlayer?.photoUrl ?? null,
+        awayPhoto: match.awayPlayer?.photoUrl ?? null,
       });
     } catch { /* share failed */ }
   }
