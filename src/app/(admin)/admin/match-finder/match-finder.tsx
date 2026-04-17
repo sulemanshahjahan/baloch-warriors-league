@@ -109,7 +109,7 @@ export function MatchFinder({ players, tournaments }: MatchFinderProps) {
     <div className="max-w-4xl space-y-4">
       {/* Search bar */}
       <div className="relative">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
@@ -123,7 +123,7 @@ export function MatchFinder({ players, tournaments }: MatchFinderProps) {
               }}
               onFocus={() => query.length >= 1 && setShowSuggestions(true)}
               placeholder="Type player name..."
-              className="pl-10 h-12 text-lg"
+              className="pl-10 h-12 text-lg w-full"
               autoFocus
             />
             {selectedPlayer && (
@@ -276,54 +276,53 @@ function MatchRow({ match }: { match: MatchResult }) {
   }
 
   return (
-    <div className="flex items-center gap-3 p-3 rounded-lg border border-border/50 bg-card/50 hover:bg-muted/30 transition-colors">
+    <div className="p-3 rounded-lg border border-border/50 bg-card/50 hover:bg-muted/30 transition-colors space-y-2">
       {/* Match info */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium truncate">{homeName}</span>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm font-semibold">{homeName}</span>
           {isCompleted ? (
-            <span className="text-sm font-black shrink-0">
+            <span className="text-sm font-black">
               {displayHome} - {displayAway}
             </span>
           ) : (
-            <span className="text-xs text-muted-foreground shrink-0">vs</span>
+            <span className="text-xs text-muted-foreground">vs</span>
           )}
-          <span className="text-sm font-medium truncate">{awayName}</span>
+          <span className="text-sm font-semibold">{awayName}</span>
         </div>
-        <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-[10px] text-muted-foreground truncate">{match.tournament.name}</span>
-          {match.round && <span className="text-[10px] text-muted-foreground">· {match.round}</span>}
-          <Badge variant="outline" className={`text-[10px] px-1 py-0 ${isCompleted ? "text-emerald-400 border-emerald-400/30" : "text-amber-400 border-amber-400/30"}`}>
-            {match.status}
-          </Badge>
-          {has2Legs && <Badge variant="outline" className="text-[10px] px-1 py-0">Agg</Badge>}
-        </div>
+        <Link href={`/admin/matches/${match.id}`} className="shrink-0">
+          <ExternalLink className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+        </Link>
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-[10px] text-muted-foreground">{match.tournament.name}</span>
+        {match.round && <span className="text-[10px] text-muted-foreground">· {match.round}</span>}
+        <Badge variant="outline" className={`text-[10px] px-1 py-0 ${isCompleted ? "text-emerald-400 border-emerald-400/30" : "text-amber-400 border-amber-400/30"}`}>
+          {match.status}
+        </Badge>
+        {has2Legs && <Badge variant="outline" className="text-[10px] px-1 py-0">Agg</Badge>}
       </div>
 
       {/* Quick score entry for non-completed */}
       {!isCompleted && (
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-1">
           <Input
             type="number" min={0} placeholder="H"
             value={homeScore} onChange={(e) => setHomeScore(e.target.value)}
-            className="w-12 h-7 text-center text-xs"
+            className="w-14 h-8 text-center text-sm"
           />
           <span className="text-muted-foreground text-xs">–</span>
           <Input
             type="number" min={0} placeholder="A"
             value={awayScore} onChange={(e) => setAwayScore(e.target.value)}
-            className="w-12 h-7 text-center text-xs"
+            className="w-14 h-8 text-center text-sm"
           />
-          <Button size="sm" onClick={handleQuickScore} disabled={isPending} className="h-7 px-2">
+          <Button size="sm" onClick={handleQuickScore} disabled={isPending} className="h-8 px-3">
             {isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
           </Button>
         </div>
       )}
-
-      {/* Link to full match page */}
-      <Link href={`/admin/matches/${match.id}`} className="shrink-0">
-        <ExternalLink className="w-4 h-4 text-muted-foreground hover:text-foreground" />
-      </Link>
 
       <canvas ref={canvasRef} style={{ display: "none" }} />
     </div>
