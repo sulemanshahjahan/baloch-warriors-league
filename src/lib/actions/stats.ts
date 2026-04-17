@@ -157,6 +157,30 @@ export async function getOverallStats(gameCategory?: string, seasonId?: string) 
 
   const playerMap = new Map(players.map(p => [p.id, p]));
 
+  // Pre-compute per-player stats (wins, clean sheets, goal diff) for MVP and leaderboards
+  const pStats = new Map<string, { wins: number; total: number; cleanSheets: number; goalsFor: number; goalsAgainst: number }>();
+  const ensureP = (id: string) => {
+    if (!pStats.has(id)) pStats.set(id, { wins: 0, total: 0, cleanSheets: 0, goalsFor: 0, goalsAgainst: 0 });
+    return pStats.get(id)!;
+  };
+  for (const m of allMatches) {
+    const legs: { h: number; a: number }[] = [{ h: m.homeScore ?? 0, a: m.awayScore ?? 0 }];
+    if (m.leg2HomeScore != null) legs.push({ h: m.leg2HomeScore ?? 0, a: m.leg2AwayScore ?? 0 });
+    if (m.leg3HomeScore != null) legs.push({ h: m.leg3HomeScore ?? 0, a: m.leg3AwayScore ?? 0 });
+    for (const leg of legs) {
+      if (m.homePlayerId) {
+        const s = ensureP(m.homePlayerId);
+        s.total++; if (leg.h > leg.a) s.wins++; if (leg.a === 0) s.cleanSheets++;
+        s.goalsFor += leg.h; s.goalsAgainst += leg.a;
+      }
+      if (m.awayPlayerId) {
+        const s = ensureP(m.awayPlayerId);
+        s.total++; if (leg.a > leg.h) s.wins++; if (leg.h === 0) s.cleanSheets++;
+        s.goalsFor += leg.a; s.goalsAgainst += leg.h;
+      }
+    }
+  }
+
   return {
     topScorers: topScorers.map(s => ({
       player: playerMap.get(s.playerId!),
@@ -179,17 +203,43 @@ export async function getOverallStats(gameCategory?: string, seasonId?: string) 
       matches: matchCounts.get(s.playerId!) || 0,
     })).filter(s => s.player),
     seasonMVP: (() => {
-      // Score = (goals * 3) + (assists * 2) + (MOTM * 5)
+      // Check if we have assists/MOTM data (2v2 or football)
+      const hasAssists = topAssists.length > 0;
+      const hasMOTM = mostMOTM.length > 0;
+
+      // Formula adapts based on available data:
+      // With assists/MOTM (2v2, football): Goals×3 + Assists×2 + MOTM×5 + Wins×3 + CleanSheets×3
+      // Without (1v1 eFootball): Goals×3 + Wins×5 + CleanSheets×4 + GoalDiff×1
       const scoreMap = new Map<string, number>();
+
+      // Goals (always counted)
       for (const s of topScorers) {
         if (s.playerId) scoreMap.set(s.playerId, (scoreMap.get(s.playerId) ?? 0) + s._count.type * 3);
       }
-      for (const s of topAssists) {
-        if (s.playerId) scoreMap.set(s.playerId, (scoreMap.get(s.playerId) ?? 0) + s._count.type * 2);
+
+      if (hasAssists) {
+        for (const s of topAssists) {
+          if (s.playerId) scoreMap.set(s.playerId, (scoreMap.get(s.playerId) ?? 0) + s._count.type * 2);
+        }
       }
-      for (const s of mostMOTM) {
-        if (s.playerId) scoreMap.set(s.playerId, (scoreMap.get(s.playerId) ?? 0) + s._count.type * 5);
+      if (hasMOTM) {
+        for (const s of mostMOTM) {
+          if (s.playerId) scoreMap.set(s.playerId, (scoreMap.get(s.playerId) ?? 0) + s._count.type * 5);
+        }
       }
+
+      // Add wins, clean sheets, goal diff from pStats
+      for (const [playerId, ps] of pStats.entries()) {
+        const current = scoreMap.get(playerId) ?? 0;
+        if (hasAssists || hasMOTM) {
+          // 2v2 / football formula
+          scoreMap.set(playerId, current + ps.wins * 3 + ps.cleanSheets * 3);
+        } else {
+          // 1v1 eFootball formula — wins and defense matter more
+          scoreMap.set(playerId, current + ps.wins * 5 + ps.cleanSheets * 4 + (ps.goalsFor - ps.goalsAgainst));
+        }
+      }
+
       return [...scoreMap.entries()]
         .sort((a, b) => b[1] - a[1])
         .slice(0, 10)
@@ -197,12 +247,16 @@ export async function getOverallStats(gameCategory?: string, seasonId?: string) 
           const goals = topScorers.find((s) => s.playerId === playerId)?._count.type ?? 0;
           const assists = topAssists.find((s) => s.playerId === playerId)?._count.type ?? 0;
           const motm = mostMOTM.find((s) => s.playerId === playerId)?._count.type ?? 0;
+          const ps = pStats.get(playerId);
           return {
             player: playerMap.get(playerId),
             score,
             goals,
             assists,
             motm,
+            wins: ps?.wins ?? 0,
+            cleanSheets: ps?.cleanSheets ?? 0,
+            goalDiff: ps ? ps.goalsFor - ps.goalsAgainst : 0,
             matches: matchCounts.get(playerId) ?? 0,
           };
         })
@@ -225,32 +279,8 @@ export async function getOverallStats(gameCategory?: string, seasonId?: string) 
       dinners: data.dinners,
       matches: data.matches,
     })).filter(s => s.player),
-    // Win rate, clean sheets, goal diff — computed from individual match scores
+    // Win rate, clean sheets, goal diff — from pre-computed pStats
     ...(() => {
-      const pStats = new Map<string, { wins: number; total: number; cleanSheets: number; goalsFor: number; goalsAgainst: number }>();
-      const ensure = (id: string) => {
-        if (!pStats.has(id)) pStats.set(id, { wins: 0, total: 0, cleanSheets: 0, goalsFor: 0, goalsAgainst: 0 });
-        return pStats.get(id)!;
-      };
-      for (const m of allMatches) {
-        // Process each leg as a separate match
-        const legs: { h: number; a: number }[] = [{ h: m.homeScore ?? 0, a: m.awayScore ?? 0 }];
-        if (m.leg2HomeScore != null) legs.push({ h: m.leg2HomeScore ?? 0, a: m.leg2AwayScore ?? 0 });
-        if (m.leg3HomeScore != null) legs.push({ h: m.leg3HomeScore ?? 0, a: m.leg3AwayScore ?? 0 });
-
-        for (const leg of legs) {
-          if (m.homePlayerId) {
-            const s = ensure(m.homePlayerId);
-            s.total++; if (leg.h > leg.a) s.wins++; if (leg.a === 0) s.cleanSheets++;
-            s.goalsFor += leg.h; s.goalsAgainst += leg.a;
-          }
-          if (m.awayPlayerId) {
-            const s = ensure(m.awayPlayerId);
-            s.total++; if (leg.a > leg.h) s.wins++; if (leg.h === 0) s.cleanSheets++;
-            s.goalsFor += leg.a; s.goalsAgainst += leg.h;
-          }
-        }
-      }
       const entries = [...pStats.entries()].filter(([, s]) => s.total >= 3);
       return {
         bestWinRate: entries

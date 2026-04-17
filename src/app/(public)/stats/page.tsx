@@ -299,7 +299,9 @@ export default async function StatsPage({ searchParams }: StatsPageProps) {
                     <BarChart3 className="w-4 h-4 text-primary" />
                     Season MVP Rankings
                     <span className="text-xs text-muted-foreground font-normal ml-2">
-                      Goals x3 + Assists x2 + MOTM x5
+                      {stats.topAssists.length > 0
+                        ? "Goals×3 + Assists×2 + MOTM×5 + Wins×3 + CS×3"
+                        : "Goals×3 + Wins×5 + CS×4 + GD×1"}
                     </span>
                   </CardTitle>
                 </CardHeader>
@@ -319,10 +321,13 @@ export default async function StatsPage({ searchParams }: StatsPageProps) {
                             <SmartAvatar type="player" id={item.player.id} name={item.player.name} className="h-10 w-10" fallbackClassName="text-sm" />
                             <div>
                               <span className="font-medium">{item.player.name}</span>
-                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
                                 <span>{item.goals}G</span>
-                                <span>{item.assists}A</span>
-                                <span>{item.motm}MOTM</span>
+                                {item.assists > 0 && <span>{item.assists}A</span>}
+                                {item.motm > 0 && <span>{item.motm}MOTM</span>}
+                                <span>{(item as { wins?: number }).wins ?? 0}W</span>
+                                <span>{(item as { cleanSheets?: number }).cleanSheets ?? 0}CS</span>
+                                {(item as { goalDiff?: number }).goalDiff != null && <span>{((item as { goalDiff?: number }).goalDiff ?? 0) > 0 ? "+" : ""}{(item as { goalDiff?: number }).goalDiff}GD</span>}
                                 <span>· {item.matches} matches</span>
                               </div>
                             </div>
