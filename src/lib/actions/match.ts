@@ -369,9 +369,11 @@ async function advanceKnockoutWinner(matchId: string, tournamentId: string) {
 
   if (!completedMatch || !completedMatch.homeScore || !completedMatch.awayScore) return;
   
-  // Only process knockout matches (have round numbers > 0 and proper round names)
+  // Only process knockout matches — skip LEAGUE format entirely
+  if (completedMatch.tournament.format === "LEAGUE") return;
+
   const roundName = completedMatch.round || "";
-  const isKnockoutMatch = completedMatch.roundNumber && completedMatch.roundNumber > 0 && 
+  const isKnockoutMatch = completedMatch.roundNumber && completedMatch.roundNumber > 0 &&
     !roundName.match(/Group\s+[A-Z]/i);
   
   if (!isKnockoutMatch) return;
