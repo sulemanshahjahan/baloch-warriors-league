@@ -447,6 +447,8 @@ model Match {
   @@index([tournamentId])
   @@index([status])
   @@index([status, deadline])
+  @@index([homePlayerId])
+  @@index([awayPlayerId])
   @@map("matches")
 }
 
