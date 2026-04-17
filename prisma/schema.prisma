@@ -262,6 +262,7 @@ model Player {
   eloHistory      EloHistory[]
   eloAsOpponent   EloHistory[]       @relation("EloOpponent")
   availabilities  MatchAvailability[]
+  playerOfWeeks   PlayerOfWeek[]
 
   @@index([isActive])
   @@map("players")
@@ -740,4 +741,27 @@ model ScoreReport {
   @@index([matchId])
   @@index([status, autoConfirmAt])
   @@map("score_reports")
+}
+
+// ─────────────────────────────────────────────────────────────
+// PLAYER OF THE WEEK (auto-generated weekly)
+// ─────────────────────────────────────────────────────────────
+
+model PlayerOfWeek {
+  id            String   @id @default(cuid())
+  playerId      String
+  weekStart     DateTime
+  weekEnd       DateTime
+  goals         Int
+  wins          Int
+  matchesPlayed Int
+  eloGained     Int
+  score         Int      // composite score used to pick
+  createdAt     DateTime @default(now())
+
+  player Player @relation(fields: [playerId], references: [id])
+
+  @@unique([weekStart])
+  @@index([createdAt])
+  @@map("player_of_week")
 }

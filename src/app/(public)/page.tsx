@@ -191,11 +191,16 @@ async function getHomeData() {
     select: { id: true, title: true, slug: true, excerpt: true, publishedAt: true },
   });
 
-  return { featuredTournaments, recentResults, upcomingMatches, stats, mvpStats, latestNews };
+  const playerOfWeek = await prisma.playerOfWeek.findFirst({
+    orderBy: { weekStart: "desc" },
+    include: { player: { select: { id: true, name: true, slug: true } } },
+  });
+
+  return { featuredTournaments, recentResults, upcomingMatches, stats, mvpStats, latestNews, playerOfWeek };
 }
 
 export default async function HomePage() {
-  const { featuredTournaments, recentResults, upcomingMatches, stats, mvpStats, latestNews } =
+  const { featuredTournaments, recentResults, upcomingMatches, stats, mvpStats, latestNews, playerOfWeek } =
     await getHomeData();
 
   return (
@@ -289,6 +294,49 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Player of the Week Banner */}
+      {playerOfWeek && playerOfWeek.player && (
+        <section className="border-b border-border/50 bg-gradient-to-r from-yellow-500/10 via-amber-500/10 to-orange-500/10">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <Link
+              href={`/players/${playerOfWeek.player.slug}`}
+              className="flex items-center gap-4 group"
+            >
+              <div className="shrink-0 relative">
+                <SmartAvatar
+                  type="player"
+                  id={playerOfWeek.player.id}
+                  name={playerOfWeek.player.name}
+                  className="h-16 w-16 sm:h-20 sm:w-20 ring-2 ring-yellow-400/50"
+                  fallbackClassName="text-xl"
+                />
+                <div className="absolute -top-1 -right-1 text-xl">🌟</div>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 text-xs font-bold text-yellow-400 tracking-widest uppercase mb-1">
+                  <Crown className="w-3 h-3" />
+                  Player of the Week
+                </div>
+                <div className="text-lg sm:text-2xl font-black group-hover:text-primary transition-colors truncate">
+                  {playerOfWeek.player.name}
+                </div>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs sm:text-sm text-muted-foreground mt-1">
+                  <span>⚽ {playerOfWeek.goals} goals</span>
+                  <span>🏆 {playerOfWeek.wins} wins</span>
+                  <span>🎯 {playerOfWeek.matchesPlayed} matches</span>
+                  {playerOfWeek.eloGained !== 0 && (
+                    <span className={playerOfWeek.eloGained > 0 ? "text-green-400" : "text-red-400"}>
+                      {playerOfWeek.eloGained > 0 ? "+" : ""}{playerOfWeek.eloGained} ELO
+                    </span>
+                  )}
+                </div>
+              </div>
+              <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
+            </Link>
+          </div>
+        </section>
+      )}
 
       {/* MVP Area */}
       {mvpStats.length > 0 && (

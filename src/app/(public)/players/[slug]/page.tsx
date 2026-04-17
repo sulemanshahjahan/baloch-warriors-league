@@ -22,6 +22,8 @@ import {
   BarChart3,
 } from "lucide-react";
 import { PlayerCard } from "@/components/public/player-card";
+import { PlayerEngagement } from "@/components/public/player-engagement";
+import { getPlayerEngagement, getAllPlayerTitles } from "@/lib/actions/engagement";
 import {
   getInitials,
   formatDate,
@@ -219,11 +221,14 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
 
   if (!player) notFound();
 
-  const [stats, recentMatches, upcomingMatches] = await Promise.all([
+  const [stats, recentMatches, upcomingMatches, engagement, allTitles] = await Promise.all([
     getPlayerStats(player.id),
     getPlayerRecentMatches(player.id),
     getPlayerUpcomingMatches(player.id),
+    getPlayerEngagement(player.id),
+    getAllPlayerTitles(),
   ]);
+  const playerTitles = allTitles.get(player.id) ?? [];
   const currentTeam = player.teams.find((t) => !t.leftAt)?.team;
 
   return (
@@ -338,6 +343,12 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                 matches: stats.appearances,
                 motm: stats.motm,
               }}
+            />
+
+            <PlayerEngagement
+              badges={engagement.badges}
+              titles={playerTitles}
+              streaks={engagement.streaks}
             />
 
             {/* Stats */}
