@@ -92,7 +92,7 @@ function RegistrationCard({ reg }: { reg: Registration }) {
           </span>
         )}
         <span>
-          {new Date(reg.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+          {new Date(reg.createdAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Karachi" })} PKT
         </span>
       </div>
 

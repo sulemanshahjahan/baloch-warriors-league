@@ -283,7 +283,7 @@ export async function sendMatchLinksViaWhatsApp(matchId: string) {
   const homeName = match.homePlayer?.name ?? match.homeTeam?.name ?? "Home";
   const awayName = match.awayPlayer?.name ?? match.awayTeam?.name ?? "Away";
   const deadlineStr = match.deadline
-    ? match.deadline.toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+    ? match.deadline.toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Karachi" }) + " PKT"
     : "No deadline set";
   const baseUrl = "https://bwlleague.com";
 

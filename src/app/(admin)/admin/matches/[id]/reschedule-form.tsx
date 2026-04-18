@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar } from "lucide-react";
 import { rescheduleMatch } from "@/lib/actions/match";
 import { useRouter } from "next/navigation";
+import { toKarachiInputValue } from "@/lib/utils";
 
 interface RescheduleFormProps {
   matchId: string;
@@ -39,12 +40,10 @@ export function RescheduleForm({
   const [success, setSuccess] = useState(false);
 
   const scheduledAtValue = currentScheduledAt
-    ? new Date(currentScheduledAt).toISOString().slice(0, 16)
-    : new Date().toISOString().slice(0, 16);
+    ? toKarachiInputValue(currentScheduledAt)
+    : toKarachiInputValue(new Date());
 
-  const deadlineValue = currentDeadline
-    ? new Date(currentDeadline).toISOString().slice(0, 16)
-    : "";
+  const deadlineValue = currentDeadline ? toKarachiInputValue(currentDeadline) : "";
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -81,7 +80,7 @@ export function RescheduleForm({
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="space-y-1.5">
-              <Label htmlFor="scheduledAt">Date &amp; Time</Label>
+              <Label htmlFor="scheduledAt">Date &amp; Time <span className="text-muted-foreground text-[10px]">(PKT)</span></Label>
               <Input
                 id="scheduledAt"
                 name="scheduledAt"
@@ -91,7 +90,7 @@ export function RescheduleForm({
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="deadline">Deadline</Label>
+              <Label htmlFor="deadline">Deadline <span className="text-muted-foreground text-[10px]">(PKT)</span></Label>
               <Input
                 id="deadline"
                 name="deadline"

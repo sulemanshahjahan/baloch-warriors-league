@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { getMatchByToken } from "./score-report";
+import { fromKarachiInputValue } from "@/lib/utils";
 
 // ─── MARK AVAILABLE ──────────────────────────────────────────
 
@@ -30,7 +31,7 @@ export async function markAvailable(
     where: { matchId_side: { matchId: match.id, side } },
     update: {
       isAvailable: true,
-      preferredTime: preferredTime ? new Date(preferredTime) : null,
+      preferredTime: fromKarachiInputValue(preferredTime ?? null),
       markedAt: new Date(),
     },
     create: {
@@ -38,7 +39,7 @@ export async function markAvailable(
       playerId,
       side,
       isAvailable: true,
-      preferredTime: preferredTime ? new Date(preferredTime) : null,
+      preferredTime: fromKarachiInputValue(preferredTime ?? null),
     },
   });
 
@@ -62,8 +63,9 @@ export async function markAvailable(
   const opponentToken = opponentSide === "home" ? match.homeToken : match.awayToken;
 
   if (opponentPhone && opponentToken) {
-    const timeStr = preferredTime
-      ? new Date(preferredTime).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
+    const parsedPreferred = fromKarachiInputValue(preferredTime ?? null);
+    const timeStr = parsedPreferred
+      ? parsedPreferred.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Karachi" }) + " PKT"
       : "anytime";
 
     const { sendWithLog } = await import("@/lib/whatsapp-log");

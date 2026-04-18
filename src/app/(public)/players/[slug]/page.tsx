@@ -441,7 +441,7 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                           <div className="flex items-center gap-2">
                             {match.deadline && (
                               <span className="text-xs text-amber-400">
-                                {new Date(match.deadline).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                                {new Date(match.deadline).toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "Asia/Karachi" })}
                               </span>
                             )}
                             <span className="text-xs font-medium px-2 py-0.5 rounded bg-blue-500/20 text-blue-400">

@@ -90,6 +90,15 @@ export function statusColor(status: string): string {
   return STATUS_COLORS[status as TournamentStatus | MatchStatus] ?? "bg-gray-500/10 text-gray-500";
 }
 
+/**
+ * All dates in the app are shown in this timezone regardless of
+ * where the server or viewer happens to be. Helpers below pin this
+ * explicitly so SSR output matches client rendering and the admin
+ * date pickers speak the same clock as the DB.
+ */
+export const APP_TIMEZONE = "Asia/Karachi";
+export const APP_TIMEZONE_LABEL = "PKT";
+
 export function formatDate(date: Date | string | null | undefined): string {
   if (!date) return "";
   const d = typeof date === "string" ? new Date(date) : date;
@@ -97,20 +106,69 @@ export function formatDate(date: Date | string | null | undefined): string {
     month: "short",
     day: "numeric",
     year: "numeric",
+    timeZone: APP_TIMEZONE,
   });
 }
 
 export function formatDateTime(
-  date: Date | string | null | undefined
+  date: Date | string | null | undefined,
+  options?: { withZone?: boolean }
 ): string {
   if (!date) return "";
   const d = typeof date === "string" ? new Date(date) : date;
-  return d.toLocaleDateString("en-US", {
+  const base = d.toLocaleString("en-US", {
     month: "short",
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
+    timeZone: APP_TIMEZONE,
   });
+  return options?.withZone === false ? base : `${base} ${APP_TIMEZONE_LABEL}`;
+}
+
+/**
+ * Format a Date into the value expected by <input type="datetime-local">,
+ * interpreted in Karachi time. Ensures the picker shows the same clock
+ * reading as the rest of the UI, regardless of the browser's own locale.
+ */
+export function toKarachiInputValue(date: Date | string | null | undefined): string {
+  if (!date) return "";
+  const d = typeof date === "string" ? new Date(date) : date;
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: APP_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(d);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
+}
+
+/**
+ * Parse a <input type="datetime-local"> string as Karachi time and
+ * return a Date anchored to the correct UTC instant.
+ * Karachi has no DST, fixed offset of +05:00.
+ */
+export function fromKarachiInputValue(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  // Value format: "YYYY-MM-DDTHH:MM"
+  return new Date(`${value}:00+05:00`);
+}
+
+/**
+ * Build an absolute Date representing a given hour/minute in Karachi on a
+ * given calendar day (the date portion is taken from `anchor` in UTC).
+ */
+export function atKarachiHour(anchor: Date, hour: number, minute = 0): Date {
+  const y = anchor.getUTCFullYear();
+  const m = String(anchor.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(anchor.getUTCDate()).padStart(2, "0");
+  const hh = String(hour).padStart(2, "0");
+  const mm = String(minute).padStart(2, "0");
+  return new Date(`${y}-${m}-${d}T${hh}:${mm}:00+05:00`);
 }
 
 export function formatLabel(str: string): string {

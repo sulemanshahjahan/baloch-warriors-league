@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { Loader2, Save, Users, User } from "lucide-react";
 import { createMatch } from "@/lib/actions/match";
+import { toKarachiInputValue } from "@/lib/utils";
 
 interface Tournament {
   id: string;
@@ -272,12 +273,12 @@ export default function NewMatchPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="scheduledAt">Date & Time</Label>
+                  <Label htmlFor="scheduledAt">Date & Time <span className="text-muted-foreground text-[10px]">(PKT)</span></Label>
                   <Input
                     id="scheduledAt"
                     name="scheduledAt"
                     type="datetime-local"
-                    defaultValue={new Date().toISOString().slice(0, 16)}
+                    defaultValue={toKarachiInputValue(new Date())}
                   />
                 </div>
                 <div className="space-y-2">
@@ -298,7 +299,7 @@ export default function NewMatchPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="deadline">Deadline</Label>
+                <Label htmlFor="deadline">Deadline <span className="text-muted-foreground text-[10px]">(PKT)</span></Label>
                 <Input
                   id="deadline"
                   name="deadline"

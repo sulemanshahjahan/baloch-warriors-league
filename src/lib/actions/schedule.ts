@@ -5,6 +5,7 @@ import { auth, getUserRole } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { MatchStatus } from "@prisma/client";
 import { randomUUID } from "crypto";
+import { atKarachiHour, fromKarachiInputValue } from "@/lib/utils";
 
 // Role hierarchy levels
 const ROLE_LEVELS: Record<string, number> = {
@@ -118,7 +119,7 @@ export async function generateSchedule(options: GenerateScheduleOptions) {
   // Compute deadline for a given round number
   const computeDeadline = (roundNum: number): Date | null => {
     if (deadlineMode === "global" && globalDeadline) {
-      return new Date(globalDeadline);
+      return fromKarachiInputValue(globalDeadline);
     }
     if (deadlineMode === "per_round" && daysPerRound && tournament.startDate) {
       return new Date(tournament.startDate.getTime() + roundNum * daysPerRound * 86400000);
@@ -378,9 +379,9 @@ export async function generateSchedule(options: GenerateScheduleOptions) {
       }
 
       if (bestDay >= 0) {
-        const scheduledAt = new Date(tournament.startDate!);
-        scheduledAt.setDate(scheduledAt.getDate() + bestDay);
-        scheduledAt.setHours(18, 0, 0, 0);
+        const dayAnchor = new Date(tournament.startDate!);
+        dayAnchor.setUTCDate(dayAnchor.getUTCDate() + bestDay);
+        const scheduledAt = atKarachiHour(dayAnchor, 18, 0); // 6 PM PKT
 
         const deadline = new Date(scheduledAt);
         deadline.setHours(deadline.getHours() + 24);
@@ -616,9 +617,9 @@ export async function generateKnockoutFromGroups(
     let dayOffset = 0;
 
     for (const m of koMatches) {
-      const scheduledAt = new Date(koStartDate);
-      scheduledAt.setDate(scheduledAt.getDate() + dayOffset);
-      scheduledAt.setHours(18, 0, 0, 0);
+      const dayAnchor = new Date(koStartDate);
+      dayAnchor.setUTCDate(dayAnchor.getUTCDate() + dayOffset);
+      const scheduledAt = atKarachiHour(dayAnchor, 18, 0); // 6 PM PKT
 
       const deadline = new Date(scheduledAt);
       deadline.setHours(deadline.getHours() + 24);

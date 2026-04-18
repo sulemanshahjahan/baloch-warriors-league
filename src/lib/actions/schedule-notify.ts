@@ -59,9 +59,9 @@ export async function sendScheduleNotifications(tournamentId: string): Promise<{
     const awaySlug = match.awayPlayer?.slug ?? null;
 
     const deadlineStr = match.deadline
-      ? match.deadline.toLocaleDateString("en-GB", { day: "numeric", month: "short" })
+      ? match.deadline.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "Asia/Karachi" })
       : match.scheduledAt
-        ? match.scheduledAt.toLocaleDateString("en-GB", { day: "numeric", month: "short" })
+        ? match.scheduledAt.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "Asia/Karachi" })
         : "TBC";
 
     // Add to home player's list

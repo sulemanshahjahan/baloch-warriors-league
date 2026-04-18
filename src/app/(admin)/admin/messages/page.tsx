@@ -211,7 +211,7 @@ export default async function MessagesPage({ searchParams }: PageProps) {
                             {log.tournament.name}
                           </Link>
                         )}
-                        <span>{new Date(log.createdAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+                        <span>{new Date(log.createdAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Karachi" })} PKT</span>
                         {log.error && (
                           <span className="text-red-400" title={log.error}>
                             ⚠ {log.error.length > 50 ? log.error.slice(0, 50) + "…" : log.error}

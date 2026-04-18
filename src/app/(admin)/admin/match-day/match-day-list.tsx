@@ -147,7 +147,7 @@ function MatchCard({ match }: { match: MatchWithDetails }) {
         {match.round ? ` — ${match.round}` : ""}
         {match.deadline && (
           <span className="ml-2 text-amber-400">
-            Deadline: {new Date(match.deadline).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+            Deadline: {new Date(match.deadline).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Karachi" })} PKT
           </span>
         )}
       </p>

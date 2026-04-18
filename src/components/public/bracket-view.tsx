@@ -208,7 +208,7 @@ function MatchCard({
             </span>
           ) : match.scheduledAt ? (
             <span>
-              Leg 1 on {new Date(match.scheduledAt).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
+              Leg 1 on {new Date(match.scheduledAt).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "Asia/Karachi" })} PKT
             </span>
           ) : (
             <span>Date TBD</span>

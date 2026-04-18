@@ -71,9 +71,9 @@ export async function GET(req: NextRequest) {
 
     // Auto-send magic links via WhatsApp (once, when 24h reminder fires)
     if (newReminders.includes("24h") && !sent.includes("wa")) {
-      const deadlineStr = match.deadline!.toLocaleDateString("en-GB", {
-        day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
-      });
+      const deadlineStr = match.deadline!.toLocaleString("en-GB", {
+        day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Karachi",
+      }) + " PKT";
       const baseUrl = "https://bwlleague.com";
 
       // Send to home player

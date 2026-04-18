@@ -8,6 +8,7 @@ import type { MatchStatus } from "@prisma/client";
 import { logActivity } from "./activity-log";
 import { invalidateCache } from "@/lib/redis";
 import { randomUUID } from "crypto";
+import { fromKarachiInputValue } from "@/lib/utils";
 
 // Role hierarchy levels
 const ROLE_LEVELS: Record<string, number> = {
@@ -84,8 +85,8 @@ export async function createMatch(formData: FormData) {
       round: data.round || null,
       roundNumber: data.roundNumber ? Number(data.roundNumber) : null,
       matchNumber: data.matchNumber ? Number(data.matchNumber) : null,
-      scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : null,
-      deadline: data.deadline ? new Date(data.deadline) : null,
+      scheduledAt: fromKarachiInputValue(data.scheduledAt ?? null),
+      deadline: fromKarachiInputValue(data.deadline ?? null),
       venueId: data.venueId || null,
       notes: data.notes || null,
       status: data.status,
@@ -528,7 +529,7 @@ export async function advanceKnockoutWinner(matchId: string, tournamentId: strin
     const homeName = nextMatch.homePlayer.name;
     const awayName = nextMatch.awayPlayer.name;
     const deadlineStr = nextMatch.deadline
-      ? nextMatch.deadline.toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+      ? nextMatch.deadline.toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Karachi" }) + " PKT"
       : "To be confirmed";
 
     import("@/lib/whatsapp-log").then(async ({ sendWithLog }) => {
@@ -1174,8 +1175,8 @@ export async function rescheduleMatch(matchId: string, formData: FormData) {
   await prisma.match.update({
     where: { id: matchId },
     data: {
-      scheduledAt: scheduledAt ? new Date(scheduledAt) : undefined,
-      deadline: deadline ? new Date(deadline) : undefined,
+      scheduledAt: scheduledAt ? fromKarachiInputValue(scheduledAt) : undefined,
+      deadline: deadline ? fromKarachiInputValue(deadline) : undefined,
       status: (status as MatchStatus) || undefined,
       notes: notes || null,
       // Reset reminders when rescheduling so they fire again for the new deadline

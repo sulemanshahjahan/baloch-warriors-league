@@ -130,7 +130,7 @@ export default async function TeamDetailPage({ params }: TeamDetailPageProps) {
               <div className="flex items-center justify-between py-2">
                 <span className="text-sm text-muted-foreground">Created</span>
                 <span className="text-sm">
-                  {new Date(team.createdAt).toLocaleDateString()}
+                  {new Date(team.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Karachi" })}
                 </span>
               </div>
             </CardContent>
@@ -252,7 +252,7 @@ export default async function TeamDetailPage({ params }: TeamDetailPageProps) {
                               {jerseyNumber ?? "—"}
                             </TableCell>
                             <TableCell className="text-right text-sm text-muted-foreground">
-                              {new Date(joinedAt).toLocaleDateString()}
+                              {new Date(joinedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Karachi" })}
                             </TableCell>
                             <TableCell>
                               <RemovePlayerButton
@@ -312,10 +312,10 @@ export default async function TeamDetailPage({ params }: TeamDetailPageProps) {
                               {player.position ?? "—"}
                             </TableCell>
                             <TableCell className="text-right text-sm text-muted-foreground">
-                              {new Date(joinedAt).toLocaleDateString()}
+                              {new Date(joinedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Karachi" })}
                             </TableCell>
                             <TableCell className="text-right text-sm text-muted-foreground">
-                              {leftAt ? new Date(leftAt).toLocaleDateString() : "—"}
+                              {leftAt ? new Date(leftAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Karachi" }) : "—"}
                             </TableCell>
                             <TableCell>
                               <ReactivatePlayerButton teamPlayerId={teamPlayerId} teamId={id} playerName={player.name} />

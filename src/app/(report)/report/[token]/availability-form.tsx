@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Loader2, Check, Clock } from "lucide-react";
 import { markAvailable } from "@/lib/actions/availability";
 import { useRouter } from "next/navigation";
+import { toKarachiInputValue } from "@/lib/utils";
 
 interface AvailabilityFormProps {
   token: string;
@@ -19,9 +20,7 @@ export function AvailabilityForm({ token, scheduledAt }: AvailabilityFormProps) 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
-  const defaultTime = scheduledAt
-    ? new Date(scheduledAt).toISOString().slice(0, 16)
-    : "";
+  const defaultTime = scheduledAt ? toKarachiInputValue(scheduledAt) : "";
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -62,7 +61,7 @@ export function AvailabilityForm({ token, scheduledAt }: AvailabilityFormProps) 
       <div className="space-y-2">
         <Label htmlFor="preferredTime" className="text-xs flex items-center gap-1.5">
           <Clock className="w-3.5 h-3.5" />
-          Preferred time (optional)
+          Preferred time <span className="text-muted-foreground text-[10px]">(PKT, optional)</span>
         </Label>
         <Input
           id="preferredTime"

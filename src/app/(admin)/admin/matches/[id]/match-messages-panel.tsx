@@ -78,7 +78,8 @@ export async function MatchMessagesPanel({ matchId }: { matchId: string }) {
                         month: "short",
                         hour: "2-digit",
                         minute: "2-digit",
-                      })}
+                        timeZone: "Asia/Karachi",
+                      })} PKT
                       {log.error && <span className="text-red-400 ml-2">· {log.error}</span>}
                     </div>
                   </div>

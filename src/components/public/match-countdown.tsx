@@ -44,6 +44,14 @@ export function MatchCountdown({ deadline }: { deadline: string }) {
     );
   }
 
+  const deadlineAbs = new Date(deadline).toLocaleString("en-GB", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Asia/Karachi",
+  });
+
   return (
     <div
       className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${
@@ -51,9 +59,10 @@ export function MatchCountdown({ deadline }: { deadline: string }) {
           ? "bg-destructive/10 text-destructive"
           : "bg-amber-500/10 text-amber-400"
       }`}
+      title={`${deadlineAbs} PKT`}
     >
       <Clock className="w-3.5 h-3.5" />
-      Deadline: {timeLeft}
+      Deadline: {timeLeft} · {deadlineAbs} PKT
     </div>
   );
 }

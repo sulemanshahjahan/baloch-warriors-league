@@ -228,7 +228,7 @@ export function ScheduleGenerator({
 
           {deadlineMode === "global" && (
             <div className="space-y-2">
-              <Label>All matches due by</Label>
+              <Label>All matches due by <span className="text-muted-foreground text-[10px]">(PKT)</span></Label>
               <Input
                 type="datetime-local"
                 value={globalDeadline}
