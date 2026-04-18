@@ -439,71 +439,55 @@ export async function advanceKnockoutWinner(matchId: string, tournamentId: strin
   const isIndividual = completedMatch.tournament.participantType === "INDIVIDUAL";
   const currentRound = completedMatch.roundNumber || 1;
   const nextRound = currentRound + 1;
-  
-  // Count KNOCKOUT matches in current round (exclude group stage matches)
-  const matchesInCurrentRound = await prisma.match.count({
+
+  // Get ALL knockout matches in the current round, deterministically ordered.
+  // Position within this list (not raw matchNumber) determines bracket slot.
+  const currentRoundMatches = await prisma.match.findMany({
     where: {
       tournamentId,
       roundNumber: currentRound,
       status: { not: "CANCELLED" },
       NOT: { round: { contains: "Group" } },
     },
+    orderBy: [{ matchNumber: "asc" }, { createdAt: "asc" }],
+    select: { id: true },
   });
-  
-  // Map match count to next round name
-  // 2 matches (semi-finals) -> Final
-  // 4 matches (quarter-finals) -> Semi-finals
-  // 8 matches (round of 16) -> Quarter-finals
+
+  const matchesInCurrentRound = currentRoundMatches.length;
+  const myIdx = currentRoundMatches.findIndex((m) => m.id === matchId);
+  if (myIdx < 0) return;
+
+  const pairIdx = Math.floor(myIdx / 2);
+  const isHomeSlot = myIdx % 2 === 0;
+  const nextMatchNumber = pairIdx + 1;
+
+  // Map count to round name
   let nextRoundName: string;
   switch (matchesInCurrentRound) {
-    case 2:
-      nextRoundName = "Final";
-      break;
-    case 4:
-      nextRoundName = "Semi-finals";
-      break;
-    case 8:
-      nextRoundName = "Quarter-finals";
-      break;
-    case 16:
-      nextRoundName = "Round of 16";
-      break;
-    default:
-      nextRoundName = `Round ${nextRound}`;
+    case 2:  nextRoundName = "Final"; break;
+    case 4:  nextRoundName = "Semi-finals"; break;
+    case 8:  nextRoundName = "Quarter-finals"; break;
+    case 16: nextRoundName = "Round of 16"; break;
+    default: nextRoundName = `Round ${nextRound}`;
   }
-  
-  // Find existing next round match for this bracket position
-  // Match number determines which next match (1&2 -> 1, 3&4 -> 2, etc.)
-  // Handle null/undefined matchNumber gracefully - use ID-based fallback
-  let matchNumber = completedMatch.matchNumber;
-  let nextMatchNumber: number;
-  let isHomeSlot: boolean;
-  
-  if (matchNumber == null) {
-    // If matchNumber is null, derive a stable position from match ID
-    // Use last 4 hex chars of UUID as a number (0-65535)
-    const idSuffix = parseInt(matchId.slice(-4), 16) || 0;
-    // Determine slot based on hash of match ID for consistency
-    isHomeSlot = (idSuffix % 2) === 0;
-    // Create a synthetic match number for calculation
-    matchNumber = (idSuffix % 8) + 1; // 1-8 range
-    nextMatchNumber = Math.ceil(matchNumber / 2);
-    console.warn(`Match ${matchId} has no matchNumber, using derived position ${matchNumber} -> next slot ${nextMatchNumber} (${isHomeSlot ? 'home' : 'away'})`);
-  } else {
-    nextMatchNumber = Math.ceil(matchNumber / 2);
-    isHomeSlot = matchNumber % 2 === 1; // Odd matches go to home, even to away
-  }
-  
-  const existingNextMatch = await prisma.match.findFirst({
+
+  // Look for existing next-round match. Prefer matchNumber match; fall back to
+  // position-in-sorted-order if matchNumber is null/mismatched on legacy rows.
+  const nextRoundMatches = await prisma.match.findMany({
     where: {
       tournamentId,
       roundNumber: nextRound,
-      matchNumber: nextMatchNumber,
+      status: { not: "CANCELLED" },
+      NOT: { round: { contains: "Group" } },
     },
+    orderBy: [{ matchNumber: "asc" }, { createdAt: "asc" }],
   });
-  
+
+  const existingNextMatch =
+    nextRoundMatches.find((m) => m.matchNumber === nextMatchNumber) ??
+    nextRoundMatches[pairIdx] ?? null;
+
   if (existingNextMatch) {
-    // Update existing match with winner
     await prisma.match.update({
       where: { id: existingNextMatch.id },
       data: isIndividual
@@ -511,7 +495,6 @@ export async function advanceKnockoutWinner(matchId: string, tournamentId: strin
         : (isHomeSlot ? { homeTeamId: winnerId } : { awayTeamId: winnerId }),
     });
   } else {
-    // Create new match for next round (including Final)
     await prisma.match.create({
       data: {
         tournamentId,
@@ -567,12 +550,38 @@ export async function advanceKnockoutWinner(matchId: string, tournamentId: strin
 }
 
 /**
- * Re-run advancement for every completed knockout match in a tournament.
- * Fills TBD slots in later rounds for tournaments affected by prior bugs.
+ * Rebuild knockout advancement from scratch.
+ * 1. Clear home/away player/team on all non-first-round SCHEDULED knockout matches
+ *    (preserves COMPLETED matches — no data loss)
+ * 2. Replay advanceKnockoutWinner for every completed knockout match in round order
  */
 export async function backfillKnockoutAdvancement(tournamentId: string) {
   const session = await auth();
   if (!hasRole(session, "ADMIN")) return { success: false, error: "Unauthorized" };
+
+  // Find the minimum roundNumber for knockout matches — that's the first bracket round.
+  const firstKo = await prisma.match.findFirst({
+    where: { tournamentId, NOT: { round: { contains: "Group" } } },
+    orderBy: { roundNumber: "asc" },
+    select: { roundNumber: true },
+  });
+  const firstRound = firstKo?.roundNumber ?? 1;
+
+  // Wipe slots on SCHEDULED matches in rounds AFTER the first (these are advancement-populated)
+  await prisma.match.updateMany({
+    where: {
+      tournamentId,
+      status: "SCHEDULED",
+      roundNumber: { gt: firstRound },
+      NOT: { round: { contains: "Group" } },
+    },
+    data: {
+      homePlayerId: null,
+      awayPlayerId: null,
+      homeTeamId: null,
+      awayTeamId: null,
+    },
+  });
 
   const completed = await prisma.match.findMany({
     where: {
@@ -581,7 +590,7 @@ export async function backfillKnockoutAdvancement(tournamentId: string) {
       NOT: { round: { contains: "Group" } },
     },
     select: { id: true, roundNumber: true, matchNumber: true },
-    orderBy: [{ roundNumber: "asc" }, { matchNumber: "asc" }],
+    orderBy: [{ roundNumber: "asc" }, { matchNumber: "asc" }, { createdAt: "asc" }],
   });
 
   let processed = 0;
