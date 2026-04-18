@@ -27,9 +27,9 @@ export async function sendScheduleNotifications(tournamentId: string): Promise<{
   });
   if (!tournament) return { success: false, sent: 0, errors: ["Tournament not found"] };
 
-  // Fetch all scheduled matches with player details
+  // Fetch all playable (not yet completed/cancelled) matches with player details
   const matches = await prisma.match.findMany({
-    where: { tournamentId, status: "SCHEDULED" },
+    where: { tournamentId, status: { in: ["SCHEDULED", "POSTPONED"] } },
     orderBy: [{ scheduledAt: "asc" }, { roundNumber: "asc" }, { matchNumber: "asc" }],
     include: {
       homePlayer: { select: { id: true, name: true, phone: true, slug: true } },

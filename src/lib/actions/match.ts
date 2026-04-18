@@ -521,7 +521,10 @@ export async function advanceKnockoutWinner(matchId: string, tournamentId: strin
     },
   });
 
-  if (nextMatch?.homePlayerId && nextMatch?.awayPlayerId && nextMatch.homePlayer?.phone && nextMatch.awayPlayer?.phone) {
+  // Don't announce a schedule for a match that's already been played or cancelled
+  const nextIsPlayable = nextMatch?.status === "SCHEDULED" || nextMatch?.status === "POSTPONED";
+
+  if (nextIsPlayable && nextMatch?.homePlayerId && nextMatch?.awayPlayerId && nextMatch.homePlayer?.phone && nextMatch.awayPlayer?.phone) {
     const homeName = nextMatch.homePlayer.name;
     const awayName = nextMatch.awayPlayer.name;
     const deadlineStr = nextMatch.deadline
