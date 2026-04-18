@@ -66,14 +66,22 @@ export async function markAvailable(
       ? new Date(preferredTime).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
       : "anytime";
 
-    const { sendOpponentReady } = await import("@/lib/whatsapp");
-    await sendOpponentReady(
-      opponentPhone,
-      opponentName,
-      playerName,
-      timeStr,
-      `https://bwlleague.com/report/${opponentToken}`,
-    );
+    const { sendWithLog } = await import("@/lib/whatsapp-log");
+    await sendWithLog({
+      to: opponentPhone,
+      templateName: "opponent_ready",
+      parameters: [
+        opponentName,
+        playerName,
+        timeStr,
+        `https://bwlleague.com/report/${opponentToken}`,
+      ],
+      // Keyed on (match, side-that-marked-ready) — re-marking clears and re-fires
+      dedupKey: `opponent_ready:${match.id}:${side}`,
+      category: "OPPONENT_READY",
+      matchId: match.id,
+      tournamentId: match.tournamentId,
+    });
   }
 
   // WhatsApp only — no broadcast push notification for availability

@@ -2,7 +2,7 @@
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { sendWhatsAppTemplate } from "@/lib/whatsapp";
+import { sendWithLog } from "@/lib/whatsapp-log";
 
 /**
  * After schedule generation, send ONE WhatsApp message per player
@@ -16,6 +16,7 @@ import { sendWhatsAppTemplate } from "@/lib/whatsapp";
 export async function sendScheduleNotifications(tournamentId: string): Promise<{
   success: boolean;
   sent: number;
+  skipped?: number;
   errors: string[];
 }> {
   const session = await auth();
@@ -89,10 +90,11 @@ export async function sendScheduleNotifications(tournamentId: string): Promise<{
   }
 
   let sent = 0;
+  let skipped = 0;
   const errors: string[] = [];
 
   // Send one message per player
-  for (const [, player] of playerMatches) {
+  for (const [playerId, player] of playerMatches) {
     if (!player.phone) {
       errors.push(`${player.name}: No WhatsApp number`);
       continue;
@@ -107,7 +109,7 @@ export async function sendScheduleNotifications(tournamentId: string): Promise<{
       ? `https://bwlleague.com/players/${player.slug}`
       : `https://bwlleague.com/tournaments/${tournament.slug}`;
 
-    const result = await sendWhatsAppTemplate({
+    const result = await sendWithLog({
       to: player.phone,
       templateName: "fixture_summary",
       languageCode: "en",
@@ -117,11 +119,16 @@ export async function sendScheduleNotifications(tournamentId: string): Promise<{
         matchList,
         fixturesUrl,
       ],
+      dedupKey: `fixture:${tournamentId}:${playerId}`,
+      category: "FIXTURE",
+      tournamentId,
+      playerId,
     });
 
-    if (result.ok && !result.error) sent++;
+    if (result.skipped) skipped++;
+    else if (result.ok) sent++;
     else errors.push(`${player.name}: ${result.error || "Failed"}`);
   }
 
-  return { success: true, sent, errors };
+  return { success: true, sent, skipped, errors };
 }

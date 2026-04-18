@@ -23,6 +23,7 @@ import {
   Zap,
   UserPlus,
   Search,
+  MessageCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -99,6 +100,11 @@ const navItems = [
     label: "Registrations",
     href: "/admin/registrations",
     icon: UserPlus,
+  },
+  {
+    label: "Messages",
+    href: "/admin/messages",
+    icon: MessageCircle,
   },
   {
     label: "Admin Users",

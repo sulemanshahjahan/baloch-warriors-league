@@ -288,21 +288,40 @@ export async function sendMatchLinksViaWhatsApp(matchId: string) {
   const baseUrl = "https://bwlleague.com";
 
   let sent = 0;
+  let skipped = 0;
   const errors: string[] = [];
 
-  const { sendMatchLink } = await import("@/lib/whatsapp");
+  const { sendWithLog } = await import("@/lib/whatsapp-log");
 
   if (match.homePlayer?.phone) {
-    const result = await sendMatchLink(match.homePlayer.phone, homeName, awayName, deadlineStr, `${baseUrl}/report/${match.homeToken}`);
-    if (result.ok && !result.error) sent++;
+    const result = await sendWithLog({
+      to: match.homePlayer.phone,
+      templateName: process.env.WHATSAPP_TEMPLATE_NAME || "match_reminder",
+      parameters: [homeName, awayName, deadlineStr, `${baseUrl}/report/${match.homeToken}`],
+      dedupKey: `reminder:${matchId}:manual:home`,
+      category: "REMINDER",
+      matchId,
+      tournamentId: match.tournamentId,
+    });
+    if (result.skipped) skipped++;
+    else if (result.ok) sent++;
     else errors.push(`${homeName}: ${result.error || "Unknown error"}`);
   } else {
     errors.push(`${homeName} has no WhatsApp number`);
   }
 
   if (match.awayPlayer?.phone) {
-    const result = await sendMatchLink(match.awayPlayer.phone, awayName, homeName, deadlineStr, `${baseUrl}/report/${match.awayToken}`);
-    if (result.ok && !result.error) sent++;
+    const result = await sendWithLog({
+      to: match.awayPlayer.phone,
+      templateName: process.env.WHATSAPP_TEMPLATE_NAME || "match_reminder",
+      parameters: [awayName, homeName, deadlineStr, `${baseUrl}/report/${match.awayToken}`],
+      dedupKey: `reminder:${matchId}:manual:away`,
+      category: "REMINDER",
+      matchId,
+      tournamentId: match.tournamentId,
+    });
+    if (result.skipped) skipped++;
+    else if (result.ok) sent++;
     else errors.push(`${awayName}: ${result.error || "Unknown error"}`);
   } else {
     errors.push(`${awayName} has no WhatsApp number`);
@@ -310,7 +329,7 @@ export async function sendMatchLinksViaWhatsApp(matchId: string) {
 
   return {
     success: true,
-    data: { sent, errors },
+    data: { sent, skipped, errors },
   };
 }
 

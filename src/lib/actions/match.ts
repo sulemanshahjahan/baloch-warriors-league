@@ -531,23 +531,37 @@ export async function advanceKnockoutWinner(matchId: string, tournamentId: strin
       ? nextMatch.deadline.toLocaleDateString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
       : "To be confirmed";
 
-    import("@/lib/whatsapp").then(async ({ sendScheduleMessage }) => {
+    import("@/lib/whatsapp-log").then(async ({ sendWithLog }) => {
       // Notify home player
-      await sendScheduleMessage(
-        nextMatch.homePlayer!.phone!,
-        homeName,
-        awayName,
-        nextMatch.awayPlayer!.phone!.replace(/[+\s\-()]/g, ""),
-        deadlineStr,
-      );
+      await sendWithLog({
+        to: nextMatch.homePlayer!.phone!,
+        templateName: "match_schedule",
+        parameters: [
+          homeName,
+          awayName,
+          nextMatch.awayPlayer!.phone!.replace(/[+\s\-()]/g, ""),
+          deadlineStr,
+        ],
+        dedupKey: `schedule:${nextMatch.id}:home`,
+        category: "SCHEDULE",
+        matchId: nextMatch.id,
+        tournamentId: nextMatch.tournamentId,
+      });
       // Notify away player
-      await sendScheduleMessage(
-        nextMatch.awayPlayer!.phone!,
-        awayName,
-        homeName,
-        nextMatch.homePlayer!.phone!.replace(/[+\s\-()]/g, ""),
-        deadlineStr,
-      );
+      await sendWithLog({
+        to: nextMatch.awayPlayer!.phone!,
+        templateName: "match_schedule",
+        parameters: [
+          awayName,
+          homeName,
+          nextMatch.homePlayer!.phone!.replace(/[+\s\-()]/g, ""),
+          deadlineStr,
+        ],
+        dedupKey: `schedule:${nextMatch.id}:away`,
+        category: "SCHEDULE",
+        matchId: nextMatch.id,
+        tournamentId: nextMatch.tournamentId,
+      });
     }).catch(() => {});
   }
 }

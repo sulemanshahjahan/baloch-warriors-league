@@ -162,13 +162,14 @@ model Tournament {
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
-  season    Season?            @relation(fields: [seasonId], references: [id])
-  teams     TournamentTeam[]
-  players   TournamentPlayer[]
-  groups    TournamentGroup[]
-  matches   Match[]
-  standings Standing[]
-  awards    Award[]
+  season       Season?            @relation(fields: [seasonId], references: [id])
+  teams        TournamentTeam[]
+  players      TournamentPlayer[]
+  groups       TournamentGroup[]
+  matches      Match[]
+  standings    Standing[]
+  awards       Award[]
+  whatsappLogs WhatsAppLog[]
 
   @@index([gameCategory])
   @@index([status])
@@ -263,6 +264,7 @@ model Player {
   eloAsOpponent   EloHistory[]       @relation("EloOpponent")
   availabilities  MatchAvailability[]
   playerOfWeeks   PlayerOfWeek[]
+  whatsappLogs    WhatsAppLog[]
 
   @@index([isActive])
   @@map("players")
@@ -444,6 +446,7 @@ model Match {
   eloHistory      EloHistory[]
   scoreReports    ScoreReport[]
   availabilities  MatchAvailability[]
+  whatsappLogs    WhatsAppLog[]
 
   @@index([tournamentId])
   @@index([status])
@@ -764,4 +767,39 @@ model PlayerOfWeek {
   @@unique([weekStart])
   @@index([createdAt])
   @@map("player_of_week")
+}
+
+// ─────────────────────────────────────────────────────────────
+// WHATSAPP MESSAGE LOG (audit + dedup)
+// ─────────────────────────────────────────────────────────────
+
+model WhatsAppLog {
+  id           String   @id @default(cuid())
+  matchId      String?
+  playerId     String?
+  tournamentId String?
+
+  phone        String   // cleaned phone number we sent to
+  templateName String   // e.g. match_reminder, match_schedule, fixture_summary
+  category     String   // REMINDER | SCHEDULE | FIXTURE | OPPONENT_READY | OTHER
+  parameters   Json     // template parameters (for audit)
+
+  status       String   // SENT | FAILED | SKIPPED
+  error        String?
+
+  // Idempotency key — if a SENT row with this key exists, skip re-sending
+  dedupKey     String   @unique
+
+  createdAt    DateTime @default(now())
+
+  match      Match?      @relation(fields: [matchId], references: [id], onDelete: SetNull)
+  player     Player?     @relation(fields: [playerId], references: [id], onDelete: SetNull)
+  tournament Tournament? @relation(fields: [tournamentId], references: [id], onDelete: SetNull)
+
+  @@index([matchId])
+  @@index([playerId])
+  @@index([tournamentId])
+  @@index([category, createdAt])
+  @@index([createdAt])
+  @@map("whatsapp_logs")
 }

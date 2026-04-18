@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { notify } from "@/lib/push";
-import { sendMatchLink } from "@/lib/whatsapp";
+import { sendWithLog } from "@/lib/whatsapp-log";
 
 export const dynamic = "force-dynamic";
 
@@ -31,8 +31,8 @@ export async function GET(req: NextRequest) {
       tournament: { select: { name: true } },
       homeTeam: { select: { name: true } },
       awayTeam: { select: { name: true } },
-      homePlayer: { select: { name: true, phone: true } },
-      awayPlayer: { select: { name: true, phone: true } },
+      homePlayer: { select: { id: true, name: true, phone: true } },
+      awayPlayer: { select: { id: true, name: true, phone: true } },
     },
   });
 
@@ -78,26 +78,32 @@ export async function GET(req: NextRequest) {
 
       // Send to home player
       if (match.homePlayer?.phone && match.homeToken) {
-        const result = await sendMatchLink(
-          match.homePlayer.phone,
-          homeName,
-          awayName,
-          deadlineStr,
-          `${baseUrl}/report/${match.homeToken}`,
-        );
-        if (result.ok) whatsappSentCount++;
+        const result = await sendWithLog({
+          to: match.homePlayer.phone,
+          templateName: process.env.WHATSAPP_TEMPLATE_NAME || "match_reminder",
+          parameters: [homeName, awayName, deadlineStr, `${baseUrl}/report/${match.homeToken}`],
+          dedupKey: `reminder:${match.id}:24h:home`,
+          category: "REMINDER",
+          matchId: match.id,
+          playerId: match.homePlayer.id,
+          tournamentId: match.tournamentId,
+        });
+        if (result.ok && !result.skipped) whatsappSentCount++;
       }
 
       // Send to away player
       if (match.awayPlayer?.phone && match.awayToken) {
-        const result = await sendMatchLink(
-          match.awayPlayer.phone,
-          awayName,
-          homeName,
-          deadlineStr,
-          `${baseUrl}/report/${match.awayToken}`,
-        );
-        if (result.ok) whatsappSentCount++;
+        const result = await sendWithLog({
+          to: match.awayPlayer.phone,
+          templateName: process.env.WHATSAPP_TEMPLATE_NAME || "match_reminder",
+          parameters: [awayName, homeName, deadlineStr, `${baseUrl}/report/${match.awayToken}`],
+          dedupKey: `reminder:${match.id}:24h:away`,
+          category: "REMINDER",
+          matchId: match.id,
+          playerId: match.awayPlayer.id,
+          tournamentId: match.tournamentId,
+        });
+        if (result.ok && !result.skipped) whatsappSentCount++;
       }
 
       newReminders.push("wa");

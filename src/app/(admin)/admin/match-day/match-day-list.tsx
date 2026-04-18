@@ -95,9 +95,12 @@ function MatchCard({ match }: { match: MatchWithDetails }) {
     const res = await sendMatchLinksViaWhatsApp(match.id);
     setWaSending(false);
     if (res.success && res.data) {
-      setWaStatus(res.data.errors.length > 0
-        ? `Sent ${res.data.sent}, issues: ${res.data.errors[0]}`
-        : `Sent to ${res.data.sent} player(s)`);
+      const d = res.data as { sent: number; skipped?: number; errors: string[] };
+      const parts: string[] = [];
+      if (d.sent > 0) parts.push(`Sent ${d.sent}`);
+      if (d.skipped && d.skipped > 0) parts.push(`${d.skipped} skipped (already sent)`);
+      if (d.errors.length > 0) parts.push(`issues: ${d.errors[0]}`);
+      setWaStatus(parts.join(" · ") || "No action");
     } else {
       setWaStatus(res.error ?? "Failed");
     }

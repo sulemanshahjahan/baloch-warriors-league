@@ -11,6 +11,7 @@ import { DeleteMatchButton } from "./delete-match-button";
 import { RescheduleForm } from "./reschedule-form";
 import { RoomIdForm } from "./room-id-form";
 import { MagicLinksCard } from "./magic-links-card";
+import { MatchMessagesPanel } from "./match-messages-panel";
 import { getAvailabilityStatus } from "@/lib/actions/availability";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -213,6 +214,9 @@ export default async function MatchDetailPage({ params }: MatchDetailPageProps) 
           matchStatus={match.status}
           pendingReport={match.scoreReports?.find((r: { status: string }) => r.status === "PENDING" || r.status === "DISPUTED") ?? null}
         />
+
+        {/* WhatsApp message history for this match */}
+        <MatchMessagesPanel matchId={match.id} />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Result Entry Form */}

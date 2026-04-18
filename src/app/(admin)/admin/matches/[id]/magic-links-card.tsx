@@ -152,12 +152,12 @@ export function MagicLinksCard({
                 const res = await sendMatchLinksViaWhatsApp(matchId);
                 setWaSending(false);
                 if (res.success && res.data) {
-                  const { sent, errors } = res.data;
-                  setWaResult(
-                    errors.length > 0
-                      ? `Sent ${sent}, issues: ${errors.join(", ")}`
-                      : `Sent to ${sent} player(s)!`
-                  );
+                  const { sent, skipped = 0, errors } = res.data as { sent: number; skipped?: number; errors: string[] };
+                  const parts: string[] = [];
+                  if (sent > 0) parts.push(`Sent to ${sent} player(s)`);
+                  if (skipped > 0) parts.push(`${skipped} already sent (skipped)`);
+                  if (errors.length > 0) parts.push(`issues: ${errors.join(", ")}`);
+                  setWaResult(parts.join(" · ") || "No action");
                 } else {
                   setWaResult(res.error ?? "Failed");
                 }
