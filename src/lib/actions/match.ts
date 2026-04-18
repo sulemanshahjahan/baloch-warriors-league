@@ -360,14 +360,14 @@ export async function updateMatchResult(
 
 // ─── KNOCKOUT BRACKET PROGRESSION ─────────────────────────────
 
-async function advanceKnockoutWinner(matchId: string, tournamentId: string) {
+export async function advanceKnockoutWinner(matchId: string, tournamentId: string) {
   // Get the completed match with its round info
   const completedMatch = await prisma.match.findUnique({
     where: { id: matchId },
     include: { tournament: true },
   });
 
-  if (!completedMatch || !completedMatch.homeScore || !completedMatch.awayScore) return;
+  if (!completedMatch || completedMatch.homeScore == null || completedMatch.awayScore == null) return;
   
   // Only process knockout matches — skip LEAGUE format entirely
   if (completedMatch.tournament.format === "LEAGUE") return;
@@ -564,6 +564,40 @@ async function advanceKnockoutWinner(matchId: string, tournamentId: string) {
       );
     }).catch(() => {});
   }
+}
+
+/**
+ * Re-run advancement for every completed knockout match in a tournament.
+ * Fills TBD slots in later rounds for tournaments affected by prior bugs.
+ */
+export async function backfillKnockoutAdvancement(tournamentId: string) {
+  const session = await auth();
+  if (!hasRole(session, "ADMIN")) return { success: false, error: "Unauthorized" };
+
+  const completed = await prisma.match.findMany({
+    where: {
+      tournamentId,
+      status: "COMPLETED",
+      NOT: { round: { contains: "Group" } },
+    },
+    select: { id: true, roundNumber: true, matchNumber: true },
+    orderBy: [{ roundNumber: "asc" }, { matchNumber: "asc" }],
+  });
+
+  let processed = 0;
+  for (const m of completed) {
+    try {
+      await advanceKnockoutWinner(m.id, tournamentId);
+      processed++;
+    } catch (err) {
+      console.error("[backfillKnockoutAdvancement] failed for", m.id, err);
+    }
+  }
+
+  revalidatePath(`/tournaments`);
+  revalidatePath(`/admin/tournaments/${tournamentId}`);
+
+  return { success: true, processed };
 }
 
 export async function addMatchEvent(formData: FormData) {

@@ -31,6 +31,7 @@ import { PlayerEnrollment } from "./player-enrollment";
 import { AwardsManager } from "./awards-manager";
 import { GroupsManager } from "./groups-manager";
 import { RecomputeStandingsButton } from "./recompute-standings-button";
+import { BackfillBracketButton } from "./backfill-bracket-button";
 import { CollapsibleSection } from "@/components/admin/collapsible-section";
 import { DrawWrapper } from "./draw-wrapper";
 import { PaginatedMatchesTable } from "./matches-table";
@@ -227,6 +228,7 @@ export default async function TournamentDetailPage({ params }: TournamentDetailP
                 📥 Matches
               </a>
               <RecomputeStandingsButton tournamentId={id} />
+              <BackfillBracketButton tournamentId={id} />
             </div>
           }
         >
