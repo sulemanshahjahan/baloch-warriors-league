@@ -48,12 +48,6 @@ function getRoundName(roundNum: number, matchCount: number, matchesByRound: Reco
   return `Round ${roundNum}`;
 }
 
-function shortLabel(fullName: string): string {
-  const words = fullName.trim().split(/\s+/);
-  if (words.length === 1) return words[0].slice(0, 3).toUpperCase();
-  return (words[0][0] + (words[1]?.[0] ?? "") + (words[2]?.[0] ?? "")).toUpperCase();
-}
-
 function getScores(match: BracketMatch) {
   const has2Legs = match.leg2HomeScore != null;
   const hasDecider = match.leg3HomeScore != null;
@@ -87,7 +81,6 @@ function getScores(match: BracketMatch) {
 }
 
 function Row({
-  shortLbl,
   fullName,
   entityId,
   entityType,
@@ -95,7 +88,6 @@ function Row({
   won,
   lost,
 }: {
-  shortLbl: string;
   fullName: string;
   entityId: string | null;
   entityType: "player" | "team";
@@ -122,11 +114,11 @@ function Row({
         </div>
       )}
       <span
-        className={`flex-1 min-w-0 text-sm truncate ${
+        className={`flex-1 min-w-0 text-xs truncate ${
           won ? "font-bold text-primary" : lost ? "text-muted-foreground" : "font-medium"
         }`}
       >
-        {shortLbl}
+        {fullName}
       </span>
       <div className="flex items-center gap-1.5 shrink-0">
         {scores.map((s, i) => {
@@ -134,7 +126,7 @@ function Row({
           return (
             <span
               key={i}
-              className={`w-5 text-center text-sm tabular-nums ${
+              className={`w-5 text-center text-xs tabular-nums ${
                 won ? "font-bold text-primary" : lost ? "text-muted-foreground" : "font-semibold"
               }`}
             >
@@ -161,21 +153,10 @@ function MatchCard({
 
   const homeName = isIndividual
     ? (match.homePlayer?.name ?? "TBD")
-    : (match.homeTeam?.shortName ?? match.homeTeam?.name ?? "TBD");
+    : (match.homeTeam?.name ?? "TBD");
   const awayName = isIndividual
     ? (match.awayPlayer?.name ?? "TBD")
-    : (match.awayTeam?.shortName ?? match.awayTeam?.name ?? "TBD");
-
-  const homeShort = homeName === "TBD"
-    ? "TBD"
-    : isIndividual
-    ? shortLabel(homeName)
-    : (match.homeTeam?.shortName?.toUpperCase() ?? shortLabel(homeName));
-  const awayShort = awayName === "TBD"
-    ? "TBD"
-    : isIndividual
-    ? shortLabel(awayName)
-    : (match.awayTeam?.shortName?.toUpperCase() ?? shortLabel(awayName));
+    : (match.awayTeam?.name ?? "TBD");
 
   const homeId = match.homePlayerId ?? match.homeTeamId;
   const awayId = match.awayPlayerId ?? match.awayTeamId;
@@ -193,7 +174,6 @@ function MatchCard({
         </div>
 
         <Row
-          shortLbl={homeShort}
           fullName={homeName}
           entityId={homeId}
           entityType={isIndividual ? "player" : "team"}
@@ -203,7 +183,6 @@ function MatchCard({
         />
 
         <Row
-          shortLbl={awayShort}
           fullName={awayName}
           entityId={awayId}
           entityType={isIndividual ? "player" : "team"}
@@ -254,8 +233,8 @@ export function BracketVisualization({ rounds, matchesByRound, participantType }
   if (rounds.length === 0) return null;
   const isIndividual = participantType === "INDIVIDUAL";
 
-  // earliest round first
-  const orderedRounds = [...rounds].reverse();
+  // Input `rounds` is ascending (R16=1, QF=2, SF=3, Final=4) — already the order we want
+  const orderedRounds = rounds;
   const totalRounds = orderedRounds.length;
 
   const firstRoundCount = matchesByRound[orderedRounds[0]]?.length ?? 1;
