@@ -252,6 +252,11 @@ export async function sendMatchLinksViaWhatsApp(matchId: string) {
 
   if (!match) return { success: false, error: "Match not found" };
 
+  // Don't send reminders for completed or cancelled matches
+  if (match.status === "COMPLETED" || match.status === "CANCELLED") {
+    return { success: false, error: `Match is ${match.status.toLowerCase()} — no reminder needed` };
+  }
+
   // Auto-generate tokens if they don't exist
   if (!match.homeToken || !match.awayToken) {
     const { randomUUID } = await import("crypto");
