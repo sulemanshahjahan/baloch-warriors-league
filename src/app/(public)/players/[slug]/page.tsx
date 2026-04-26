@@ -772,7 +772,7 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                               </span>
                             </div>
                             <span className="text-xs text-muted-foreground">
-                              {rc.createdAt.toISOString().slice(0, 10)}
+                              {new Date(rc.createdAt).toISOString().slice(0, 10)}
                             </span>
                           </div>
                           <pre className="text-[11px] text-muted-foreground whitespace-pre-wrap leading-relaxed font-sans">
