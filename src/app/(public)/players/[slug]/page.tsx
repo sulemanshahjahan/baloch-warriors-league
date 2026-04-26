@@ -288,13 +288,11 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                     {player.position}
                   </span>
                 )}
-                {player.skillLevel !== null && player.skillLevel !== undefined && (
-                  <div className="flex items-center gap-1 text-xs sm:text-sm">
-                    <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4 text-primary" />
-                    <span className="font-medium">{player.skillLevel}</span>
-                    <span className="text-muted-foreground">lvl</span>
-                  </div>
-                )}
+                <div className="flex items-center gap-1 text-xs sm:text-sm">
+                  <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4 text-primary" />
+                  <span className="font-medium">{player.cardRank}</span>
+                  <span className="text-muted-foreground">card</span>
+                </div>
                 {player.eloRating !== 100 && (
                   <Link href="/rankings" className="flex items-center gap-1 text-xs sm:text-sm hover:text-primary transition-colors">
                     <Trophy className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-400" />
@@ -302,10 +300,6 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                     <span className="text-muted-foreground">ELO</span>
                   </Link>
                 )}
-                <div className="flex items-center gap-1 text-xs sm:text-sm bg-gradient-to-br from-amber-400/20 to-yellow-600/20 border border-amber-500/30 px-2 py-0.5 rounded-md">
-                  <span className="text-[10px] uppercase tracking-wider text-amber-400 font-bold">Card</span>
-                  <span className="font-black text-amber-300">{player.cardRank}</span>
-                </div>
                 {player.nationality && (
                   <div className="flex items-center gap-1 text-xs sm:text-sm text-muted-foreground">
                     <MapPin className="w-3 h-3 sm:w-4 sm:h-4" />
