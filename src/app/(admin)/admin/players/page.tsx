@@ -4,7 +4,7 @@ import { requireRole } from "@/lib/auth";
 import { AdminHeader } from "@/components/admin/header";
 import { getPlayersPaginated } from "@/lib/actions/player";
 import { PlayersTable } from "./players-table";
-import { Pagination } from "@/components/admin/pagination";
+import { RecomputeRanksButton } from "./recompute-ranks-button";
 
 export const metadata = { title: "Players" };
 
@@ -33,7 +33,10 @@ export default async function PlayersPage({ searchParams }: PlayersPageProps) {
       />
 
       <main className="flex-1 p-6 space-y-6">
-        <PlayersTable 
+        <div className="flex justify-end">
+          <RecomputeRanksButton />
+        </div>
+        <PlayersTable
           players={players} 
           currentPage={currentPage}
           totalPages={totalPages}

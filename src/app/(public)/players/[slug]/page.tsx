@@ -20,6 +20,9 @@ import {
   Award,
   Swords,
   BarChart3,
+  TrendingUp,
+  TrendingDown,
+  Sparkles,
 } from "lucide-react";
 import { PlayerCard } from "@/components/public/player-card";
 import { PlayerEngagement } from "@/components/public/player-engagement";
@@ -76,6 +79,17 @@ async function getPlayerBySlug(slug: string) {
           tournament: { select: { name: true, slug: true } },
         },
         orderBy: { createdAt: "desc" },
+      },
+      rankChanges: {
+        orderBy: { createdAt: "desc" },
+        take: 10,
+        select: {
+          id: true,
+          oldRank: true,
+          newRank: true,
+          reason: true,
+          createdAt: true,
+        },
       },
     },
   });
@@ -288,6 +302,10 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                     <span className="text-muted-foreground">ELO</span>
                   </Link>
                 )}
+                <div className="flex items-center gap-1 text-xs sm:text-sm bg-gradient-to-br from-amber-400/20 to-yellow-600/20 border border-amber-500/30 px-2 py-0.5 rounded-md">
+                  <span className="text-[10px] uppercase tracking-wider text-amber-400 font-bold">Card</span>
+                  <span className="font-black text-amber-300">{player.cardRank}</span>
+                </div>
                 {player.nationality && (
                   <div className="flex items-center gap-1 text-xs sm:text-sm text-muted-foreground">
                     <MapPin className="w-3 h-3 sm:w-4 sm:h-4" />
@@ -703,6 +721,66 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                         </div>
                       </div>
                     ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Card Rank History */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-amber-400" />
+                  Card Rank History
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {player.rankChanges.length === 0 ? (
+                  <p className="text-muted-foreground text-sm text-center py-4">
+                    No rank changes yet — card stays at <strong>{player.cardRank}</strong>.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {player.rankChanges.map((rc) => {
+                      const delta = rc.newRank - rc.oldRank;
+                      const isUp = delta > 0;
+                      return (
+                        <div
+                          key={rc.id}
+                          className={`p-3 rounded-lg border ${
+                            isUp
+                              ? "bg-emerald-500/5 border-emerald-500/20"
+                              : "bg-rose-500/5 border-rose-500/20"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              {isUp ? (
+                                <TrendingUp className="w-4 h-4 text-emerald-400" />
+                              ) : (
+                                <TrendingDown className="w-4 h-4 text-rose-400" />
+                              )}
+                              <span className="font-bold text-sm">
+                                {rc.oldRank} → {rc.newRank}
+                              </span>
+                              <span
+                                className={`text-xs font-semibold ${
+                                  isUp ? "text-emerald-400" : "text-rose-400"
+                                }`}
+                              >
+                                ({isUp ? "+" : ""}{delta})
+                              </span>
+                            </div>
+                            <span className="text-xs text-muted-foreground">
+                              {rc.createdAt.toISOString().slice(0, 10)}
+                            </span>
+                          </div>
+                          <pre className="text-[11px] text-muted-foreground whitespace-pre-wrap leading-relaxed font-sans">
+                            {rc.reason}
+                          </pre>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>
