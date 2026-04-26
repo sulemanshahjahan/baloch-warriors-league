@@ -196,11 +196,72 @@ async function getHomeData() {
     include: { player: { select: { id: true, name: true, slug: true } } },
   });
 
-  return { featuredTournaments, recentResults, upcomingMatches, stats, mvpStats, latestNews, playerOfWeek };
+  // Most recent completed tournament that has a TOURNAMENT_WINNER award assigned
+  const completedTournament = await prisma.tournament.findFirst({
+    where: {
+      status: "COMPLETED",
+      awards: { some: { type: "TOURNAMENT_WINNER" } },
+    },
+    orderBy: [{ endDate: "desc" }, { updatedAt: "desc" }],
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      gameCategory: true,
+      endDate: true,
+      awards: {
+        where: {
+          type: {
+            in: [
+              "TOURNAMENT_WINNER",
+              "TOURNAMENT_MVP",
+              "GOLDEN_BOOT",
+              "TOP_ASSISTS",
+              "BEST_PLAYER",
+              "BEST_GOALKEEPER",
+              "FAIR_PLAY",
+              "CUSTOM",
+            ],
+          },
+        },
+        select: {
+          id: true,
+          type: true,
+          customName: true,
+          description: true,
+          player: { select: { id: true, name: true, slug: true } },
+          team: { select: { id: true, name: true, slug: true, logoUrl: true } },
+        },
+      },
+    },
+  });
+
+  const seasonChampion = (() => {
+    if (!completedTournament) return null;
+    const winnerAward = completedTournament.awards.find(
+      (a) => a.type === "TOURNAMENT_WINNER",
+    );
+    if (!winnerAward) return null;
+    return {
+      tournament: {
+        id: completedTournament.id,
+        name: completedTournament.name,
+        slug: completedTournament.slug,
+        gameCategory: completedTournament.gameCategory,
+        endDate: completedTournament.endDate,
+      },
+      winnerAward,
+      otherAwards: completedTournament.awards.filter(
+        (a) => a.type !== "TOURNAMENT_WINNER",
+      ),
+    };
+  })();
+
+  return { featuredTournaments, recentResults, upcomingMatches, stats, mvpStats, latestNews, playerOfWeek, seasonChampion };
 }
 
 export default async function HomePage() {
-  const { featuredTournaments, recentResults, upcomingMatches, stats, mvpStats, latestNews, playerOfWeek } =
+  const { featuredTournaments, recentResults, upcomingMatches, stats, mvpStats, latestNews, playerOfWeek, seasonChampion } =
     await getHomeData();
 
   return (
@@ -294,6 +355,143 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Season Champion Card */}
+      {seasonChampion && (() => {
+        const w = seasonChampion.winnerAward;
+        const winnerName = w.player?.name ?? w.team?.name ?? "Champion";
+        const winnerHref = w.player
+          ? `/players/${w.player.slug}`
+          : w.team
+            ? `/teams/${w.team.slug}`
+            : `/tournaments/${seasonChampion.tournament.slug}`;
+        const awardLabel = (a: { type: string; customName: string | null }) => {
+          if (a.type === "CUSTOM") return a.customName ?? "Custom";
+          return a.type
+            .split("_")
+            .map((s) => s[0] + s.slice(1).toLowerCase())
+            .join(" ");
+        };
+        return (
+          <section className="relative overflow-hidden border-y border-amber-500/20 bg-gradient-to-br from-amber-500/10 via-yellow-500/10 to-orange-500/10">
+            <div className="absolute inset-0 pointer-events-none">
+              <div className="absolute -top-20 left-1/4 w-96 h-96 bg-amber-400/10 rounded-full blur-3xl" />
+              <div className="absolute -bottom-20 right-1/4 w-96 h-96 bg-yellow-400/10 rounded-full blur-3xl" />
+            </div>
+            <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+              <div className="flex flex-col items-center text-center mb-8">
+                <div className="flex items-center gap-2 text-xs font-bold text-amber-400 tracking-[0.2em] uppercase mb-3">
+                  <Trophy className="w-4 h-4" />
+                  Season Champion
+                </div>
+                <Link
+                  href={`/tournaments/${seasonChampion.tournament.slug}`}
+                  className="text-sm text-muted-foreground hover:text-amber-400 transition-colors"
+                >
+                  {seasonChampion.tournament.name}
+                </Link>
+              </div>
+
+              <Link
+                href={winnerHref}
+                className="flex flex-col items-center group"
+              >
+                <div className="relative mb-4">
+                  <div className="absolute inset-0 bg-gradient-to-br from-amber-400 to-yellow-600 rounded-full blur-xl opacity-50 group-hover:opacity-75 transition-opacity" />
+                  <div className="relative">
+                    {w.player ? (
+                      <SmartAvatar
+                        type="player"
+                        id={w.player.id}
+                        name={w.player.name}
+                        className="h-32 w-32 sm:h-40 sm:w-40 ring-4 ring-amber-400/60"
+                        fallbackClassName="text-4xl"
+                      />
+                    ) : (
+                      <SmartAvatar
+                        type="team"
+                        id={w.team?.id ?? ""}
+                        name={winnerName}
+                        className="h-32 w-32 sm:h-40 sm:w-40 ring-4 ring-amber-400/60"
+                        fallbackClassName="text-4xl"
+                      />
+                    )}
+                    <div className="absolute -top-2 -right-2 text-4xl">🏆</div>
+                  </div>
+                </div>
+                <h2 className="text-3xl sm:text-5xl font-black tracking-tight bg-gradient-to-br from-amber-300 via-yellow-400 to-orange-400 bg-clip-text text-transparent group-hover:scale-105 transition-transform">
+                  {winnerName}
+                </h2>
+                {w.description && (
+                  <p className="text-sm text-muted-foreground mt-2 max-w-xl">
+                    {w.description}
+                  </p>
+                )}
+              </Link>
+
+              {seasonChampion.otherAwards.length > 0 && (
+                <div className="mt-10 pt-8 border-t border-amber-500/10">
+                  <p className="text-center text-xs font-bold text-muted-foreground tracking-widest uppercase mb-5">
+                    Season Honours
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 max-w-5xl mx-auto">
+                    {seasonChampion.otherAwards.map((a) => {
+                      const recipientName = a.player?.name ?? a.team?.name ?? "—";
+                      const recipientHref = a.player
+                        ? `/players/${a.player.slug}`
+                        : a.team
+                          ? `/teams/${a.team.slug}`
+                          : null;
+                      const inner = (
+                        <div className="flex items-center gap-3 p-3 rounded-lg bg-card/50 border border-border/50 hover:border-amber-500/40 transition-colors h-full">
+                          {a.player ? (
+                            <SmartAvatar
+                              type="player"
+                              id={a.player.id}
+                              name={a.player.name}
+                              className="h-10 w-10 shrink-0"
+                              fallbackClassName="text-xs"
+                            />
+                          ) : a.team ? (
+                            <SmartAvatar
+                              type="team"
+                              id={a.team.id}
+                              name={a.team.name}
+                              className="h-10 w-10 shrink-0"
+                              fallbackClassName="text-xs"
+                            />
+                          ) : (
+                            <Avatar className="h-10 w-10 shrink-0">
+                              <AvatarFallback className="text-xs">
+                                {getInitials(recipientName)}
+                              </AvatarFallback>
+                            </Avatar>
+                          )}
+                          <div className="min-w-0 text-left">
+                            <p className="text-[10px] font-bold text-amber-400 tracking-wider uppercase truncate">
+                              {awardLabel(a)}
+                            </p>
+                            <p className="text-sm font-semibold truncate">
+                              {recipientName}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                      return recipientHref ? (
+                        <Link key={a.id} href={recipientHref}>
+                          {inner}
+                        </Link>
+                      ) : (
+                        <div key={a.id}>{inner}</div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        );
+      })()}
 
       {/* Player of the Week Banner */}
       {playerOfWeek && playerOfWeek.player && (
