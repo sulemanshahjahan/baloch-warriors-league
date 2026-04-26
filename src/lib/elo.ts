@@ -32,18 +32,38 @@ function getKFactor(matchCount: number): number {
   return matchCount < K_THRESHOLD ? K_NEW : K_ESTABLISHED;
 }
 
+// ═══════════════════════════════════════════════════════
+// MAIN ELO UPDATE FUNCTION — called after match completion
+// ═══════════════════════════════════════════════════════
+
 /**
- * Count completed 1v1 matches for a player (excluding a specific match).
+ * Update ELO ratings after a match changes (created, edited, or deleted).
+ *
+ * Why a full recompute? Surgical per-match updates can't preserve correctness
+ * when an old match is edited: the edit's effect must propagate forward through
+ * every subsequent match, recalculating each player's expected scores from
+ * their corrected (post-edit) rating. Doing this incrementally is fragile —
+ * it goes out of sync silently. A full chronological replay is O(N) on a
+ * dataset of a few hundred matches, which is fast enough and bulletproof.
+ *
+ * The matchId argument is kept for API compatibility but is not used.
  */
-async function countPlayerMatches(playerId: string, excludeMatchId?: string): Promise<number> {
-  return prisma.match.count({
+export async function updateEloAfterMatch(_matchId?: string): Promise<void> {
+  await recomputeAllElo();
+}
+
+/**
+ * Recompute ELO ratings for ALL players from scratch by replaying every
+ * completed 1v1 individual match in chronological order.
+ */
+export async function recomputeAllElo(): Promise<{ matchesProcessed: number }> {
+  // Reset all players to 100 ELO and wipe history
+  await prisma.player.updateMany({ data: { eloRating: 100 } });
+  await prisma.eloHistory.deleteMany({});
+
+  const matches = await prisma.match.findMany({
     where: {
       status: "COMPLETED",
-      id: excludeMatchId ? { not: excludeMatchId } : undefined,
-      OR: [
-        { homePlayerId: playerId },
-        { awayPlayerId: playerId },
-      ],
       homePlayerId: { not: null },
       awayPlayerId: { not: null },
       tournament: {
@@ -51,156 +71,79 @@ async function countPlayerMatches(playerId: string, excludeMatchId?: string): Pr
         participantType: "INDIVIDUAL",
       },
     },
-  });
-}
-
-// ═══════════════════════════════════════════════════════
-// MAIN ELO UPDATE FUNCTION — called after match completion
-// ═══════════════════════════════════════════════════════
-
-/**
- * Update ELO ratings for both players after a completed 1v1 match.
- * Idempotent — deletes existing EloHistory for this match first.
- */
-export async function updateEloAfterMatch(matchId: string): Promise<void> {
-  const match = await prisma.match.findUnique({
-    where: { id: matchId },
-    include: {
-      tournament: { select: { gameCategory: true, participantType: true } },
+    orderBy: [{ completedAt: "asc" }, { createdAt: "asc" }],
+    select: {
+      id: true,
+      homePlayerId: true,
+      awayPlayerId: true,
+      homeScore: true,
+      awayScore: true,
+      leg2HomeScore: true,
+      leg2AwayScore: true,
+      leg3HomeScore: true,
+      leg3AwayScore: true,
     },
   });
 
-  if (!match) return;
+  const matchCounts = new Map<string, number>();
+  // In-memory ratings to avoid one DB roundtrip per leg
+  const ratings = new Map<string, number>();
 
-  // Guard: only 1v1 individual matches, not PUBG
-  if (match.tournament.gameCategory === "PUBG") return;
-  if (match.tournament.participantType !== "INDIVIDUAL") return;
-  if (!match.homePlayerId || !match.awayPlayerId) return;
-  if (match.homePlayerId === match.awayPlayerId) return;
-  if (match.status !== "COMPLETED") return;
+  for (const m of matches) {
+    const homeId = m.homePlayerId!;
+    const awayId = m.awayPlayerId!;
+    if (homeId === awayId) continue;
 
-  const homeId = match.homePlayerId;
-  const awayId = match.awayPlayerId;
+    const legs: { h: number; a: number }[] = [
+      { h: m.homeScore ?? 0, a: m.awayScore ?? 0 },
+    ];
+    if (m.leg2HomeScore != null) legs.push({ h: m.leg2HomeScore ?? 0, a: m.leg2AwayScore ?? 0 });
+    if (m.leg3HomeScore != null) legs.push({ h: m.leg3HomeScore ?? 0, a: m.leg3AwayScore ?? 0 });
 
-  // Build list of legs to process (each leg = separate ELO calculation)
-  const legs: { hScore: number; aScore: number; label: string }[] = [];
+    for (const leg of legs) {
+      const hR = ratings.get(homeId) ?? 100;
+      const aR = ratings.get(awayId) ?? 100;
+      const hCount = matchCounts.get(homeId) ?? 0;
+      const aCount = matchCounts.get(awayId) ?? 0;
+      const hK = getKFactor(hCount);
+      const aK = getKFactor(aCount);
 
-  // Leg 1
-  legs.push({ hScore: match.homeScore ?? 0, aScore: match.awayScore ?? 0, label: "Leg 1" });
+      let hActual: number, aActual: number, hRes: string, aRes: string;
+      if (leg.h !== leg.a) {
+        hActual = leg.h > leg.a ? 1 : 0;
+        aActual = 1 - hActual;
+        hRes = leg.h > leg.a ? "WIN" : "LOSS";
+        aRes = leg.h > leg.a ? "LOSS" : "WIN";
+      } else {
+        hActual = 0.5;
+        aActual = 0.5;
+        hRes = "DRAW";
+        aRes = "DRAW";
+      }
 
-  // Leg 2 (if 2-legged knockout)
-  if (match.leg2HomeScore != null) {
-    legs.push({ hScore: match.leg2HomeScore ?? 0, aScore: match.leg2AwayScore ?? 0, label: "Leg 2" });
-  }
+      const hExp = expectedScore(hR, aR);
+      const aExp = expectedScore(aR, hR);
+      const hNew = newRating(hR, hExp, hActual, hK);
+      const aNew = newRating(aR, aExp, aActual, aK);
 
-  // Leg 3 / Decider (if aggregate was tied)
-  if (match.leg3HomeScore != null) {
-    const l3h = match.leg3HomeScore ?? 0;
-    const l3a = match.leg3AwayScore ?? 0;
-    // If decider was decided by pens, it's a draw in regular time + pen winner
-    if (l3h === l3a && match.leg3HomePens != null) {
-      // Decider drawn + pens = treat as draw for ELO (pens are luck)
-      legs.push({ hScore: l3h, aScore: l3a, label: "Decider" });
-    } else {
-      legs.push({ hScore: l3h, aScore: l3a, label: "Decider" });
+      await prisma.eloHistory.createMany({
+        data: [
+          { playerId: homeId, matchId: m.id, ratingBefore: hR, ratingAfter: hNew, change: hNew - hR, opponentId: awayId, opponentRatingBefore: aR, result: hRes, kFactor: hK },
+          { playerId: awayId, matchId: m.id, ratingBefore: aR, ratingAfter: aNew, change: aNew - aR, opponentId: homeId, opponentRatingBefore: hR, result: aRes, kFactor: aK },
+        ],
+      });
+
+      ratings.set(homeId, hNew);
+      ratings.set(awayId, aNew);
+      matchCounts.set(homeId, hCount + 1);
+      matchCounts.set(awayId, aCount + 1);
     }
   }
 
-  // Check for existing ELO records for this match (re-edit scenario)
-  // If they exist, revert to the FIRST entry's ratingBefore to avoid double-inflation
-  const existingElo = await prisma.eloHistory.findMany({
-    where: { matchId },
-    orderBy: { createdAt: "asc" },
-  });
-  if (existingElo.length > 0) {
-    // Find the earliest ratingBefore for each player
-    const firstHome = existingElo.find((e) => e.playerId === homeId);
-    const firstAway = existingElo.find((e) => e.playerId === awayId);
-    const revertOps = [];
-    if (firstHome) revertOps.push(prisma.player.update({ where: { id: homeId }, data: { eloRating: firstHome.ratingBefore } }));
-    if (firstAway) revertOps.push(prisma.player.update({ where: { id: awayId }, data: { eloRating: firstAway.ratingBefore } }));
-    if (revertOps.length > 0) await prisma.$transaction(revertOps);
+  // Persist final ratings to player rows
+  for (const [playerId, rating] of ratings.entries()) {
+    await prisma.player.update({ where: { id: playerId }, data: { eloRating: rating } });
   }
 
-  // Delete all existing ELO records for this match
-  await prisma.eloHistory.deleteMany({ where: { matchId } });
-
-  // Get current ratings (correctly reverted)
-  const [homePlayer, awayPlayer] = await Promise.all([
-    prisma.player.findUnique({ where: { id: homeId }, select: { eloRating: true } }),
-    prisma.player.findUnique({ where: { id: awayId }, select: { eloRating: true } }),
-  ]);
-
-  if (!homePlayer || !awayPlayer) return;
-
-  let currentHomeRating = homePlayer.eloRating;
-  let currentAwayRating = awayPlayer.eloRating;
-
-  // Process each leg as a separate ELO calculation
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const allOps: any[] = [];
-
-  for (const leg of legs) {
-    const homeCount = await countPlayerMatches(homeId, matchId);
-    const awayCount = await countPlayerMatches(awayId, matchId);
-    const homeK = getKFactor(homeCount + legs.indexOf(leg)); // account for legs already processed
-    const awayK = getKFactor(awayCount + legs.indexOf(leg));
-
-    let homeActual: number, awayActual: number, resultHome: string, resultAway: string;
-
-    if (leg.hScore !== leg.aScore) {
-      homeActual = leg.hScore > leg.aScore ? 1.0 : 0.0;
-      awayActual = 1.0 - homeActual;
-      resultHome = leg.hScore > leg.aScore ? "WIN" : "LOSS";
-      resultAway = leg.hScore > leg.aScore ? "LOSS" : "WIN";
-    } else {
-      homeActual = 0.5;
-      awayActual = 0.5;
-      resultHome = "DRAW";
-      resultAway = "DRAW";
-    }
-
-    const homeExp = expectedScore(currentHomeRating, currentAwayRating);
-    const awayExp = expectedScore(currentAwayRating, currentHomeRating);
-    const homeNew = newRating(currentHomeRating, homeExp, homeActual, homeK);
-    const awayNew = newRating(currentAwayRating, awayExp, awayActual, awayK);
-
-    allOps.push(
-      prisma.eloHistory.create({
-        data: {
-          playerId: homeId, matchId,
-          ratingBefore: currentHomeRating, ratingAfter: homeNew,
-          change: homeNew - currentHomeRating,
-          opponentId: awayId, opponentRatingBefore: currentAwayRating,
-          result: resultHome, kFactor: homeK,
-        },
-      }),
-      prisma.eloHistory.create({
-        data: {
-          playerId: awayId, matchId,
-          ratingBefore: currentAwayRating, ratingAfter: awayNew,
-          change: awayNew - currentAwayRating,
-          opponentId: homeId, opponentRatingBefore: currentHomeRating,
-          result: resultAway, kFactor: awayK,
-        },
-      }),
-    );
-
-    currentHomeRating = homeNew;
-    currentAwayRating = awayNew;
-  }
-
-  // Final player rating updates + all history entries
-  allOps.push(
-    prisma.player.update({
-      where: { id: homeId },
-      data: { eloRating: currentHomeRating },
-    }),
-    prisma.player.update({
-      where: { id: awayId },
-      data: { eloRating: currentAwayRating },
-    }),
-  );
-
-  await prisma.$transaction(allOps);
+  return { matchesProcessed: matches.length };
 }
