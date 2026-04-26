@@ -28,14 +28,25 @@ import { createAward, deleteAward } from "@/lib/actions/award";
 import { getInitials } from "@/lib/utils";
 
 const AWARD_TYPES = [
+  { value: "TOURNAMENT_WINNER", label: "Tournament Winner" },
+  { value: "TOURNAMENT_MVP", label: "Tournament MVP" },
   { value: "GOLDEN_BOOT", label: "Golden Boot (Top Scorer)" },
-  { value: "TOP_ASSISTS", label: "Top Assists" },
+  { value: "TOP_ASSISTS", label: "Top Assists / Playmaker" },
   { value: "BEST_PLAYER", label: "Best Player" },
   { value: "BEST_GOALKEEPER", label: "Best Goalkeeper" },
-  { value: "FAIR_PLAY", label: "Fair Play Award" },
-  { value: "TOURNAMENT_MVP", label: "Tournament MVP" },
-  { value: "TOURNAMENT_WINNER", label: "Tournament Winner" },
   { value: "CUSTOM", label: "Custom Award" },
+];
+
+const CUSTOM_AWARD_PRESETS = [
+  { name: "Mr Reliable", hint: "Highest win rate (min. 5 matches)" },
+  { name: "Comeback King", hint: "Most matches won after going behind" },
+  { name: "Goal of the Season", hint: "Best individual goal (community vote)" },
+  { name: "Iron Defence", hint: "Most clean sheets" },
+  { name: "Hot Streak", hint: "Longest unbeaten run" },
+  { name: "Underdog Award", hint: "Best wins vs higher-rated opponents" },
+  { name: "Rising Warrior", hint: "Best new / first-time player" },
+  { name: "Loyal Warrior", hint: "Played every scheduled match" },
+  { name: "Drama Award", hint: "Most penalty shootouts / extra-time matches" },
 ];
 
 interface AwardsManagerProps {
@@ -261,14 +272,43 @@ export function AwardsManager({
             </div>
 
             {awardType === "CUSTOM" && (
-              <div className="space-y-2">
-                <Label>Custom Award Name</Label>
-                <Input
-                  value={customName}
-                  onChange={(e) => setCustomName(e.target.value)}
-                  placeholder="e.g. Best Young Player"
-                />
-              </div>
+              <>
+                <div className="space-y-2">
+                  <Label>Quick Pick (optional)</Label>
+                  <Select
+                    value={CUSTOM_AWARD_PRESETS.find((p) => p.name === customName)?.name ?? ""}
+                    onValueChange={(name) => {
+                      const preset = CUSTOM_AWARD_PRESETS.find((p) => p.name === name);
+                      if (preset) {
+                        setCustomName(preset.name);
+                        if (!description) setDescription(preset.hint);
+                      }
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pick a preset or type your own below..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CUSTOM_AWARD_PRESETS.map((preset) => (
+                        <SelectItem key={preset.name} value={preset.name}>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{preset.name}</span>
+                            <span className="text-xs text-muted-foreground">{preset.hint}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Custom Award Name</Label>
+                  <Input
+                    value={customName}
+                    onChange={(e) => setCustomName(e.target.value)}
+                    placeholder="e.g. Best Young Player"
+                  />
+                </div>
+              </>
             )}
 
             <div className="space-y-2">
