@@ -351,7 +351,7 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
             <PlayerCard
               name={player.name}
               position={player.position ?? ""}
-              rating={player.skillLevel ?? 50}
+              rating={player.cardRank}
               nationality={player.nationality ?? ""}
               avatarUrl={player.photoUrl || `/api/image?type=player&id=${player.id}&_=${Date.now()}`}
               playerId={player.id}
