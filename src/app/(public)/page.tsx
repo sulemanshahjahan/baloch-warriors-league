@@ -196,10 +196,10 @@ async function getHomeData() {
     include: { player: { select: { id: true, name: true, slug: true } } },
   });
 
-  // Most recent completed tournament that has a TOURNAMENT_WINNER award assigned
+  // Most recent tournament with a TOURNAMENT_WINNER award assigned
+  // (status doesn't matter — having a winner award is the signal)
   const completedTournament = await prisma.tournament.findFirst({
     where: {
-      status: "COMPLETED",
       awards: { some: { type: "TOURNAMENT_WINNER" } },
     },
     orderBy: [{ endDate: "desc" }, { updatedAt: "desc" }],
