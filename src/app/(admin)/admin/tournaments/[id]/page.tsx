@@ -51,14 +51,20 @@ export default async function TournamentDetailPage({ params }: TournamentDetailP
 
   if (!tournament) notFound();
 
-  // Single batch query instead of N+1 per-team queries
+  // Players for awards: union of team rosters + individually enrolled players (deduped)
   const teamIds = tournament.teams.map((t) => t.team.id);
-  const allPlayers = teamIds.length > 0
+  const teamPlayers = teamIds.length > 0
     ? await prisma.teamPlayer.findMany({
         where: { teamId: { in: teamIds }, isActive: true },
         select: { player: { select: { id: true, name: true, photoUrl: true } } },
       }).then((rows) => rows.map((r) => r.player))
     : [];
+  const individualPlayers = tournament.players.map((p) => p.player);
+  const allPlayers = Array.from(
+    new Map(
+      [...teamPlayers, ...individualPlayers].map((p) => [p.id, p]),
+    ).values(),
+  );
 
   // Sort matches: Knockout first, then Group rounds
   const sortedMatches = [...tournament.matches].sort((a, b) => {
