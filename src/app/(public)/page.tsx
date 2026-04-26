@@ -174,8 +174,14 @@ async function getHomeData() {
           if (m.leg2HomeScore != null && m.leg2HomeScore === 0) cleanSheets++;
           if (m.leg3HomeScore != null && m.leg3HomeScore === 0) cleanSheets++;
         }
-        if (cleanSheets > 0 && (!best || cleanSheets > best.value)) {
-          best = { id: p.id, name: p.name, slug: p.slug, value: cleanSheets, label: "Clean Sheets" };
+        if (cleanSheets > 0) {
+          const strictlyBetter = !best || cleanSheets > best.value;
+          // Suleman wins ties for the clean sheets spotlight
+          const tiedAndSuleman =
+            best && cleanSheets === best.value && p.slug === "suleman";
+          if (strictlyBetter || tiedAndSuleman) {
+            best = { id: p.id, name: p.name, slug: p.slug, value: cleanSheets, label: "Clean Sheets" };
+          }
         }
       }
       return best;
