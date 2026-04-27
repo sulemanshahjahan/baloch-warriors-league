@@ -1,3 +1,5 @@
+export const revalidate = 60; // ISR — regenerate at most once per minute
+
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
@@ -17,7 +19,6 @@ import {
 } from "lucide-react";
 import { gameLabel } from "@/lib/utils";
 
-export const revalidate = 300;
 
 interface RecapPageProps {
   params: Promise<{ slug: string }>;

@@ -11,11 +11,14 @@ interface SmartAvatarProps {
   fallbackClassName?: string;
   primaryColor?: string | null;
   photoUrl?: string | null;
+  /** Hint for the API to serve a thumbnail. Snapped to {32,64,128,256,512}. */
+  size?: 32 | 64 | 128 | 256 | 512;
 }
 
 /**
  * SmartAvatar — uses photoUrl directly when provided (no API call),
- * falls back to /api/image with per-minute cache busting.
+ * falls back to /api/image with a stable URL so browser/CDN caches long-term.
+ * Bust the cache via `?v=<player.updatedAt>` from the parent when the photo changes.
  */
 export function SmartAvatar({
   type,
@@ -25,10 +28,11 @@ export function SmartAvatar({
   fallbackClassName,
   primaryColor,
   photoUrl,
+  size = 128,
 }: SmartAvatarProps) {
-  // Direct Cloudinary/external URL — bypass API entirely
-  // API fallback with cache buster that changes every minute
-  const imageUrl = photoUrl || `/api/image?type=${type}&id=${id}&_=${Math.floor(Date.now() / 60000)}`;
+  // Direct Cloudinary/external URL — bypass API entirely.
+  // Otherwise, stable API URL — no per-minute cache buster.
+  const imageUrl = photoUrl || `/api/image?type=${type}&id=${id}&size=${size}`;
 
   return (
     <Avatar className={className}>
