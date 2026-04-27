@@ -157,18 +157,19 @@ async function getHomeData() {
       let bestRate = 0;
       const candidates: { id: string; name: string; slug: string; value: number; total: number; label: string }[] = [];
       for (const p of players) {
+        // Per-fixture: 1 fixture = 1 match, aggregate score across legs determines winner
         let wins = 0, total = 0;
         for (const m of p.homeMatches) {
-          const legs: { h: number; a: number }[] = [{ h: m.homeScore ?? 0, a: m.awayScore ?? 0 }];
-          if (m.leg2HomeScore != null) legs.push({ h: m.leg2HomeScore ?? 0, a: m.leg2AwayScore ?? 0 });
-          if (m.leg3HomeScore != null) legs.push({ h: m.leg3HomeScore ?? 0, a: m.leg3AwayScore ?? 0 });
-          for (const l of legs) { total++; if (l.h > l.a) wins++; }
+          const hg = (m.homeScore ?? 0) + (m.leg2HomeScore ?? 0) + (m.leg3HomeScore ?? 0);
+          const ag = (m.awayScore ?? 0) + (m.leg2AwayScore ?? 0) + (m.leg3AwayScore ?? 0);
+          total++;
+          if (hg > ag) wins++;
         }
         for (const m of p.awayMatches) {
-          const legs: { h: number; a: number }[] = [{ h: m.homeScore ?? 0, a: m.awayScore ?? 0 }];
-          if (m.leg2HomeScore != null) legs.push({ h: m.leg2HomeScore ?? 0, a: m.leg2AwayScore ?? 0 });
-          if (m.leg3HomeScore != null) legs.push({ h: m.leg3HomeScore ?? 0, a: m.leg3AwayScore ?? 0 });
-          for (const l of legs) { total++; if (l.a > l.h) wins++; }
+          const hg = (m.homeScore ?? 0) + (m.leg2HomeScore ?? 0) + (m.leg3HomeScore ?? 0);
+          const ag = (m.awayScore ?? 0) + (m.leg2AwayScore ?? 0) + (m.leg3AwayScore ?? 0);
+          total++;
+          if (ag > hg) wins++;
         }
         if (total < 3) continue;
         const rate = Math.round((wins / total) * 100);
