@@ -101,16 +101,11 @@ export async function getOverallStats(gameCategory?: string, seasonId?: string) 
       : Promise.resolve([]),
   ]);
 
-  // Calculate matches played per player (2-legged = 2 matches, 3-legged = 3)
+  // Per-fixture matches played (1 fixture = 1 match, regardless of leg count)
   const matchCounts = new Map<string, number>();
   for (const match of allMatches) {
-    const legCount = 1 + (match.leg2HomeScore != null ? 1 : 0) + (match.leg3HomeScore != null ? 1 : 0);
-    if (match.homePlayerId) {
-      matchCounts.set(match.homePlayerId, (matchCounts.get(match.homePlayerId) || 0) + legCount);
-    }
-    if (match.awayPlayerId) {
-      matchCounts.set(match.awayPlayerId, (matchCounts.get(match.awayPlayerId) || 0) + legCount);
-    }
+    if (match.homePlayerId) matchCounts.set(match.homePlayerId, (matchCounts.get(match.homePlayerId) || 0) + 1);
+    if (match.awayPlayerId) matchCounts.set(match.awayPlayerId, (matchCounts.get(match.awayPlayerId) || 0) + 1);
   }
 
   // Aggregate PUBG kills per player
@@ -157,35 +152,56 @@ export async function getOverallStats(gameCategory?: string, seasonId?: string) 
 
   const playerMap = new Map(players.map(p => [p.id, p]));
 
-  // Pre-compute per-player stats (wins, clean sheets, goal diff) for MVP and leaderboards
+  // Per-fixture stats: 1 fixture = 1 match (legs aggregated to determine winner + goals).
+  // A "clean sheet" = opponent's aggregate across all legs of the fixture is 0.
   const pStats = new Map<string, { wins: number; total: number; cleanSheets: number; goalsFor: number; goalsAgainst: number }>();
   const ensureP = (id: string) => {
     if (!pStats.has(id)) pStats.set(id, { wins: 0, total: 0, cleanSheets: 0, goalsFor: 0, goalsAgainst: 0 });
     return pStats.get(id)!;
   };
   for (const m of allMatches) {
-    const legs: { h: number; a: number }[] = [{ h: m.homeScore ?? 0, a: m.awayScore ?? 0 }];
-    if (m.leg2HomeScore != null) legs.push({ h: m.leg2HomeScore ?? 0, a: m.leg2AwayScore ?? 0 });
-    if (m.leg3HomeScore != null) legs.push({ h: m.leg3HomeScore ?? 0, a: m.leg3AwayScore ?? 0 });
-    for (const leg of legs) {
-      if (m.homePlayerId) {
-        const s = ensureP(m.homePlayerId);
-        s.total++; if (leg.h > leg.a) s.wins++; if (leg.a === 0) s.cleanSheets++;
-        s.goalsFor += leg.h; s.goalsAgainst += leg.a;
-      }
-      if (m.awayPlayerId) {
-        const s = ensureP(m.awayPlayerId);
-        s.total++; if (leg.a > leg.h) s.wins++; if (leg.h === 0) s.cleanSheets++;
-        s.goalsFor += leg.a; s.goalsAgainst += leg.h;
-      }
+    const hg = (m.homeScore ?? 0) + (m.leg2HomeScore ?? 0) + (m.leg3HomeScore ?? 0);
+    const ag = (m.awayScore ?? 0) + (m.leg2AwayScore ?? 0) + (m.leg3AwayScore ?? 0);
+    if (m.homePlayerId) {
+      const s = ensureP(m.homePlayerId);
+      s.total++;
+      if (hg > ag) s.wins++;
+      if (ag === 0) s.cleanSheets++;
+      s.goalsFor += hg;
+      s.goalsAgainst += ag;
+    }
+    if (m.awayPlayerId) {
+      const s = ensureP(m.awayPlayerId);
+      s.total++;
+      if (ag > hg) s.wins++;
+      if (hg === 0) s.cleanSheets++;
+      s.goalsFor += ag;
+      s.goalsAgainst += hg;
     }
   }
 
+  // For top scorers, prefer scoreline goals (authoritative for 1v1 individual tournaments).
+  // If a player has no individual matches but has GOAL events (team football), fall back to events.
+  const eventGoalsMap = new Map(topScorers.map((s) => [s.playerId!, s._count.type]));
+  const goalsForLeaderboard = new Map<string, number>();
+  for (const [playerId, ps] of pStats.entries()) {
+    if (ps.goalsFor > 0) goalsForLeaderboard.set(playerId, ps.goalsFor);
+  }
+  for (const [playerId, eventGoals] of eventGoalsMap.entries()) {
+    // Players with no individual-match record but with event goals (team football)
+    if (!goalsForLeaderboard.has(playerId) && eventGoals > 0) {
+      goalsForLeaderboard.set(playerId, eventGoals);
+    }
+  }
+  const sortedTopScorers = [...goalsForLeaderboard.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 20);
+
   return {
-    topScorers: topScorers.map(s => ({
-      player: playerMap.get(s.playerId!),
-      count: s._count.type,
-      matches: matchCounts.get(s.playerId!) || 0,
+    topScorers: sortedTopScorers.map(([playerId, goals]) => ({
+      player: playerMap.get(playerId),
+      count: goals,
+      matches: matchCounts.get(playerId) || 0,
     })).filter(s => s.player),
     topAssists: topAssists.map(s => ({
       player: playerMap.get(s.playerId!),
@@ -212,9 +228,9 @@ export async function getOverallStats(gameCategory?: string, seasonId?: string) 
       // Without (1v1 eFootball): Goals×3 + Wins×5 + CleanSheets×4 + GoalDiff×1
       const scoreMap = new Map<string, number>();
 
-      // Goals (always counted)
-      for (const s of topScorers) {
-        if (s.playerId) scoreMap.set(s.playerId, (scoreMap.get(s.playerId) ?? 0) + s._count.type * 3);
+      // Goals (always counted) — use scoreline-derived goals for accuracy
+      for (const [playerId, g] of goalsForLeaderboard.entries()) {
+        scoreMap.set(playerId, (scoreMap.get(playerId) ?? 0) + g * 3);
       }
 
       if (hasAssists) {
@@ -244,7 +260,7 @@ export async function getOverallStats(gameCategory?: string, seasonId?: string) 
         .sort((a, b) => b[1] - a[1])
         .slice(0, 10)
         .map(([playerId, score]) => {
-          const goals = topScorers.find((s) => s.playerId === playerId)?._count.type ?? 0;
+          const goals = goalsForLeaderboard.get(playerId) ?? 0;
           const assists = topAssists.find((s) => s.playerId === playerId)?._count.type ?? 0;
           const motm = mostMOTM.find((s) => s.playerId === playerId)?._count.type ?? 0;
           const ps = pStats.get(playerId);

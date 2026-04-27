@@ -16,9 +16,9 @@ export const metadata: Metadata = {
 };
 
 async function getPlayersWithStats() {
-  // Two parallel queries instead of 5 sequential ones
-  const [players, eloStats] = await Promise.all([
-    // Query 1: Players with goal count
+  // Per-fixture model (matches the league standings):
+  // 1 fixture = 1 match, multi-leg knockouts aggregate scores across legs to determine the winner.
+  const [players, individualMatches, eventGoalCounts] = await Promise.all([
     prisma.player.findMany({
       where: { isActive: true },
       orderBy: { eloRating: "desc" },
@@ -30,13 +30,7 @@ async function getPlayersWithStats() {
         position: true,
         nationality: true,
         eloRating: true,
-        _count: {
-          select: {
-            awards: true,
-            homeMatches: { where: { status: "COMPLETED" } },
-            awayMatches: { where: { status: "COMPLETED" } },
-          },
-        },
+        _count: { select: { awards: true } },
         teams: {
           where: { isActive: true },
           select: { team: { select: { id: true, name: true } } },
@@ -44,46 +38,71 @@ async function getPlayersWithStats() {
         },
       },
     }),
-    // Query 2: Win counts from ELO history (already indexed)
-    prisma.eloHistory.groupBy({
+    prisma.match.findMany({
+      where: {
+        status: "COMPLETED",
+        homePlayerId: { not: null },
+        awayPlayerId: { not: null },
+        tournament: { gameCategory: { not: "PUBG" }, participantType: "INDIVIDUAL" },
+      },
+      select: {
+        homePlayerId: true,
+        awayPlayerId: true,
+        homeScore: true, awayScore: true,
+        leg2HomeScore: true, leg2AwayScore: true,
+        leg3HomeScore: true, leg3AwayScore: true,
+      },
+    }),
+    prisma.matchEvent.groupBy({
       by: ["playerId"],
-      where: { result: "WIN" },
-      _count: { result: true },
+      where: { type: "GOAL", playerId: { not: null } },
+      _count: { type: true },
     }),
   ]);
 
-  // Build wins map
-  const winsMap = new Map(eloStats.map((e) => [e.playerId, e._count.result]));
+  type Acc = { matches: number; wins: number; goals: number };
+  const acc = new Map<string, Acc>();
+  const ensure = (id: string) => {
+    if (!acc.has(id)) acc.set(id, { matches: 0, wins: 0, goals: 0 });
+    return acc.get(id)!;
+  };
 
-  // Get goal counts in one batch
-  const playerIds = players.map((p) => p.id);
-  const goalCounts = playerIds.length > 0
-    ? await prisma.matchEvent.groupBy({
-        by: ["playerId"],
-        where: { playerId: { in: playerIds }, type: "GOAL" },
-        _count: { type: true },
-      })
-    : [];
-  const goalsMap = new Map(goalCounts.map((g) => [g.playerId!, g._count.type]));
+  for (const m of individualMatches) {
+    const hg = (m.homeScore ?? 0) + (m.leg2HomeScore ?? 0) + (m.leg3HomeScore ?? 0);
+    const ag = (m.awayScore ?? 0) + (m.leg2AwayScore ?? 0) + (m.leg3AwayScore ?? 0);
+    const home = ensure(m.homePlayerId!);
+    const away = ensure(m.awayPlayerId!);
+    home.matches++; away.matches++;
+    home.goals += hg; away.goals += ag;
+    if (hg > ag) home.wins++;
+    else if (ag > hg) away.wins++;
+  }
 
-  return players.map((player) => ({
-    id: player.id,
-    name: player.name,
-    slug: player.slug,
-    nickname: player.nickname,
-    position: player.position,
-    nationality: player.nationality,
-    eloRating: player.eloRating,
-    teams: player.teams,
-    _count: { matchEvents: 0, awards: player._count.awards },
-    stats: {
-      goals: goalsMap.get(player.id) ?? 0,
-      wins: winsMap.get(player.id) ?? 0,
-      assists: 0,
-      matches: player._count.homeMatches + player._count.awayMatches,
-      tournaments: 0,
-    },
-  }));
+  const eventGoalsMap = new Map(eventGoalCounts.map((g) => [g.playerId!, g._count.type]));
+
+  return players.map((player) => {
+    const a = acc.get(player.id);
+    // Scoreline is authoritative when the player has 1v1 matches; fall back to events for team-only players.
+    const goals = a && a.matches > 0 ? a.goals : (eventGoalsMap.get(player.id) ?? 0);
+    return {
+      id: player.id,
+      name: player.name,
+      slug: player.slug,
+      nickname: player.nickname,
+      position: player.position,
+      nationality: player.nationality,
+      eloRating: player.eloRating,
+      teams: player.teams,
+      _count: { matchEvents: 0, awards: player._count.awards },
+      stats: {
+        goals,
+        wins: a?.wins ?? 0,
+        assists: 0,
+        matches: a?.matches ?? 0,
+        tournaments: 0,
+      },
+    };
+  });
 }
 
 export default async function PlayersPage() {
