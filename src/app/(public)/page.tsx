@@ -204,16 +204,15 @@ async function getHomeData() {
     }).then((players) => {
       let best: { id: string; name: string; slug: string; value: number; label: string } | null = null;
       for (const p of players) {
+        // Per-fixture clean sheet: opponent's aggregate across all legs == 0
         let cleanSheets = 0;
         for (const m of p.homeMatches) {
-          if ((m.awayScore ?? 0) === 0) cleanSheets++;
-          if (m.leg2AwayScore != null && m.leg2AwayScore === 0) cleanSheets++;
-          if (m.leg3AwayScore != null && m.leg3AwayScore === 0) cleanSheets++;
+          const opp = (m.awayScore ?? 0) + (m.leg2AwayScore ?? 0) + (m.leg3AwayScore ?? 0);
+          if (opp === 0) cleanSheets++;
         }
         for (const m of p.awayMatches) {
-          if ((m.homeScore ?? 0) === 0) cleanSheets++;
-          if (m.leg2HomeScore != null && m.leg2HomeScore === 0) cleanSheets++;
-          if (m.leg3HomeScore != null && m.leg3HomeScore === 0) cleanSheets++;
+          const opp = (m.homeScore ?? 0) + (m.leg2HomeScore ?? 0) + (m.leg3HomeScore ?? 0);
+          if (opp === 0) cleanSheets++;
         }
         if (cleanSheets > 0) {
           const strictlyBetter = !best || cleanSheets > best.value;

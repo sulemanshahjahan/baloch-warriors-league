@@ -127,16 +127,20 @@ export async function buildStatsSnapshot(playerId: string): Promise<PlayerStatsS
   let wins = 0, draws = 0, losses = 0;
   let goalsFor = 0, goalsAgainst = 0, cleanSheets = 0;
 
-  // playerScore = scored, opponentScore = conceded (from this player's perspective)
-  const tally = (legs: Array<{ playerScore: number; opponentScore: number }>) => {
+  // Per-leg accumulators feed into per-leg W/D/L counts and goal totals (matches the ELO model);
+  // clean-sheet count is per-fixture (opponent aggregate across all legs == 0).
+  const tally = (
+    legs: Array<{ playerScore: number; opponentScore: number }>,
+    fixtureOppAgg: number,
+  ) => {
     for (const l of legs) {
       goalsFor += l.playerScore;
       goalsAgainst += l.opponentScore;
-      if (l.opponentScore === 0) cleanSheets++;
       if (l.playerScore > l.opponentScore) wins++;
       else if (l.playerScore < l.opponentScore) losses++;
       else draws++;
     }
+    if (fixtureOppAgg === 0) cleanSheets++;
   };
 
   for (const m of homeMatches) {
@@ -145,7 +149,8 @@ export async function buildStatsSnapshot(playerId: string): Promise<PlayerStatsS
     ];
     if (m.leg2HomeScore != null) legs.push({ playerScore: m.leg2HomeScore ?? 0, opponentScore: m.leg2AwayScore ?? 0 });
     if (m.leg3HomeScore != null) legs.push({ playerScore: m.leg3HomeScore ?? 0, opponentScore: m.leg3AwayScore ?? 0 });
-    tally(legs);
+    const oppAgg = (m.awayScore ?? 0) + (m.leg2AwayScore ?? 0) + (m.leg3AwayScore ?? 0);
+    tally(legs, oppAgg);
   }
 
   for (const m of awayMatches) {
@@ -154,7 +159,8 @@ export async function buildStatsSnapshot(playerId: string): Promise<PlayerStatsS
     ];
     if (m.leg2HomeScore != null) legs.push({ playerScore: m.leg2AwayScore ?? 0, opponentScore: m.leg2HomeScore ?? 0 });
     if (m.leg3HomeScore != null) legs.push({ playerScore: m.leg3AwayScore ?? 0, opponentScore: m.leg3HomeScore ?? 0 });
-    tally(legs);
+    const oppAgg = (m.homeScore ?? 0) + (m.leg2HomeScore ?? 0) + (m.leg3HomeScore ?? 0);
+    tally(legs, oppAgg);
   }
 
   const matches = wins + draws + losses;
