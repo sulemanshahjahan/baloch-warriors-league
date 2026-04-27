@@ -18,7 +18,7 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "2mb",
     },
   },
-  serverExternalPackages: ["@prisma/client", "bcryptjs", "firebase-admin"],
+  serverExternalPackages: ["@prisma/client", "bcryptjs", "firebase-admin", "sharp"],
 };
 
 export default withSentryConfig(nextConfig, {
