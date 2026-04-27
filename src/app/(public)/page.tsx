@@ -92,21 +92,62 @@ async function getHomeData() {
 
   // MVP stats — top performers across all data
   const [topScorer, topWinRate, biggestEloJump, topRated] = await Promise.all([
-    // Top scorer
-    prisma.matchEvent.groupBy({
-      by: ["playerId"],
-      where: { type: "GOAL", playerId: { not: null } },
-      _count: { type: true },
-      orderBy: { _count: { type: "desc" } },
-      take: 1,
-    }).then(async (res) => {
-      if (!res[0]?.playerId) return null;
-      const player = await prisma.player.findUnique({
-        where: { id: res[0].playerId },
-        select: { name: true, slug: true, id: true },
+    // Top scorer — combine scoreline goals (authoritative for 1v1) with event-derived
+    // goals (used for team football), then take the max per player.
+    (async () => {
+      const goalsByPlayer = new Map<string, number>();
+
+      // Scoreline goals from 1v1 individual non-PUBG matches
+      const playersWithMatches = await prisma.player.findMany({
+        select: {
+          id: true,
+          homeMatches: {
+            where: {
+              status: "COMPLETED",
+              tournament: { participantType: "INDIVIDUAL", gameCategory: { not: "PUBG" } },
+            },
+            select: { homeScore: true, leg2HomeScore: true, leg3HomeScore: true },
+          },
+          awayMatches: {
+            where: {
+              status: "COMPLETED",
+              tournament: { participantType: "INDIVIDUAL", gameCategory: { not: "PUBG" } },
+            },
+            select: { awayScore: true, leg2AwayScore: true, leg3AwayScore: true },
+          },
+        },
       });
-      return player ? { ...player, value: res[0]._count.type, label: "Goals" } : null;
-    }),
+      for (const p of playersWithMatches) {
+        let g = 0;
+        for (const m of p.homeMatches) g += (m.homeScore ?? 0) + (m.leg2HomeScore ?? 0) + (m.leg3HomeScore ?? 0);
+        for (const m of p.awayMatches) g += (m.awayScore ?? 0) + (m.leg2AwayScore ?? 0) + (m.leg3AwayScore ?? 0);
+        if (g > 0) goalsByPlayer.set(p.id, g);
+      }
+
+      // Event-derived goals (team football)
+      const eventGoals = await prisma.matchEvent.groupBy({
+        by: ["playerId"],
+        where: { type: "GOAL", playerId: { not: null } },
+        _count: { type: true },
+      });
+      for (const eg of eventGoals) {
+        if (!eg.playerId) continue;
+        const existing = goalsByPlayer.get(eg.playerId) ?? 0;
+        if (eg._count.type > existing) goalsByPlayer.set(eg.playerId, eg._count.type);
+      }
+
+      let topId: string | null = null;
+      let topVal = 0;
+      for (const [id, val] of goalsByPlayer) {
+        if (val > topVal) { topVal = val; topId = id; }
+      }
+      if (!topId) return null;
+      const player = await prisma.player.findUnique({
+        where: { id: topId },
+        select: { id: true, name: true, slug: true },
+      });
+      return player ? { ...player, value: topVal, label: "Goals" } : null;
+    })(),
 
     // Best win rate (min 3 matches) — rotates among tied players
     prisma.player.findMany({

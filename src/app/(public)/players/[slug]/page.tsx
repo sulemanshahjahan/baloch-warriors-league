@@ -107,14 +107,7 @@ async function getPlayerStats(playerId: string) {
     statsMap[e.type] = e._count.type;
   }
 
-  // Get all match IDs where player has events
-  const eventAppearances = await prisma.matchEvent.findMany({
-    where: { playerId, match: { status: "COMPLETED" } },
-    select: { matchId: true },
-    distinct: ["matchId"],
-  });
-
-  // Get all match IDs where player participated as home/away player (eFootball 1v1)
+  // 1v1 matches the player participated in (any 1v1 tournament — eFootball etc)
   const individualMatches = await prisma.match.findMany({
     where: {
       status: "COMPLETED",
@@ -123,21 +116,51 @@ async function getPlayerStats(playerId: string) {
         { awayPlayerId: playerId },
       ],
     },
-    select: { id: true, homePlayerId: true, homeScore: true, awayScore: true, leg2HomeScore: true, leg2AwayScore: true, leg3HomeScore: true, leg3AwayScore: true },
+    select: {
+      id: true, homePlayerId: true,
+      homeScore: true, awayScore: true,
+      leg2HomeScore: true, leg2AwayScore: true,
+      leg3HomeScore: true, leg3AwayScore: true,
+      tournament: { select: { participantType: true, gameCategory: true } },
+    },
   });
 
-  // Count appearances: each leg = 1 match played
-  let totalAppearances = 0;
-  for (const m of individualMatches) {
-    totalAppearances += 1 + (m.leg2HomeScore != null ? 1 : 0) + (m.leg3HomeScore != null ? 1 : 0);
+  // Distinct fixture count = one row per match (multi-leg knockouts still count as ONE)
+  let appearances = individualMatches.length;
+
+  // Add fixtures from team matches where the player only appears as event author
+  const eventAppearances = await prisma.matchEvent.findMany({
+    where: { playerId, match: { status: "COMPLETED" } },
+    select: { matchId: true },
+    distinct: ["matchId"],
+  });
+  const individualMatchIds = new Set(individualMatches.map((m) => m.id));
+  for (const e of eventAppearances) {
+    if (!individualMatchIds.has(e.matchId)) appearances++;
   }
 
-  // Also count from events (for team matches where player had events)
-  const eventMatchIds = new Set(eventAppearances.map((e) => e.matchId));
-  const individualMatchIds = new Set(individualMatches.map((m) => m.id));
-  // Event-only appearances (team matches not counted above)
-  for (const eid of eventMatchIds) {
-    if (!individualMatchIds.has(eid)) totalAppearances++;
+  // Wins (each leg counted separately — same as ELO model)
+  let wins = 0;
+  // Goals scored from scoreline for 1v1 individual (non-PUBG) matches
+  let scorelineGoals = 0;
+  let usedScorelineMatches = 0;
+  for (const m of individualMatches) {
+    const isHome = m.homePlayerId === playerId;
+    const legs: { h: number; a: number }[] = [{ h: m.homeScore ?? 0, a: m.awayScore ?? 0 }];
+    if (m.leg2HomeScore != null) legs.push({ h: m.leg2HomeScore ?? 0, a: m.leg2AwayScore ?? 0 });
+    if (m.leg3HomeScore != null) legs.push({ h: m.leg3HomeScore ?? 0, a: m.leg3AwayScore ?? 0 });
+    for (const leg of legs) {
+      const my = isHome ? leg.h : leg.a;
+      const opp = isHome ? leg.a : leg.h;
+      if (my > opp) wins++;
+    }
+    // Only sum goals from individual non-PUBG tournaments where scoreline is the source of truth
+    if (m.tournament.participantType === "INDIVIDUAL" && m.tournament.gameCategory !== "PUBG") {
+      for (const leg of legs) {
+        scorelineGoals += isHome ? leg.h : leg.a;
+      }
+      usedScorelineMatches++;
+    }
   }
 
   // Average player rating from CUSTOM events with description "PLAYER_RATING"
@@ -149,29 +172,19 @@ async function getPlayerStats(playerId: string) {
     ? Math.round((ratingEvents.reduce((sum, e) => sum + (e.value ?? 0), 0) / ratingEvents.length) * 10) / 10
     : null;
 
-  // Count wins (each leg separately)
-  let wins = 0;
-  for (const m of individualMatches) {
-    const isHome = m.homePlayerId === playerId;
-    const legs: { h: number; a: number }[] = [{ h: m.homeScore ?? 0, a: m.awayScore ?? 0 }];
-    if (m.leg2HomeScore != null) legs.push({ h: m.leg2HomeScore ?? 0, a: m.leg2AwayScore ?? 0 });
-    if (m.leg3HomeScore != null) legs.push({ h: m.leg3HomeScore ?? 0, a: m.leg3AwayScore ?? 0 });
-    for (const leg of legs) {
-      const my = isHome ? leg.h : leg.a;
-      const opp = isHome ? leg.a : leg.h;
-      if (my > opp) wins++;
-    }
-  }
+  // For 1v1 players, scoreline is authoritative.
+  // For team-only players (no individual matches), fall back to event count.
+  const goals = usedScorelineMatches > 0 ? scorelineGoals : (statsMap["GOAL"] ?? 0);
 
   return {
     wins,
-    goals: statsMap["GOAL"] ?? 0,
+    goals,
     assists: statsMap["ASSIST"] ?? 0,
     yellowCards: statsMap["YELLOW_CARD"] ?? 0,
     redCards: statsMap["RED_CARD"] ?? 0,
     motm: statsMap["MOTM"] ?? 0,
     kills: statsMap["KILL"] ?? 0,
-    appearances: totalAppearances,
+    appearances,
     avgRating,
     ratingCount: ratingEvents.length,
   };

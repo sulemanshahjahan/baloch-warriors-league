@@ -843,6 +843,10 @@ async function recomputeTeamStandings(tournamentId: string, gameCategory: string
       awayTeamId: true,
       homeScore: true,
       awayScore: true,
+      leg2HomeScore: true,
+      leg2AwayScore: true,
+      leg3HomeScore: true,
+      leg3AwayScore: true,
       participants: true,
     },
   });
@@ -870,8 +874,9 @@ async function recomputeTeamStandings(tournamentId: string, gameCategory: string
   for (const match of matches) {
     const homeId = match.homeTeamId!;
     const awayId = match.awayTeamId!;
-    const hg = match.homeScore ?? 0;
-    const ag = match.awayScore ?? 0;
+    // Aggregate scores across all legs (1 fixture = 1 match played in standings)
+    const hg = (match.homeScore ?? 0) + (match.leg2HomeScore ?? 0) + (match.leg3HomeScore ?? 0);
+    const ag = (match.awayScore ?? 0) + (match.leg2AwayScore ?? 0) + (match.leg3AwayScore ?? 0);
 
     // For PUBG, use totalScore from MatchParticipant
     if (isPUBG && match.participants && match.participants.length > 0) {
@@ -1008,6 +1013,10 @@ async function recomputeIndividualStandings(tournamentId: string, gameCategory: 
       awayPlayerId: true,
       homeScore: true,
       awayScore: true,
+      leg2HomeScore: true,
+      leg2AwayScore: true,
+      leg3HomeScore: true,
+      leg3AwayScore: true,
       participants: true,
     },
   });
@@ -1049,8 +1058,9 @@ async function recomputeIndividualStandings(tournamentId: string, gameCategory: 
   for (const match of matches) {
     const homeId = match.homePlayerId!;
     const awayId = match.awayPlayerId!;
-    const hg = match.homeScore ?? 0;
-    const ag = match.awayScore ?? 0;
+    // Aggregate scores across all legs (1 fixture = 1 match played in standings)
+    const hg = (match.homeScore ?? 0) + (match.leg2HomeScore ?? 0) + (match.leg3HomeScore ?? 0);
+    const ag = (match.awayScore ?? 0) + (match.leg2AwayScore ?? 0) + (match.leg3AwayScore ?? 0);
 
     // For PUBG, use totalScore from MatchParticipant
     if (isPUBG && match.participants && match.participants.length > 0) {
