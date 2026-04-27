@@ -180,9 +180,9 @@ async function getTournamentBySlug(slug: string) {
       players: {
         select: {
           id: true,
-          // photoUrl intentionally omitted — base64 photos bloat the HTML payload.
-          // SmartAvatar falls back to /api/image?type=player&id=X with separate HTTP caching.
-          player: { select: { id: true, name: true, slug: true } },
+          // photoUrl is now a Cloudinary URL (~80 bytes) — safe to include in HTML.
+          // SmartAvatar uses it directly; browser hits Cloudinary CDN.
+          player: { select: { id: true, name: true, slug: true, photoUrl: true } },
         },
       },
     },
