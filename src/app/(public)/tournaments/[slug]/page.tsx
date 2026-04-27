@@ -179,7 +179,9 @@ async function getTournamentBySlug(slug: string) {
       players: {
         select: {
           id: true,
-          player: { select: { id: true, name: true, slug: true, photoUrl: true } },
+          // photoUrl intentionally omitted — base64 photos bloat the HTML payload.
+          // SmartAvatar falls back to /api/image?type=player&id=X with separate HTTP caching.
+          player: { select: { id: true, name: true, slug: true } },
         },
       },
     },
@@ -596,7 +598,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                               <div key={tp.id} className="flex items-center gap-3 p-2 rounded-lg bg-muted/30">
                                 <span className="text-sm font-bold text-muted-foreground w-6 text-center">{i + 1}</span>
                                 {playerId && (
-                                  <SmartAvatar type="player" id={playerId} name={name} photoUrl={tp.player?.photoUrl} className="h-7 w-7" fallbackClassName="text-[10px]" />
+                                  <SmartAvatar type="player" id={playerId} name={name} className="h-7 w-7" fallbackClassName="text-[10px]" />
                                 )}
                                 {slug ? (
                                   <Link href={`/players/${slug}`} className="text-sm font-medium hover:text-primary">{name}</Link>

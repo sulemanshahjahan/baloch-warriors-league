@@ -47,17 +47,19 @@ async function getMatch(id: string) {
       tournament: {
         select: { id: true, name: true, slug: true, gameCategory: true },
       },
+      // photoUrl/logoUrl intentionally omitted — base64 photos bloat the HTML payload.
+      // SmartAvatar / TournamentAvatar fall back to /api/image with separate HTTP caching.
       homeTeam: {
-        select: { id: true, name: true, shortName: true, slug: true, logoUrl: true },
+        select: { id: true, name: true, shortName: true, slug: true },
       },
       awayTeam: {
-        select: { id: true, name: true, shortName: true, slug: true, logoUrl: true },
+        select: { id: true, name: true, shortName: true, slug: true },
       },
       homePlayer: {
-        select: { id: true, name: true, slug: true, photoUrl: true },
+        select: { id: true, name: true, slug: true },
       },
       awayPlayer: {
-        select: { id: true, name: true, slug: true, photoUrl: true },
+        select: { id: true, name: true, slug: true },
       },
       motmPlayer: {
         select: { id: true, name: true, slug: true },
@@ -465,8 +467,16 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
                 matchId={match.id}
                 round={match.round}
                 matchNumber={match.matchNumber}
-                homePhoto={match.homePlayer?.photoUrl ?? match.homeTeam?.logoUrl ?? null}
-                awayPhoto={match.awayPlayer?.photoUrl ?? match.awayTeam?.logoUrl ?? null}
+                homePhoto={
+                  match.homePlayer ? `/api/image?type=player&id=${match.homePlayer.id}`
+                  : match.homeTeam ? `/api/image?type=team&id=${match.homeTeam.id}`
+                  : null
+                }
+                awayPhoto={
+                  match.awayPlayer ? `/api/image?type=player&id=${match.awayPlayer.id}`
+                  : match.awayTeam ? `/api/image?type=team&id=${match.awayTeam.id}`
+                  : null
+                }
                 leg2HomeScore={match.leg2HomeScore}
                 leg2AwayScore={match.leg2AwayScore}
                 leg3HomeScore={match.leg3HomeScore}

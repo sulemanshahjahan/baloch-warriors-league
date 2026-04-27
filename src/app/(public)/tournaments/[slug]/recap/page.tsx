@@ -47,7 +47,7 @@ export default async function RecapPage({ params }: RecapPageProps) {
   const standings = await prisma.standing.findMany({
     where: { tournamentId: tournament.id, groupId: { not: null } },
     include: {
-      player: { select: { id: true, name: true, slug: true, photoUrl: true } },
+      player: { select: { id: true, name: true, slug: true } },
       group: { select: { id: true, name: true } },
     },
     orderBy: [{ points: "desc" }, { goalDiff: "desc" }, { goalsFor: "desc" }],
@@ -75,7 +75,7 @@ export default async function RecapPage({ params }: RecapPageProps) {
   });
   const scorerPlayers = await prisma.player.findMany({
     where: { id: { in: topScorers.map((s) => s.playerId!).filter(Boolean) } },
-    select: { id: true, name: true, slug: true, photoUrl: true },
+    select: { id: true, name: true, slug: true },
   });
   const scorerMap = new Map(scorerPlayers.map((p) => [p.id, p]));
 
@@ -85,7 +85,7 @@ export default async function RecapPage({ params }: RecapPageProps) {
     where: { id: { in: tournamentPlayerIds } },
     orderBy: { eloRating: "desc" },
     take: 5,
-    select: { id: true, name: true, slug: true, photoUrl: true, eloRating: true },
+    select: { id: true, name: true, slug: true, eloRating: true },
   });
 
   // Best defensive records
