@@ -42,16 +42,17 @@ export function PublicFooter() {
             <div className="text-center sm:text-left">
               <h3 className="font-bold text-lg">Get the BWL App</h3>
               <p className="text-sm text-muted-foreground">
-                Download for Android — tournaments, matches & stats on the go!
+                Available on Google Play — tournaments, matches & stats on the go!
               </p>
             </div>
             <a
-              href="/bwl.apk"
-              download
+              href="https://play.google.com/store/apps/details?id=com.bwl.league"
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-lg font-semibold hover:bg-primary/90 transition-colors whitespace-nowrap"
             >
               <Download className="w-5 h-5" />
-              Download APK
+              Get on Google Play
             </a>
           </div>
         )}
