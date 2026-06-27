@@ -17,6 +17,7 @@ import {
   getRoundDisplayName,
 } from "@/lib/utils";
 import { SmartAvatar } from "@/components/public/smart-avatar";
+import { DuoTeamAvatar } from "@/components/public/duo-team-avatar";
 
 async function getHomeData() {
   const [featuredTournaments, recentResults, upcomingMatches, stats] =
@@ -53,8 +54,8 @@ async function getHomeData() {
           homeScorePens: true,
           awayScorePens: true,
           tournament: { select: { name: true, gameCategory: true } },
-          homeTeam: { select: { id: true, name: true, shortName: true } },
-          awayTeam: { select: { id: true, name: true, shortName: true } },
+          homeTeam: { select: { id: true, name: true, shortName: true, isDuo: true, players: { where: { isActive: true }, select: { player: { select: { id: true, name: true, photoUrl: true } } } } } },
+          awayTeam: { select: { id: true, name: true, shortName: true, isDuo: true, players: { where: { isActive: true }, select: { player: { select: { id: true, name: true, photoUrl: true } } } } } },
           homePlayer: { select: { id: true, name: true } },
           awayPlayer: { select: { id: true, name: true } },
           motmPlayer: { select: { id: true, name: true } },
@@ -71,8 +72,8 @@ async function getHomeData() {
           matchNumber: true,
           scheduledAt: true,
           tournament: { select: { name: true, gameCategory: true } },
-          homeTeam: { select: { id: true, name: true } },
-          awayTeam: { select: { id: true, name: true } },
+          homeTeam: { select: { id: true, name: true, isDuo: true, players: { where: { isActive: true }, select: { player: { select: { id: true, name: true, photoUrl: true } } } } } },
+          awayTeam: { select: { id: true, name: true, isDuo: true, players: { where: { isActive: true }, select: { player: { select: { id: true, name: true, photoUrl: true } } } } } },
           homePlayer: { select: { id: true, name: true } },
           awayPlayer: { select: { id: true, name: true } },
         },
@@ -733,7 +734,11 @@ export default async function HomePage() {
                             <div className="flex items-center gap-2 flex-1 justify-end">
                               <p className="font-semibold text-sm text-right truncate">{homeName}</p>
                               {homeId ? (
-                                <SmartAvatar type={homeType as "player" | "team"} id={homeId} name={homeName} className="h-8 w-8 shrink-0" fallbackClassName="text-[10px]" />
+                                homeType === "team" ? (
+                                  <DuoTeamAvatar id={homeId} name={homeName} isDuo={match.homeTeam?.isDuo} members={match.homeTeam?.players?.map((p) => p.player)} className="h-8 w-8 shrink-0" fallbackClassName="text-[10px]" />
+                                ) : (
+                                  <SmartAvatar type="player" id={homeId} name={homeName} className="h-8 w-8 shrink-0" fallbackClassName="text-[10px]" />
+                                )
                               ) : (
                                 <Avatar className="h-8 w-8 shrink-0">
                                   <AvatarFallback className="text-[10px]">{getInitials(homeName)}</AvatarFallback>
@@ -752,7 +757,11 @@ export default async function HomePage() {
                             </div>
                             <div className="flex items-center gap-2 flex-1">
                               {awayId ? (
-                                <SmartAvatar type={awayType as "player" | "team"} id={awayId} name={awayName} className="h-8 w-8 shrink-0" fallbackClassName="text-[10px]" />
+                                awayType === "team" ? (
+                                  <DuoTeamAvatar id={awayId} name={awayName} isDuo={match.awayTeam?.isDuo} members={match.awayTeam?.players?.map((p) => p.player)} className="h-8 w-8 shrink-0" fallbackClassName="text-[10px]" />
+                                ) : (
+                                  <SmartAvatar type="player" id={awayId} name={awayName} className="h-8 w-8 shrink-0" fallbackClassName="text-[10px]" />
+                                )
                               ) : (
                                 <Avatar className="h-8 w-8 shrink-0">
                                   <AvatarFallback className="text-[10px]">{getInitials(awayName)}</AvatarFallback>
@@ -822,7 +831,11 @@ export default async function HomePage() {
                             <div className="flex items-center gap-2 flex-1 justify-end">
                               <p className="font-semibold text-sm text-right truncate">{homeName}</p>
                               {homeId ? (
-                                <SmartAvatar type={homeType as "player" | "team"} id={homeId} name={homeName} className="h-7 w-7 shrink-0" fallbackClassName="text-[10px]" />
+                                homeType === "team" ? (
+                                  <DuoTeamAvatar id={homeId} name={homeName} isDuo={match.homeTeam?.isDuo} members={match.homeTeam?.players?.map((p) => p.player)} className="h-7 w-7 shrink-0" fallbackClassName="text-[10px]" />
+                                ) : (
+                                  <SmartAvatar type="player" id={homeId} name={homeName} className="h-7 w-7 shrink-0" fallbackClassName="text-[10px]" />
+                                )
                               ) : (
                                 <Avatar className="h-7 w-7 shrink-0">
                                   <AvatarFallback className="text-[10px]">{getInitials(homeName)}</AvatarFallback>
@@ -832,7 +845,11 @@ export default async function HomePage() {
                             <span className="text-xs text-muted-foreground px-2 shrink-0">vs</span>
                             <div className="flex items-center gap-2 flex-1">
                               {awayId ? (
-                                <SmartAvatar type={awayType as "player" | "team"} id={awayId} name={awayName} className="h-7 w-7 shrink-0" fallbackClassName="text-[10px]" />
+                                awayType === "team" ? (
+                                  <DuoTeamAvatar id={awayId} name={awayName} isDuo={match.awayTeam?.isDuo} members={match.awayTeam?.players?.map((p) => p.player)} className="h-7 w-7 shrink-0" fallbackClassName="text-[10px]" />
+                                ) : (
+                                  <SmartAvatar type="player" id={awayId} name={awayName} className="h-7 w-7 shrink-0" fallbackClassName="text-[10px]" />
+                                )
                               ) : (
                                 <Avatar className="h-7 w-7 shrink-0">
                                   <AvatarFallback className="text-[10px]">{getInitials(awayName)}</AvatarFallback>

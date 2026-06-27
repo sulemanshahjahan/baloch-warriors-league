@@ -10,6 +10,7 @@ export const dynamicParams = true;
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { SmartAvatar } from "@/components/public/smart-avatar";
+import { DuoTeamAvatar } from "@/components/public/duo-team-avatar";
 import {
   ArrowLeft,
   Calendar,
@@ -51,10 +52,10 @@ async function getMatch(id: string) {
       // photoUrl/logoUrl intentionally omitted — base64 photos bloat the HTML payload.
       // SmartAvatar / TournamentAvatar fall back to /api/image with separate HTTP caching.
       homeTeam: {
-        select: { id: true, name: true, shortName: true, slug: true },
+        select: { id: true, name: true, shortName: true, slug: true, isDuo: true, players: { where: { isActive: true }, select: { player: { select: { id: true, name: true, photoUrl: true } } } } },
       },
       awayTeam: {
-        select: { id: true, name: true, shortName: true, slug: true },
+        select: { id: true, name: true, shortName: true, slug: true, isDuo: true, players: { where: { isActive: true }, select: { player: { select: { id: true, name: true, photoUrl: true } } } } },
       },
       homePlayer: {
         select: { id: true, name: true, slug: true },
@@ -251,13 +252,24 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
               {homeSlug ? (
                 <Link href={homeSlug}>
                   {homeId ? (
-                    <SmartAvatar 
-                      type={homeType as "player" | "team"} 
-                      id={homeId} 
-                      name={homeName}
-                      className="h-20 w-20 ring-2 ring-border hover:ring-primary transition-all"
-                      fallbackClassName="text-lg font-bold"
-                    />
+                    homeType === "team" ? (
+                      <DuoTeamAvatar
+                        id={homeId}
+                        name={homeName}
+                        isDuo={match.homeTeam?.isDuo}
+                        members={match.homeTeam?.players?.map((p) => p.player)}
+                        className="h-20 w-20 ring-2 ring-border hover:ring-primary transition-all"
+                        fallbackClassName="text-lg font-bold"
+                      />
+                    ) : (
+                      <SmartAvatar
+                        type="player"
+                        id={homeId}
+                        name={homeName}
+                        className="h-20 w-20 ring-2 ring-border hover:ring-primary transition-all"
+                        fallbackClassName="text-lg font-bold"
+                      />
+                    )
                   ) : (
                     <Avatar className="h-20 w-20 ring-2 ring-border hover:ring-primary transition-all">
                       <AvatarFallback className="text-lg font-bold">
@@ -344,13 +356,24 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
               {awaySlug ? (
                 <Link href={awaySlug}>
                   {awayId ? (
-                    <SmartAvatar 
-                      type={awayType as "player" | "team"} 
-                      id={awayId} 
-                      name={awayName}
-                      className="h-20 w-20 ring-2 ring-border hover:ring-primary transition-all"
-                      fallbackClassName="text-lg font-bold"
-                    />
+                    awayType === "team" ? (
+                      <DuoTeamAvatar
+                        id={awayId}
+                        name={awayName}
+                        isDuo={match.awayTeam?.isDuo}
+                        members={match.awayTeam?.players?.map((p) => p.player)}
+                        className="h-20 w-20 ring-2 ring-border hover:ring-primary transition-all"
+                        fallbackClassName="text-lg font-bold"
+                      />
+                    ) : (
+                      <SmartAvatar
+                        type="player"
+                        id={awayId}
+                        name={awayName}
+                        className="h-20 w-20 ring-2 ring-border hover:ring-primary transition-all"
+                        fallbackClassName="text-lg font-bold"
+                      />
+                    )
                   ) : (
                     <Avatar className="h-20 w-20 ring-2 ring-border hover:ring-primary transition-all">
                       <AvatarFallback className="text-lg font-bold">

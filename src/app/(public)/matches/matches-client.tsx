@@ -15,6 +15,7 @@ import {
   getRoundDisplayName,
 } from "@/lib/utils";
 import { SmartAvatar } from "@/components/public/smart-avatar";
+import { DuoTeamAvatar } from "@/components/public/duo-team-avatar";
 
 type Match = {
   id: string;
@@ -35,8 +36,8 @@ type Match = {
   leg3AwayPens: number | null;
   completedAt: string | null;
   tournament: { name: string; slug: string; gameCategory: string };
-  homeTeam: { id: string; name: string; shortName: string | null } | null;
-  awayTeam: { id: string; name: string; shortName: string | null } | null;
+  homeTeam: { id: string; name: string; shortName: string | null; isDuo?: boolean; players?: { player: { id: string; name: string; photoUrl: string | null } }[] } | null;
+  awayTeam: { id: string; name: string; shortName: string | null; isDuo?: boolean; players?: { player: { id: string; name: string; photoUrl: string | null } }[] } | null;
   homePlayer: { id: string; name: string } | null;
   awayPlayer: { id: string; name: string } | null;
 };
@@ -93,7 +94,7 @@ function MatchCard({ match }: { match: Match }) {
               {match.homePlayer ? (
                 <SmartAvatar type="player" id={match.homePlayer.id} name={homeName} className="h-10 w-10 shrink-0" fallbackClassName="text-sm" />
               ) : match.homeTeam ? (
-                <SmartAvatar type="team" id={match.homeTeam.id} name={homeName} className="h-10 w-10 shrink-0" fallbackClassName="text-sm" />
+                <DuoTeamAvatar id={match.homeTeam.id} name={homeName} isDuo={match.homeTeam.isDuo} members={match.homeTeam.players?.map((p) => p.player)} className="h-10 w-10 shrink-0" fallbackClassName="text-sm" />
               ) : null}
               <div className="min-w-0">
                 <p className="font-medium truncate">{homeName}</p>
@@ -133,7 +134,7 @@ function MatchCard({ match }: { match: Match }) {
               {match.awayPlayer ? (
                 <SmartAvatar type="player" id={match.awayPlayer.id} name={awayName} className="h-10 w-10 shrink-0" fallbackClassName="text-sm" />
               ) : match.awayTeam ? (
-                <SmartAvatar type="team" id={match.awayTeam.id} name={awayName} className="h-10 w-10 shrink-0" fallbackClassName="text-sm" />
+                <DuoTeamAvatar id={match.awayTeam.id} name={awayName} isDuo={match.awayTeam.isDuo} members={match.awayTeam.players?.map((p) => p.player)} className="h-10 w-10 shrink-0" fallbackClassName="text-sm" />
               ) : null}
             </div>
           </div>

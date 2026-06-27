@@ -44,10 +44,10 @@ export async function GET(req: NextRequest) {
             select: { name: true, slug: true, gameCategory: true },
           },
           homeTeam: {
-            select: { id: true, name: true, shortName: true },
+            select: { id: true, name: true, shortName: true, isDuo: true, players: { where: { isActive: true }, select: { player: { select: { id: true, name: true, photoUrl: true } } } } },
           },
           awayTeam: {
-            select: { id: true, name: true, shortName: true },
+            select: { id: true, name: true, shortName: true, isDuo: true, players: { where: { isActive: true }, select: { player: { select: { id: true, name: true, photoUrl: true } } } } },
           },
           homePlayer: {
             select: { id: true, name: true },
