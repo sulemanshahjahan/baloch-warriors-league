@@ -36,6 +36,7 @@ import { RecomputeStandingsButton } from "./recompute-standings-button";
 import { BackfillBracketButton } from "./backfill-bracket-button";
 import { CollapsibleSection } from "@/components/admin/collapsible-section";
 import { DrawWrapper } from "./draw-wrapper";
+import { DuoGroupDrawWrapper } from "./duo-group-draw-wrapper";
 import { PaginatedMatchesTable } from "./matches-table";
 
 interface TournamentDetailPageProps {
@@ -217,6 +218,22 @@ export default async function TournamentDetailPage({ params }: TournamentDetailP
                     id: g.id,
                     name: g.name,
                   }))}
+                />
+              )}
+
+            {/* Animated Draw — 2v2 duos into groups */}
+            {is2v2 &&
+              duos.filter((d) => !d.groupId).length > 0 &&
+              tournament.groups.length >= 2 && (
+                <DuoGroupDrawWrapper
+                  duos={duos
+                    .filter((d) => !d.groupId)
+                    .map((d) => ({
+                      tournamentTeamId: d.tournamentTeamId,
+                      name: d.name,
+                      photoUrl: d.players[0]?.photoUrl ?? null,
+                    }))}
+                  groups={tournament.groups.map((g) => ({ id: g.id, name: g.name }))}
                 />
               )}
           </CollapsibleSection>

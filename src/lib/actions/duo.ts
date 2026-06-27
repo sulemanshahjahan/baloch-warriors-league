@@ -271,6 +271,70 @@ export async function autoPairDuos(
   };
 }
 
+/**
+ * Persist an explicit set of pairs (used by the animated auto-pair draw, where
+ * the pairing is computed on the client so it can be revealed, then saved).
+ * Validates the same rules as createDuo, across the whole batch.
+ */
+export async function createDuosFromPairs(
+  tournamentId: string,
+  pairs: { player1Id: string; player2Id: string }[]
+): Promise<ActionResult<{ created: number }>> {
+  const denied = await checkAdmin();
+  if (denied) return denied as ActionResult<{ created: number }>;
+
+  const bad = await assertDuoTournament(tournamentId);
+  if (bad) return bad as ActionResult<{ created: number }>;
+
+  const ids = pairs.flatMap((p) => [p.player1Id, p.player2Id]);
+  if (ids.length === 0) return { success: false, error: "No pairs to create" };
+  if (new Set(ids).size !== ids.length) {
+    return { success: false, error: "A player appears in more than one pair" };
+  }
+
+  const alreadyPaired = await getPairedPlayerIds(tournamentId);
+  if (ids.some((id) => alreadyPaired.includes(id))) {
+    return { success: false, error: "A selected player is already in another duo in this tournament" };
+  }
+
+  const players = await prisma.player.findMany({
+    where: { id: { in: ids }, isActive: true },
+    select: { id: true, name: true },
+  });
+  const nameById = new Map(players.map((p) => [p.id, p.name]));
+  if (nameById.size !== ids.length) return { success: false, error: "One or more players were not found" };
+
+  let created = 0;
+  for (const pair of pairs) {
+    const name = await resolveDuoName(
+      tournamentId,
+      undefined,
+      defaultDuoName(nameById.get(pair.player1Id)!, nameById.get(pair.player2Id)!),
+      true
+    );
+    if (!name.ok) continue;
+    await prisma.team.create({
+      data: {
+        name: name.name,
+        slug: `duo-${slugify(name.name)}-${randomUUID().slice(0, 8)}`,
+        isDuo: true,
+        players: { create: [{ playerId: pair.player1Id }, { playerId: pair.player2Id }] },
+        tournaments: { create: [{ tournamentId }] },
+      },
+    });
+    created++;
+  }
+
+  await logActivity({
+    action: "AUTO_PAIR",
+    entityType: "DUO",
+    entityId: tournamentId,
+    details: { created, animated: true },
+  });
+  await revalidateTournament(tournamentId);
+  return { success: true, data: { created }, message: `Created ${created} duo(s).` };
+}
+
 /** Rename a duo. Enforces uniqueness among duos in the same tournament. */
 export async function renameDuo(
   tournamentId: string,

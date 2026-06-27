@@ -25,8 +25,9 @@ import {
 } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Plus, Trash2, Loader2, Users, Sparkles, Pencil, Check, X } from "lucide-react";
-import { createDuo, autoPairDuos, renameDuo, deleteDuo } from "@/lib/actions/duo";
+import { createDuo, autoPairDuos, createDuosFromPairs, renameDuo, deleteDuo } from "@/lib/actions/duo";
 import type { DuoView, DuoRatingSource } from "@/lib/actions/duo";
+import { AnimatedDuoPair } from "@/components/admin/animated-duo-pair";
 import { getInitials } from "@/lib/utils";
 
 interface AvailablePlayer {
@@ -59,6 +60,11 @@ export function DuoManager({ tournamentId, duos, availablePlayers }: DuoManagerP
   const [autoOpen, setAutoOpen] = useState(false);
   const [autoSelected, setAutoSelected] = useState<string[]>([]);
   const [ratingSource, setRatingSource] = useState<DuoRatingSource>("CARD");
+
+  // Animated auto-pair overlay
+  const [animateOpen, setAnimateOpen] = useState(false);
+  const [animatePlayers, setAnimatePlayers] = useState<AvailablePlayer[]>([]);
+  const [animateSource, setAnimateSource] = useState<DuoRatingSource>("CARD");
 
   const ratingOf = (p: AvailablePlayer) => (ratingSource === "SKILL" ? p.skillLevel ?? 70 : p.cardRank);
 
@@ -102,6 +108,27 @@ export function DuoManager({ tournamentId, duos, availablePlayers }: DuoManagerP
         setError(res.error);
       }
     });
+  }
+
+  function launchAnimatedPair() {
+    const selected = availablePlayers.filter((p) => autoSelected.includes(p.id));
+    if (selected.length < 2) return;
+    setAnimatePlayers(selected);
+    setAnimateSource(ratingSource);
+    setAutoOpen(false);
+    setAnimateOpen(true);
+  }
+
+  async function handleAnimatedConfirm(pairs: { player1Id: string; player2Id: string }[]) {
+    const res = await createDuosFromPairs(tournamentId, pairs);
+    setAnimateOpen(false);
+    reset();
+    if (res.success) {
+      setNotice(res.message ?? "Duos created");
+      router.refresh();
+    } else {
+      setError(res.error);
+    }
   }
 
   function handleRename(teamId: string) {
@@ -368,6 +395,10 @@ export function DuoManager({ tournamentId, duos, availablePlayers }: DuoManagerP
 
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => { setAutoOpen(false); reset(); }}>Cancel</Button>
+              <Button variant="secondary" onClick={launchAnimatedPair} disabled={autoSelected.length < 2 || isPending}>
+                <Sparkles className="w-4 h-4 mr-2" />
+                Animated
+              </Button>
               <Button onClick={handleAutoPair} disabled={autoSelected.length < 2 || isPending}>
                 {isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
                 Pair {Math.floor(autoSelected.length / 2)} duo(s)
@@ -376,6 +407,15 @@ export function DuoManager({ tournamentId, duos, availablePlayers }: DuoManagerP
           </DialogContent>
         </Dialog>
       </div>
+
+      {/* Fullscreen animated auto-pair draw */}
+      <AnimatedDuoPair
+        open={animateOpen}
+        players={animatePlayers}
+        ratingSource={animateSource}
+        onClose={() => setAnimateOpen(false)}
+        onConfirm={handleAnimatedConfirm}
+      />
     </div>
   );
 }

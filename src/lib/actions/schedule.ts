@@ -791,6 +791,44 @@ export async function bulkAssignPlayersToGroups(
   return { success: true, data: { count: assignments.length } };
 }
 
+/** Bulk-assign duo (team) enrollments to groups — used by the 2v2 animated draw. */
+export async function bulkAssignTeamsToGroups(
+  assignments: Array<{ tournamentTeamId: string; groupId: string }>
+) {
+  const session = await auth();
+  if (!session) return { success: false, error: "Unauthorized" };
+  if (!hasRole(session, "EDITOR")) return { success: false, error: "Forbidden" };
+
+  let tournamentId: string | null = null;
+
+  for (const { tournamentTeamId, groupId } of assignments) {
+    const tt = await prisma.tournamentTeam.update({
+      where: { id: tournamentTeamId },
+      data: { groupId },
+      select: { tournamentId: true },
+    });
+    if (!tournamentId) tournamentId = tt.tournamentId;
+  }
+
+  if (tournamentId) {
+    revalidatePath(`/admin/tournaments/${tournamentId}`);
+    const t = await prisma.tournament.findUnique({ where: { id: tournamentId }, select: { slug: true } });
+    if (t?.slug) revalidatePath(`/tournaments/${t.slug}`);
+    revalidatePath("/tournaments");
+
+    import("@/lib/push").then(({ notify }) =>
+      notify({
+        title: "Group Draw Complete!",
+        body: `${assignments.length} duos have been drawn into groups`,
+        url: t?.slug ? `/tournaments/${t.slug}` : "/tournaments",
+        tag: `draw-${tournamentId}`,
+      })
+    ).catch(() => {});
+  }
+
+  return { success: true, data: { count: assignments.length } };
+}
+
 // ─── RANDOM DRAW FOR GROUPS ──────────────────────────────────
 
 interface RandomDrawOptions {

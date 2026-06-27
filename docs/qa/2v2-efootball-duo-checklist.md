@@ -50,6 +50,10 @@ existing team match / standings / knockout engines. These hidden duo teams must
    - [ ] Result: strongest+weakest pairing → **96+62** and **90+79** (balanced), 2 duos created.
    - [ ] If all selected players have the **same** card rank, every duo will show the
          same combined value — that's expected (nothing to differentiate).
+   - [ ] **Animated auto-pair** — in the auto-pair dialog, click **Animated** →
+         fullscreen draw opens → Start → shuffle → duos reveal one by one →
+         **Redraw** reshuffles → **Confirm & Save** persists exactly the revealed
+         duos. Odd count shows the unpaired warning on the final screen.
    - [ ] Success notice reports the number of duos created.
 7. **Handle odd player count**
    - [ ] **Auto-pair** → select an **odd** set (e.g. 5 players).
@@ -69,7 +73,10 @@ existing team match / standings / knockout engines. These hidden duo teams must
 ## C. Group stage
 
 11. **Generate group fixtures**
-    - [ ] Create groups (Groups section) and draw/assign duos into them.
+    - [ ] Create groups (Groups section) and assign duos into them — either manually
+          or via **Animated Draw** (shows each duo being drawn into a group, then
+          Confirm & Save). The animated draw appears when there are unassigned duos
+          and ≥ 2 groups.
     - [ ] Generate the schedule (Group + Knockout / round-robin within groups).
 12. **Fixtures are Duo vs Duo**
     - [ ] Each generated match shows **Duo A vs Duo B** (duo names), not single player names.
