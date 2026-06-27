@@ -12,6 +12,9 @@ const TIERS = [
   { key: "30m", threshold: 30 * 60 * 1000, label: "30 minutes" },
 ] as const;
 
+// WhatsApp magic links go out once a match is within this window of its deadline.
+const WA_THRESHOLD_MS = 3 * 60 * 60 * 1000; // 3 hours
+
 export async function GET(req: NextRequest) {
   // Verify cron secret (Vercel sends this automatically for cron jobs)
   const authHeader = req.headers.get("authorization");
@@ -70,9 +73,9 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Auto-send magic links via WhatsApp (once, when 24h reminder fires).
+    // Auto-send magic links via WhatsApp (once, when ≤ 3h to deadline).
     // Sends to every recipient on each side — both members for 2v2 duos.
-    if (newReminders.includes("24h") && !sent.includes("wa")) {
+    if (msUntilDeadline <= WA_THRESHOLD_MS && !sent.includes("wa")) {
       const deadlineStr = match.deadline!.toLocaleString("en-GB", {
         day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Karachi",
       }) + " PKT";

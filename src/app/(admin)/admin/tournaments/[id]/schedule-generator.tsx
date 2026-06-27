@@ -52,6 +52,7 @@ export function ScheduleGenerator({
   const [daysPerRound, setDaysPerRound] = useState(3);
   const [globalDeadline, setGlobalDeadline] = useState("");
   const [maxMatchesPerDay, setMaxMatchesPerDay] = useState(2);
+  const [kickoffTime, setKickoffTime] = useState("18:00");
   const [isLoading, setIsLoading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSendingWA, setIsSendingWA] = useState(false);
@@ -63,6 +64,7 @@ export function ScheduleGenerator({
     setIsLoading(true);
     setResult(null);
     
+    const [kh, km] = kickoffTime.split(":").map(Number);
     const res = await generateSchedule({
       tournamentId,
       format,
@@ -73,6 +75,8 @@ export function ScheduleGenerator({
       daysPerRound: deadlineMode === "per_round" ? daysPerRound : undefined,
       globalDeadline: deadlineMode === "global" ? globalDeadline : undefined,
       maxMatchesPerDay,
+      kickoffHour: Number.isFinite(kh) ? kh : 18,
+      kickoffMinute: Number.isFinite(km) ? km : 0,
     });
     
     setIsLoading(false);
@@ -228,28 +232,40 @@ export function ScheduleGenerator({
 
           {deadlineMode === "global" && (
             <div className="space-y-2">
-              <Label>All matches due by <span className="text-muted-foreground text-[10px]">(PKT)</span></Label>
+              <Label>Hard finish deadline — all matches due by <span className="text-muted-foreground text-[10px]">(PKT)</span></Label>
               <Input
                 type="datetime-local"
                 value={globalDeadline}
                 onChange={(e) => setGlobalDeadline(e.target.value)}
               />
+              <p className="text-xs text-muted-foreground">
+                Every match gets this exact deadline (e.g. 29 Jun 03:00). Reminders fire 3h before it.
+              </p>
             </div>
           )}
 
-          {/* Max matches per player per day */}
-          <div className="space-y-2">
-            <Label>Max matches per player per day</Label>
-            <Input
-              type="number"
-              min={1}
-              max={4}
-              value={maxMatchesPerDay}
-              onChange={(e) => setMaxMatchesPerDay(Number(e.target.value))}
-            />
-            <p className="text-xs text-muted-foreground">
-              Dates auto-assigned from tournament start date. Each player gets at most this many matches per day.
-            </p>
+          {/* Kickoff time + max per day */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Kickoff time <span className="text-muted-foreground text-[10px]">(PKT)</span></Label>
+              <Input
+                type="time"
+                value={kickoffTime}
+                onChange={(e) => setKickoffTime(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">Daily start time (e.g. 21:00).</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Max matches / day</Label>
+              <Input
+                type="number"
+                min={1}
+                max={8}
+                value={maxMatchesPerDay}
+                onChange={(e) => setMaxMatchesPerDay(Number(e.target.value))}
+              />
+              <p className="text-xs text-muted-foreground">Per participant. Raise to compress.</p>
+            </div>
           </div>
 
           {/* Group Settings */}
@@ -398,6 +414,9 @@ export function GenerateKnockoutButton({
 }) {
   const [open, setOpen] = useState(false);
   const [advanceCount, setAdvanceCount] = useState(4);
+  const [kickoffTime, setKickoffTime] = useState("18:00");
+  const [finalDeadline, setFinalDeadline] = useState("");
+  const [gapDays, setGapDays] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [koResult, setKoResult] = useState<{ success: boolean; count?: number; message?: string } | null>(null);
   const [isSendingKoWA, setIsSendingKoWA] = useState(false);
@@ -407,7 +426,13 @@ export function GenerateKnockoutButton({
   const handleGenerate = async () => {
     setIsLoading(true);
     setKoResult(null);
-    const res = await generateKnockoutFromGroups(tournamentId, advanceCount);
+    const [kh, km] = kickoffTime.split(":").map(Number);
+    const res = await generateKnockoutFromGroups(tournamentId, advanceCount, {
+      kickoffHour: Number.isFinite(kh) ? kh : 18,
+      kickoffMinute: Number.isFinite(km) ? km : 0,
+      finalDeadline: finalDeadline || undefined,
+      gapDays,
+    });
     setIsLoading(false);
     if (res.success) {
       setKoResult({ success: true, count: res.count, message: `${res.count} knockout matches created! Dates auto-assigned.` });
@@ -473,6 +498,23 @@ export function GenerateKnockoutButton({
               onChange={(e) => setAdvanceCount(Number(e.target.value))}
             />
           </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-2">
+              <Label>Kickoff <span className="text-muted-foreground text-[10px]">(PKT)</span></Label>
+              <Input type="time" value={kickoffTime} onChange={(e) => setKickoffTime(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Gap days</Label>
+              <Input type="number" min={0} max={14} value={gapDays} onChange={(e) => setGapDays(Number(e.target.value))} />
+            </div>
+            <div className="space-y-2">
+              <Label>Due by <span className="text-muted-foreground text-[10px]">(PKT)</span></Label>
+              <Input type="datetime-local" value={finalDeadline} onChange={(e) => setFinalDeadline(e.target.value)} />
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Gap days = days after the last group match before the knockout starts (0 = same day). &ldquo;Due by&rdquo; sets the hard deadline for every knockout match.
+          </p>
           <div className="text-sm text-muted-foreground">
             {groupCount} groups × {advanceCount} teams = {groupCount * advanceCount} teams in knockout
           </div>

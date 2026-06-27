@@ -27,8 +27,10 @@ interface GenerateScheduleOptions {
   advanceCount?: number; // How many from each group advance
   deadlineMode?: "none" | "per_round" | "global";
   daysPerRound?: number;
-  globalDeadline?: string; // ISO date string
+  globalDeadline?: string; // ISO date string — when deadlineMode="global", the hard finish deadline for ALL matches
   maxMatchesPerDay?: number; // Auto-date assignment: max matches per player per day (default 2)
+  kickoffHour?: number; // Daily kickoff hour in PKT for auto-assigned dates (default 18)
+  kickoffMinute?: number; // Daily kickoff minute in PKT (default 0)
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────
@@ -77,7 +79,10 @@ export async function generateSchedule(options: GenerateScheduleOptions) {
   if (!session) return { success: false, error: "Unauthorized" };
   if (!hasRole(session, "ADMIN")) return { success: false, error: "Forbidden: Admin role required" };
 
-  const { tournamentId, format, seedingMethod, groupCount = 4, advanceCount = 2, deadlineMode = "none", daysPerRound, globalDeadline } = options;
+  const { tournamentId, format, seedingMethod, groupCount = 4, advanceCount = 2, deadlineMode = "none", daysPerRound, globalDeadline, kickoffHour = 18, kickoffMinute = 0 } = options;
+
+  // Hard finish deadline (applied to every match) when using a global deadline.
+  const hardDeadline = deadlineMode === "global" && globalDeadline ? fromKarachiInputValue(globalDeadline) : null;
 
   // Get tournament and participants
   const tournament = await prisma.tournament.findUnique({
@@ -381,10 +386,16 @@ export async function generateSchedule(options: GenerateScheduleOptions) {
       if (bestDay >= 0) {
         const dayAnchor = new Date(tournament.startDate!);
         dayAnchor.setUTCDate(dayAnchor.getUTCDate() + bestDay);
-        const scheduledAt = atKarachiHour(dayAnchor, 18, 0); // 6 PM PKT
+        const scheduledAt = atKarachiHour(dayAnchor, kickoffHour, kickoffMinute);
 
-        const deadline = new Date(scheduledAt);
-        deadline.setHours(deadline.getHours() + 24);
+        // Use the hard finish deadline if set, otherwise kickoff + 24h.
+        let deadline: Date;
+        if (hardDeadline) {
+          deadline = hardDeadline;
+        } else {
+          deadline = new Date(scheduledAt);
+          deadline.setHours(deadline.getHours() + 24);
+        }
 
         updates.push({ id: m.id, scheduledAt, deadline });
 
@@ -416,7 +427,8 @@ export async function generateSchedule(options: GenerateScheduleOptions) {
 
 export async function generateKnockoutFromGroups(
   tournamentId: string,
-  advanceCount: number = 2
+  advanceCount: number = 2,
+  options?: { kickoffHour?: number; kickoffMinute?: number; finalDeadline?: string; gapDays?: number }
 ) {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };
@@ -607,6 +619,11 @@ export async function generateKnockoutFromGroups(
 
   // Auto-assign dates to knockout matches
   if (tournament.startDate && createdMatches > 0) {
+    const kickoffHour = options?.kickoffHour ?? 18;
+    const kickoffMinute = options?.kickoffMinute ?? 0;
+    const gapDays = options?.gapDays ?? 1;
+    const hardDeadline = options?.finalDeadline ? fromKarachiInputValue(options.finalDeadline) : null;
+
     const koMatches = await prisma.match.findMany({
       where: { tournamentId, status: "SCHEDULED" as MatchStatus, groupId: null },
       orderBy: [{ roundNumber: "asc" }, { matchNumber: "asc" }],
@@ -622,8 +639,8 @@ export async function generateKnockoutFromGroups(
     const koStartDate = lastGroupMatch?.completedAt
       ? new Date(Math.max(lastGroupMatch.completedAt.getTime(), tournament.startDate.getTime()))
       : tournament.startDate;
-    // Add 1 day gap after group stage
-    koStartDate.setDate(koStartDate.getDate() + 1);
+    // Gap (days) after group stage before knockout starts
+    koStartDate.setDate(koStartDate.getDate() + gapDays);
 
     const koUpdates: { id: string; scheduledAt: Date; deadline: Date }[] = [];
     let dayOffset = 0;
@@ -631,10 +648,16 @@ export async function generateKnockoutFromGroups(
     for (const m of koMatches) {
       const dayAnchor = new Date(koStartDate);
       dayAnchor.setUTCDate(dayAnchor.getUTCDate() + dayOffset);
-      const scheduledAt = atKarachiHour(dayAnchor, 18, 0); // 6 PM PKT
+      const scheduledAt = atKarachiHour(dayAnchor, kickoffHour, kickoffMinute);
 
-      const deadline = new Date(scheduledAt);
-      deadline.setHours(deadline.getHours() + 24);
+      // Use the hard finish deadline if set, otherwise kickoff + 24h.
+      let deadline: Date;
+      if (hardDeadline) {
+        deadline = hardDeadline;
+      } else {
+        deadline = new Date(scheduledAt);
+        deadline.setHours(deadline.getHours() + 24);
+      }
 
       koUpdates.push({ id: m.id, scheduledAt, deadline });
       // For RO16: 2 matches per day
