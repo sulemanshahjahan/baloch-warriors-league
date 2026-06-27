@@ -8,7 +8,11 @@ import { AnimatedDraw } from "@/components/admin/animated-draw";
 import { bulkAssignTeamsToGroups } from "@/lib/actions/schedule";
 
 interface DuoGroupDrawWrapperProps {
-  duos: Array<{ tournamentTeamId: string; name: string; photoUrl?: string | null }>;
+  duos: Array<{
+    tournamentTeamId: string;
+    name: string;
+    members: Array<{ id: string; name: string; photoUrl?: string | null }>;
+  }>;
   groups: Array<{ id: string; name: string }>;
 }
 
@@ -18,7 +22,7 @@ export function DuoGroupDrawWrapper({ duos, groups }: DuoGroupDrawWrapperProps) 
   return (
     <div className="mt-4 pt-4 border-t border-border/50">
       <AnimatedDraw
-        players={duos.map((d) => ({ id: d.tournamentTeamId, name: d.name, photoUrl: d.photoUrl }))}
+        players={duos.map((d) => ({ id: d.tournamentTeamId, name: d.name, members: d.members }))}
         groups={groups}
         onComplete={async (assignments) => {
           await bulkAssignTeamsToGroups(

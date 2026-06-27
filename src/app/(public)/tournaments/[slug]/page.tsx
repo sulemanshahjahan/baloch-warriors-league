@@ -49,6 +49,7 @@ import {
   getRoundDisplayName,
 } from "@/lib/utils";
 import { SmartAvatar } from "@/components/public/smart-avatar";
+import { DuoTeamAvatar } from "@/components/public/duo-team-avatar";
 
 type FormResult = "W" | "D" | "L";
 
@@ -212,8 +213,8 @@ async function getTournamentBySlug(slug: string) {
       awayTeamId: true,
       homePlayerId: true,
       awayPlayerId: true,
-      homeTeam: { select: { id: true, name: true, shortName: true } },
-      awayTeam: { select: { id: true, name: true, shortName: true } },
+      homeTeam: { select: { id: true, name: true, shortName: true, isDuo: true, players: { where: { isActive: true }, select: { player: { select: { id: true, name: true, photoUrl: true } } } } } },
+      awayTeam: { select: { id: true, name: true, shortName: true, isDuo: true, players: { where: { isActive: true }, select: { player: { select: { id: true, name: true, photoUrl: true } } } } } },
       homePlayer: { select: { id: true, name: true } },
       awayPlayer: { select: { id: true, name: true } },
       completedAt: true,
@@ -239,7 +240,7 @@ async function getTournamentBySlug(slug: string) {
           isDuo: true,
           players: {
             where: { isActive: true },
-            select: { player: { select: { name: true } } },
+            select: { player: { select: { id: true, name: true, photoUrl: true } } },
           },
         },
       },
@@ -249,7 +250,7 @@ async function getTournamentBySlug(slug: string) {
     prisma.tournamentTeam.findMany({
     where: { tournamentId: tid },
     select: {
-      team: { select: { id: true, slug: true, name: true, shortName: true } },
+      team: { select: { id: true, slug: true, name: true, shortName: true, isDuo: true, players: { where: { isActive: true }, select: { player: { select: { id: true, name: true, photoUrl: true } } } } } },
     },
   }),
     // Players
@@ -275,7 +276,7 @@ async function getTournamentBySlug(slug: string) {
       points: true,
       teamId: true,
       playerId: true,
-      team: { select: { id: true, slug: true, name: true } },
+      team: { select: { id: true, slug: true, name: true, isDuo: true, players: { where: { isActive: true }, select: { player: { select: { id: true, name: true, photoUrl: true } } } } } },
       player: { select: { id: true, slug: true, name: true } },
     },
   }),
@@ -775,7 +776,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                     <Card className="hover:border-primary/50 transition-all cursor-pointer">
                       <CardContent className="p-4">
                         <div className="flex items-center gap-3">
-                          <SmartAvatar type="team" id={team.id} name={team.name} className="h-10 w-10" fallbackClassName="text-sm" />
+                          <DuoTeamAvatar id={team.id} name={team.name} isDuo={team.isDuo} members={team.players?.map((p) => p.player)} className="h-10 w-10" fallbackClassName="text-sm" />
                           <div>
                             <p className="font-medium">{team.name}</p>
                             {team.shortName && (
@@ -830,7 +831,11 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                             {winner && (
                               <div className="flex items-center gap-1.5 mt-2">
                                 {winnerId ? (
-                                  <SmartAvatar type={winnerType as "player" | "team"} id={winnerId} name={winner.name} className="h-5 w-5" fallbackClassName="text-[8px]" />
+                                  winnerType === "team" ? (
+                                    <DuoTeamAvatar id={winnerId} name={winner.name} isDuo={award.team?.isDuo} members={award.team?.players?.map((p) => p.player)} className="h-5 w-5" fallbackClassName="text-[8px]" />
+                                  ) : (
+                                    <SmartAvatar type="player" id={winnerId} name={winner.name} className="h-5 w-5" fallbackClassName="text-[8px]" />
+                                  )
                                 ) : (
                                   <Avatar className="h-5 w-5">
                                     <AvatarFallback className="text-[8px]">{getInitials(winner.name)}</AvatarFallback>
@@ -902,8 +907,8 @@ function MatchCard({
     roundNumber: number | null;
     matchNumber: number | null;
     notes: string | null;
-    homeTeam: { id: string; name: string; shortName: string | null } | null;
-    awayTeam: { id: string; name: string; shortName: string | null } | null;
+    homeTeam: { id: string; name: string; shortName: string | null; isDuo?: boolean; players?: { player: { id: string; name: string; photoUrl: string | null } }[] } | null;
+    awayTeam: { id: string; name: string; shortName: string | null; isDuo?: boolean; players?: { player: { id: string; name: string; photoUrl: string | null } }[] } | null;
     homePlayer: { id: string; name: string; slug?: string } | null;
     awayPlayer: { id: string; name: string; slug?: string } | null;
     homeScore: number | null;
@@ -1045,7 +1050,11 @@ function MatchCard({
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 flex-1">
             {homeId ? (
-              <SmartAvatar type={homeType as "player" | "team"} id={homeId} name={homeName} className="h-6 w-6" fallbackClassName="text-[10px]" />
+              isPlayerMatch ? (
+                <SmartAvatar type="player" id={homeId} name={homeName} className="h-6 w-6" fallbackClassName="text-[10px]" />
+              ) : (
+                <DuoTeamAvatar id={homeId} name={homeName} isDuo={match.homeTeam?.isDuo} members={match.homeTeam?.players?.map((p) => p.player)} className="h-6 w-6" fallbackClassName="text-[10px]" />
+              )
             ) : (
               <Avatar className="h-6 w-6">
                 <AvatarFallback className="text-[10px]">{getInitials(homeName)}</AvatarFallback>
@@ -1070,7 +1079,11 @@ function MatchCard({
           <div className="flex items-center gap-2 flex-1 justify-end">
             <span className="font-medium">{awayName}</span>
             {awayId ? (
-              <SmartAvatar type={awayType as "player" | "team"} id={awayId} name={awayName} className="h-6 w-6" fallbackClassName="text-[10px]" />
+              isPlayerMatch ? (
+                <SmartAvatar type="player" id={awayId} name={awayName} className="h-6 w-6" fallbackClassName="text-[10px]" />
+              ) : (
+                <DuoTeamAvatar id={awayId} name={awayName} isDuo={match.awayTeam?.isDuo} members={match.awayTeam?.players?.map((p) => p.player)} className="h-6 w-6" fallbackClassName="text-[10px]" />
+              )
             ) : (
               <Avatar className="h-6 w-6">
                 <AvatarFallback className="text-[10px]">{getInitials(awayName)}</AvatarFallback>
@@ -1127,7 +1140,7 @@ function StandingsTable({
     goalsAgainst: number;
     goalDiff: number;
     points: number;
-    team: { id: string; slug: string; name: string } | null;
+    team: { id: string; slug: string; name: string; isDuo?: boolean; players?: { player: { id: string; name: string; photoUrl: string | null } }[] } | null;
     player: { id: string; slug: string; name: string } | null;
   }>;
   participantType: string;
@@ -1213,7 +1226,7 @@ function StandingsTable({
                   {isIndividual && s.player ? (
                     <SmartAvatar type="player" id={s.player.id} name={name ?? ""} className="h-7 w-7 shrink-0" fallbackClassName="text-[10px]" />
                   ) : s.team ? (
-                    <SmartAvatar type="team" id={s.team.id} name={name ?? ""} className="h-7 w-7 shrink-0" fallbackClassName="text-[10px]" />
+                    <DuoTeamAvatar id={s.team.id} name={name ?? ""} isDuo={s.team.isDuo} members={s.team.players?.map((p) => p.player)} className="h-7 w-7 shrink-0" fallbackClassName="text-[10px]" />
                   ) : (
                     <Avatar className="h-7 w-7 shrink-0">
                       <AvatarFallback className="text-[10px]">

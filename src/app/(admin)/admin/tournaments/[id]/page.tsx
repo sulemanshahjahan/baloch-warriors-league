@@ -231,7 +231,7 @@ export default async function TournamentDetailPage({ params }: TournamentDetailP
                     .map((d) => ({
                       tournamentTeamId: d.tournamentTeamId,
                       name: d.name,
-                      photoUrl: d.players[0]?.photoUrl ?? null,
+                      members: d.players.map((p) => ({ id: p.id, name: p.name, photoUrl: p.photoUrl })),
                     }))}
                   groups={tournament.groups.map((g) => ({ id: g.id, name: g.name }))}
                 />

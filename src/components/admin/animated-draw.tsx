@@ -9,6 +9,47 @@ interface Player {
   id: string;
   name: string;
   photoUrl?: string | null;
+  /** For 2v2 duos: the two members, so both faces are shown instead of one. */
+  members?: Array<{ id: string; name: string; photoUrl?: string | null }>;
+}
+
+/** Renders a single avatar, or a stacked pair when the participant is a duo. */
+function ParticipantAvatar({
+  player,
+  className,
+  fallbackClassName,
+}: {
+  player: Player;
+  className: string;
+  fallbackClassName: string;
+}) {
+  if (player.members && player.members.length >= 2) {
+    return (
+      <div className="flex -space-x-2">
+        {player.members.slice(0, 2).map((m) => (
+          <SmartAvatar
+            key={m.id}
+            type="player"
+            id={m.id}
+            name={m.name}
+            photoUrl={m.photoUrl}
+            className={`${className} border-2 border-background`}
+            fallbackClassName={fallbackClassName}
+          />
+        ))}
+      </div>
+    );
+  }
+  return (
+    <SmartAvatar
+      type="player"
+      id={player.id}
+      name={player.name}
+      photoUrl={player.photoUrl}
+      className={className}
+      fallbackClassName={fallbackClassName}
+    />
+  );
 }
 
 interface Group {
@@ -165,11 +206,8 @@ export function AnimatedDraw({ players, groups, onComplete }: AnimatedDrawProps)
             <div className="mb-6 flex flex-col items-center animate-in zoom-in-75 duration-500">
               <div className="relative">
                 <div className="absolute inset-0 bg-primary/30 rounded-full blur-xl animate-pulse" />
-                <SmartAvatar
-                  type="player"
-                  id={currentPlayer.id}
-                  name={currentPlayer.name}
-                  photoUrl={currentPlayer.photoUrl}
+                <ParticipantAvatar
+                  player={currentPlayer}
                   className="h-20 w-20 ring-4 ring-primary relative"
                   fallbackClassName="text-2xl"
                 />
@@ -191,14 +229,7 @@ export function AnimatedDraw({ players, groups, onComplete }: AnimatedDrawProps)
                       : "opacity-40 scale-90"
                   }`}
                 >
-                  <SmartAvatar
-                    type="player"
-                    id={p.id}
-                    name={p.name}
-                    photoUrl={p.photoUrl}
-                    className="h-10 w-10"
-                    fallbackClassName="text-xs"
-                  />
+                  <ParticipantAvatar player={p} className="h-10 w-10" fallbackClassName="text-xs" />
                 </div>
               ))}
             </div>
@@ -225,14 +256,7 @@ export function AnimatedDraw({ players, groups, onComplete }: AnimatedDrawProps)
                       className="flex items-center gap-2 animate-in slide-in-from-top-2 fade-in duration-500"
                       style={{ animationDelay: `${i * 100}ms` }}
                     >
-                      <SmartAvatar
-                        type="player"
-                        id={player.id}
-                        name={player.name}
-                        photoUrl={player.photoUrl}
-                        className="h-7 w-7"
-                        fallbackClassName="text-[9px]"
-                      />
+                      <ParticipantAvatar player={player} className="h-7 w-7" fallbackClassName="text-[9px]" />
                       <span className="text-white text-xs font-medium truncate">{player.name}</span>
                     </div>
                   ))}
