@@ -231,7 +231,18 @@ async function getTournamentBySlug(slug: string) {
       customName: true,
       description: true,
       player: { select: { id: true, name: true, slug: true } },
-      team: { select: { id: true, name: true, slug: true } },
+      team: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          isDuo: true,
+          players: {
+            where: { isActive: true },
+            select: { player: { select: { name: true } } },
+          },
+        },
+      },
     },
   }),
     // Teams
@@ -833,6 +844,12 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                                   <span className="text-xs font-semibold">{winner.name}</span>
                                 )}
                               </div>
+                            )}
+                            {/* 2v2 duo: list both members under the duo name */}
+                            {award.team?.isDuo && award.team.players.length > 0 && (
+                              <p className="text-[11px] text-muted-foreground mt-1">
+                                Players: {award.team.players.map((tp) => tp.player.name).join(", ")}
+                              </p>
                             )}
                           </div>
                         </div>

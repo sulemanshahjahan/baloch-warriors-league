@@ -27,7 +27,9 @@ export type ActivityLogAction =
   | "REMOVE_EVENT"
   | "ACTIVATE"
   | "DEACTIVATE"
-  | "BULK_DELETE";
+  | "BULK_DELETE"
+  | "RENAME"
+  | "AUTO_PAIR";
 
 export type EntityType =
   | "TOURNAMENT"
@@ -40,7 +42,8 @@ export type EntityType =
   | "ADMIN_USER"
   | "AWARD"
   | "STANDING"
-  | "GROUP";
+  | "GROUP"
+  | "DUO";
 
 interface LogActivityParams {
   action: ActivityLogAction;

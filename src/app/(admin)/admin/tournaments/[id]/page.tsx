@@ -6,6 +6,8 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { AdminHeader } from "@/components/admin/header";
 import { getTournamentById, getAvailableTeams, getAvailablePlayers } from "@/lib/actions/tournament";
+import { getTournamentDuos, getAvailablePlayersForDuo } from "@/lib/actions/duo";
+import { DuoManager } from "./duo-manager";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -50,6 +52,13 @@ export default async function TournamentDetailPage({ params }: TournamentDetailP
   ]);
 
   if (!tournament) notFound();
+
+  // 2v2 eFootball: competitors are duos (backed by isDuo teams), not single players.
+  const is2v2 = tournament.gameCategory === "EFOOTBALL" && tournament.eFootballMode === "2v2";
+  const [duos, duoAvailablePlayers] = is2v2
+    ? await Promise.all([getTournamentDuos(id), getAvailablePlayersForDuo(id)])
+    : [[], []];
+  const participantNoun = is2v2 ? "Duo" : tournament.participantType === "INDIVIDUAL" ? "Player" : "Team";
 
   // Players for awards: union of team rosters + individually enrolled players (deduped)
   const teamIds = tournament.teams.map((t) => t.team.id);
@@ -111,34 +120,51 @@ export default async function TournamentDetailPage({ params }: TournamentDetailP
           </div>
         </div>
 
-        {/* Participants — side by side, collapsed by default if populated */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Participants */}
+        {is2v2 ? (
+          /* 2v2 eFootball — duos are the competitors */
           <CollapsibleSection
             icon={<Users className="w-4 h-4 text-blue-400" />}
-            title="Teams"
-            count={tournament.teams.length}
-            defaultOpen={tournament.teams.length === 0}
+            title="Duos"
+            count={duos.length}
+            defaultOpen={duos.length === 0}
           >
-            <TeamEnrollment
+            <DuoManager
               tournamentId={id}
-              enrolledTeams={tournament.teams}
-              availableTeams={availableTeams}
+              duos={duos}
+              availablePlayers={duoAvailablePlayers}
             />
           </CollapsibleSection>
+        ) : (
+          /* Standard team / individual enrollment, side by side */
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <CollapsibleSection
+              icon={<Users className="w-4 h-4 text-blue-400" />}
+              title="Teams"
+              count={tournament.teams.length}
+              defaultOpen={tournament.teams.length === 0}
+            >
+              <TeamEnrollment
+                tournamentId={id}
+                enrolledTeams={tournament.teams}
+                availableTeams={availableTeams}
+              />
+            </CollapsibleSection>
 
-          <CollapsibleSection
-            icon={<User className="w-4 h-4 text-purple-400" />}
-            title="Players"
-            count={tournament.players.length}
-            defaultOpen={tournament.players.length === 0}
-          >
-            <PlayerEnrollment
-              tournamentId={id}
-              enrolledPlayers={tournament.players}
-              availablePlayers={availablePlayers}
-            />
-          </CollapsibleSection>
-        </div>
+            <CollapsibleSection
+              icon={<User className="w-4 h-4 text-purple-400" />}
+              title="Players"
+              count={tournament.players.length}
+              defaultOpen={tournament.players.length === 0}
+            >
+              <PlayerEnrollment
+                tournamentId={id}
+                enrolledPlayers={tournament.players}
+                availablePlayers={availablePlayers}
+              />
+            </CollapsibleSection>
+          </div>
+        )}
 
         {/* Groups — only for GROUP_KNOCKOUT, collapsed when set up */}
         {tournament.format === "GROUP_KNOCKOUT" && (
@@ -247,7 +273,7 @@ export default async function TournamentDetailPage({ params }: TournamentDetailP
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-8">#</TableHead>
-                  <TableHead>{tournament.participantType === "INDIVIDUAL" ? "Player" : "Team"}</TableHead>
+                  <TableHead>{participantNoun}</TableHead>
                   <TableHead className="text-center">P</TableHead>
                   <TableHead className="text-center">W</TableHead>
                   <TableHead className="text-center">D</TableHead>

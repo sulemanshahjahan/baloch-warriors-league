@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
     prisma.team.findMany({
       where: {
         isActive: true,
+        isDuo: false,
         OR: [
           { name: { contains, mode: "insensitive" } },
           { shortName: { contains, mode: "insensitive" } },

@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 
 async function getTeams() {
   return prisma.team.findMany({
-    where: { isActive: true },
+    where: { isActive: true, isDuo: false },
     orderBy: { name: "asc" },
     select: {
       id: true,

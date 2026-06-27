@@ -13,7 +13,8 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "preflight": "npm run lint && npm run test && npm run build"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

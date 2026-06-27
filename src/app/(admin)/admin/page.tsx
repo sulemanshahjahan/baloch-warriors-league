@@ -35,7 +35,7 @@ async function getDashboardStats() {
   ] = await Promise.all([
     prisma.tournament.count(),
     prisma.tournament.count({ where: { status: "ACTIVE" } }),
-    prisma.team.count({ where: { isActive: true } }),
+    prisma.team.count({ where: { isActive: true, isDuo: false } }),
     prisma.player.count({ where: { isActive: true } }),
     prisma.match.count({ where: { status: "COMPLETED" } }),
     prisma.match.count({ where: { status: "LIVE" } }),

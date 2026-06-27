@@ -209,6 +209,9 @@ model Team {
   primaryColor String?
   captainId    String?
   isActive     Boolean  @default(true)
+  // True when this "team" is actually a 2v2 eFootball duo (exactly 2 players).
+  // Duo teams are hidden from the global/public team directories.
+  isDuo        Boolean  @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

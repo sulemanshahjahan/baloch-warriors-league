@@ -21,6 +21,8 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["@prisma/client", "bcryptjs", "firebase-admin", "sharp"],
 };
 
+const isProdDeploy = process.env.VERCEL_ENV === "production";
+
 export default withSentryConfig(nextConfig, {
   silent: true,
   org: process.env.SENTRY_ORG,
@@ -28,5 +30,8 @@ export default withSentryConfig(nextConfig, {
   authToken: process.env.SENTRY_AUTH_TOKEN,
   sourcemaps: {
     deleteSourcemapsAfterUpload: true,
+    disable: !isProdDeploy,
   },
+  disableLogger: !isProdDeploy,
+  telemetry: false,
 });

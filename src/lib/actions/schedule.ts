@@ -446,6 +446,18 @@ export async function generateKnockoutFromGroups(
     return { success: false, error: "No groups found" };
   }
 
+  // Guard: don't seed the knockout until every group-stage match is played,
+  // otherwise standings (and therefore qualifiers) are not yet final.
+  const pendingGroupMatches = await prisma.match.count({
+    where: { tournamentId, groupId: { not: null }, status: { not: "COMPLETED" } },
+  });
+  if (pendingGroupMatches > 0) {
+    return {
+      success: false,
+      error: `Group stage is not complete — ${pendingGroupMatches} group match(es) still unplayed.`,
+    };
+  }
+
   const isIndividual = tournament.participantType === "INDIVIDUAL";
   
   // Collect advancing participants from each group, organized by group

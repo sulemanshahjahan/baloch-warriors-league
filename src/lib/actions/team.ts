@@ -189,7 +189,7 @@ export async function reactivatePlayerOnTeam(teamPlayerId: string, teamId: strin
 
 export async function getTeams() {
   return prisma.team.findMany({
-    where: { isActive: true },
+    where: { isActive: true, isDuo: false },
     orderBy: { name: "asc" },
     include: {
       _count: { select: { players: true, tournaments: true } },
@@ -209,6 +209,7 @@ export async function getTeamsPaginated(options?: {
 
   const where = {
     isActive: true,
+    isDuo: false, // hide 2v2 duo teams from the global team directory
     ...(options?.search && {
       name: { contains: options.search, mode: "insensitive" as const },
     }),

@@ -37,6 +37,39 @@ async function checkAdmin(): Promise<ActionResult | null> {
   return null;
 }
 
+/**
+ * Ids of 2v2 duo (isDuo) teams that belong ONLY to this tournament — safe to
+ * remove when it is deleted. Normal teams, and duo teams that happen to be
+ * enrolled in another tournament, are never returned.
+ * Must be called BEFORE the tournament's enrollment rows are deleted.
+ */
+async function getExclusiveDuoTeamIds(tournamentId: string): Promise<string[]> {
+  const duoEnrollments = await prisma.tournamentTeam.findMany({
+    where: { tournamentId, team: { isDuo: true } },
+    select: { teamId: true },
+  });
+  const exclusive: string[] = [];
+  for (const { teamId } of duoEnrollments) {
+    const elsewhere = await prisma.tournamentTeam.count({
+      where: { teamId, tournamentId: { not: tournamentId } },
+    });
+    if (elsewhere === 0) exclusive.push(teamId);
+  }
+  return exclusive;
+}
+
+/**
+ * Delete duo teams + their roster links. The `isDuo: true` guard on the team
+ * delete is a hard safety net so a normal team can never be removed here.
+ * Must be called AFTER the tournament (and its matches/enrollments) are gone,
+ * so nothing still references these teams.
+ */
+async function deleteExclusiveDuoTeams(teamIds: string[]) {
+  if (teamIds.length === 0) return;
+  await prisma.teamPlayer.deleteMany({ where: { teamId: { in: teamIds } } });
+  await prisma.team.deleteMany({ where: { id: { in: teamIds }, isDuo: true } });
+}
+
 export async function createTournament(
   formData: FormData
 ): Promise<ActionResult<{ id: string; slug: string }>> {
@@ -198,7 +231,10 @@ export async function deleteTournament(id: string): Promise<ActionResult> {
   const denied = await checkAdmin();
   if (denied) return denied;
 
-  await prisma.tournament.delete({ where: { id } });
+  // Capture duo teams to clean up before cascade removes their enrollment rows.
+  const duoTeamIds = await getExclusiveDuoTeamIds(id);
+  await prisma.tournament.delete({ where: { id } }); // cascades matches/standings/enrollments/groups
+  await deleteExclusiveDuoTeams(duoTeamIds);
 
   await logActivity({
     action: "DELETE",
@@ -218,6 +254,9 @@ export async function bulkDeleteTournaments(ids: string[]): Promise<ActionResult
 
   // Delete in order: matches (with events/participants) → standings → awards → groups → enrollments → tournament
   for (const id of ids) {
+    // Resolve duo teams before their enrollment rows are removed below.
+    const duoTeamIds = await getExclusiveDuoTeamIds(id);
+
     const matches = await prisma.match.findMany({ where: { tournamentId: id }, select: { id: true } });
     const matchIds = matches.map((m) => m.id);
     if (matchIds.length > 0) {
@@ -232,6 +271,9 @@ export async function bulkDeleteTournaments(ids: string[]): Promise<ActionResult
     await prisma.tournamentTeam.deleteMany({ where: { tournamentId: id } });
     await prisma.tournamentGroup.deleteMany({ where: { tournamentId: id } });
     await prisma.tournament.delete({ where: { id } });
+
+    // Now that matches + enrollments are gone, the duo teams are unreferenced.
+    await deleteExclusiveDuoTeams(duoTeamIds);
   }
 
   await logActivity({
@@ -553,6 +595,7 @@ export async function getAvailableTeams(tournamentId: string) {
   return prisma.team.findMany({
     where: {
       isActive: true,
+      isDuo: false, // duos are managed via the duo pairing UI, not team enrollment
       ...(enrolledIds.length > 0 && { id: { notIn: enrolledIds } }),
     },
     orderBy: { name: "asc" },

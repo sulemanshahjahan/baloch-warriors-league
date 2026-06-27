@@ -142,6 +142,13 @@ export function TournamentForm({ tournament }: TournamentFormProps) {
     }
   }, [gameCategory, gameConfig, tournament]);
 
+  // 2v2 eFootball competitors are duos, which are stored as (TEAM) participants.
+  // Force TEAM so the duo pairing system is used instead of 1v1 individual matches.
+  const is2v2 = gameCategory === "EFOOTBALL" && eFootballMode === "2v2";
+  useEffect(() => {
+    if (is2v2) setParticipantType("TEAM");
+  }, [is2v2]);
+
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
@@ -262,10 +269,10 @@ export function TournamentForm({ tournament }: TournamentFormProps) {
             {/* Participant Selection - Dynamic based on game */}
             <div className="space-y-2">
               <Label>Participants *</Label>
-              <Select 
-                value={participantType} 
+              <Select
+                value={participantType}
                 onValueChange={(v) => setParticipantType(v as ParticipantType)}
-                disabled={gameConfig.participants.length === 1} // Disable if only one option
+                disabled={gameConfig.participants.length === 1 || is2v2} // single option, or locked to duos for 2v2
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -279,7 +286,9 @@ export function TournamentForm({ tournament }: TournamentFormProps) {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                {gameConfig.participants.find(p => p.value === participantType)?.description}
+                {is2v2
+                  ? "2v2 competitors are duos (2 players each). Pair players on the tournament page."
+                  : gameConfig.participants.find(p => p.value === participantType)?.description}
               </p>
             </div>
           </div>
