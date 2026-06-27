@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { defaultDuoName, pairBySkill, type PairablePlayer } from "@/lib/duo-pairing";
+import {
+  defaultDuoName,
+  pairBySkill,
+  pairBalancedRandom,
+  type PairablePlayer,
+} from "@/lib/duo-pairing";
 
 // ─── defaultDuoName ────────────────────────────────────
 
@@ -69,6 +74,61 @@ describe("pairBySkill", () => {
     const players = [p("A", 60), p("B", 95)];
     const copy = [...players];
     pairBySkill(players);
+    expect(players).toEqual(copy);
+  });
+});
+
+// ─── pairBalancedRandom ────────────────────────────────
+
+describe("pairBalancedRandom", () => {
+  // 8 players: strong half = 99,97,96,95 · weak half = 62,60,55,50
+  const make = () => [
+    p("A", 99), p("B", 97), p("C", 96), p("D", 95),
+    p("E", 62), p("F", 60), p("G", 55), p("H", 50),
+  ];
+  const strongIds = new Set(["A", "B", "C", "D"]);
+  const weakIds = new Set(["E", "F", "G", "H"]);
+
+  it("uses every player exactly once and pairs strong-half with weak-half", () => {
+    const { duos, unpaired } = pairBalancedRandom(make());
+    expect(unpaired).toBeNull();
+    expect(duos).toHaveLength(4);
+
+    const seen = new Set<string>();
+    for (const d of duos) {
+      // player1 always from the strong half, player2 from the weak half
+      expect(strongIds.has(d.player1.id)).toBe(true);
+      expect(weakIds.has(d.player2.id)).toBe(true);
+      // stronger rating never below the partner's
+      expect(d.player1.rating! >= d.player2.rating!).toBe(true);
+      seen.add(d.player1.id);
+      seen.add(d.player2.id);
+    }
+    expect(seen.size).toBe(8);
+  });
+
+  it("is random — the top player does not always get the same partner", () => {
+    const partners = new Set<string>();
+    for (let i = 0; i < 50; i++) {
+      const { duos } = pairBalancedRandom(make());
+      const top = duos.find((d) => d.player1.id === "A");
+      partners.add(top!.player2.id);
+    }
+    // Across 50 runs the 99-rated player should see more than one weak partner.
+    expect(partners.size).toBeGreaterThan(1);
+  });
+
+  it("leaves the median player unpaired on odd counts", () => {
+    const players = [...make(), p("I", 70)]; // 9 players → median is rank 5
+    const { duos, unpaired } = pairBalancedRandom(players);
+    expect(duos).toHaveLength(4);
+    expect(unpaired?.id).toBe("I"); // 70 is the median of 99,97,96,95,70,62,60,55,50
+  });
+
+  it("does not mutate the input array", () => {
+    const players = make();
+    const copy = [...players];
+    pairBalancedRandom(players);
     expect(players).toEqual(copy);
   });
 });

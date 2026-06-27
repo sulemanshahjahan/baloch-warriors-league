@@ -6,7 +6,7 @@ import { auth, getUserRole } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { slugify } from "@/lib/utils";
 import type { ActionResult } from "@/lib/utils";
-import { defaultDuoName, pairBySkill, type PairablePlayer } from "@/lib/duo-pairing";
+import { defaultDuoName, pairBalancedRandom, type PairablePlayer } from "@/lib/duo-pairing";
 import { logActivity } from "./activity-log";
 
 // ─── ROLE HELPERS (mirror tournament.ts) ─────────────────────
@@ -224,8 +224,8 @@ export async function autoPairDuos(
     return { success: false, error: "Not enough available players to pair (some may already be in a duo)" };
   }
 
-  // Balance duos (strongest with weakest) on the admin-chosen metric.
-  const { duos, unpaired } = pairBySkill<PairablePlayer>(
+  // Balance duos (a stronger + a random weaker player) on the admin-chosen metric.
+  const { duos, unpaired } = pairBalancedRandom<PairablePlayer>(
     eligible.map((p) => ({
       id: p.id,
       name: p.name,
