@@ -26,7 +26,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Plus, Trash2, Loader2, Users, Sparkles, Pencil, Check, X } from "lucide-react";
 import { createDuo, autoPairDuos, renameDuo, deleteDuo } from "@/lib/actions/duo";
-import type { DuoView } from "@/lib/actions/duo";
+import type { DuoView, DuoRatingSource } from "@/lib/actions/duo";
 import { getInitials } from "@/lib/utils";
 
 interface AvailablePlayer {
@@ -34,6 +34,7 @@ interface AvailablePlayer {
   name: string;
   photoUrl: string | null;
   cardRank: number;
+  skillLevel: number | null;
 }
 
 interface DuoManagerProps {
@@ -57,6 +58,9 @@ export function DuoManager({ tournamentId, duos, availablePlayers }: DuoManagerP
   // Auto-pair dialog
   const [autoOpen, setAutoOpen] = useState(false);
   const [autoSelected, setAutoSelected] = useState<string[]>([]);
+  const [ratingSource, setRatingSource] = useState<DuoRatingSource>("CARD");
+
+  const ratingOf = (p: AvailablePlayer) => (ratingSource === "SKILL" ? p.skillLevel ?? 70 : p.cardRank);
 
   // Inline rename
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -88,7 +92,7 @@ export function DuoManager({ tournamentId, duos, availablePlayers }: DuoManagerP
   function handleAutoPair() {
     setError("");
     startTransition(async () => {
-      const res = await autoPairDuos(tournamentId, autoSelected);
+      const res = await autoPairDuos(tournamentId, autoSelected, ratingSource);
       if (res.success) {
         setAutoOpen(false);
         reset();
@@ -284,7 +288,7 @@ export function DuoManager({ tournamentId, duos, availablePlayers }: DuoManagerP
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Auto-pair by Skill</DialogTitle>
+              <DialogTitle>Auto-pair Duos</DialogTitle>
               <DialogDescription>
                 Strongest pairs with weakest for balance. Select the players to pair ({availablePlayers.length} available).
               </DialogDescription>
@@ -293,6 +297,29 @@ export function DuoManager({ tournamentId, duos, availablePlayers }: DuoManagerP
             {error && autoOpen && (
               <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">{error}</p>
             )}
+
+            {/* Rating source toggle */}
+            <div className="space-y-1.5">
+              <Label className="text-xs">Balance by</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={ratingSource === "CARD" ? "default" : "outline"}
+                  onClick={() => setRatingSource("CARD")}
+                >
+                  Card Rank
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={ratingSource === "SKILL" ? "default" : "outline"}
+                  onClick={() => setRatingSource("SKILL")}
+                >
+                  Skill Level
+                </Button>
+              </div>
+            </div>
 
             <div className="flex items-center justify-between px-1">
               <button
@@ -332,7 +359,9 @@ export function DuoManager({ tournamentId, duos, availablePlayers }: DuoManagerP
                     <AvatarFallback className="text-xs">{getInitials(p.name)}</AvatarFallback>
                   </Avatar>
                   <span className="text-sm flex-1">{p.name}</span>
-                  <span className="text-xs text-muted-foreground">card {p.cardRank}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {ratingSource === "SKILL" ? "skill" : "card"} {ratingOf(p)}
+                  </span>
                 </label>
               ))}
             </div>

@@ -90,9 +90,12 @@ export async function getAvailablePlayersForDuo(tournamentId: string) {
       ...(pairedIds.length > 0 && { id: { notIn: pairedIds } }),
     },
     orderBy: [{ cardRank: "desc" }, { name: "asc" }],
-    select: { id: true, name: true, photoUrl: true, cardRank: true },
+    select: { id: true, name: true, photoUrl: true, cardRank: true, skillLevel: true },
   });
 }
+
+/** Which player metric to balance duos on. */
+export type DuoRatingSource = "CARD" | "SKILL";
 
 /** Internal: ids of every player already assigned to a duo in this tournament. */
 async function getPairedPlayerIds(tournamentId: string): Promise<string[]> {
@@ -198,7 +201,8 @@ export async function createDuo(
  */
 export async function autoPairDuos(
   tournamentId: string,
-  playerIds: string[]
+  playerIds: string[],
+  ratingSource: DuoRatingSource = "CARD"
 ): Promise<ActionResult<{ created: number; unpaired: string | null }>> {
   const denied = await checkAdmin();
   if (denied) return denied as ActionResult<{ created: number; unpaired: string | null }>;
@@ -213,16 +217,20 @@ export async function autoPairDuos(
   const alreadyPaired = await getPairedPlayerIds(tournamentId);
   const eligible = await prisma.player.findMany({
     where: { id: { in: unique }, isActive: true, ...(alreadyPaired.length > 0 && { id: { notIn: alreadyPaired } }) },
-    select: { id: true, name: true, cardRank: true },
+    select: { id: true, name: true, cardRank: true, skillLevel: true },
   });
 
   if (eligible.length < 2) {
     return { success: false, error: "Not enough available players to pair (some may already be in a duo)" };
   }
 
-  // Balance duos by live card rank (strongest with weakest).
+  // Balance duos (strongest with weakest) on the admin-chosen metric.
   const { duos, unpaired } = pairBySkill<PairablePlayer>(
-    eligible.map((p) => ({ id: p.id, name: p.name, rating: p.cardRank }))
+    eligible.map((p) => ({
+      id: p.id,
+      name: p.name,
+      rating: ratingSource === "SKILL" ? p.skillLevel : p.cardRank,
+    }))
   );
 
   let created = 0;
