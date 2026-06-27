@@ -12,8 +12,9 @@ existing team match / standings / knockout engines. These hidden duo teams must
 
 **Test environment**
 - [ ] Run against a non-production DB if possible (this flow creates/deletes Teams).
-- [ ] Have at least **5 active players** available, with varied `skillLevel`
-      values (e.g. 95, 88, 74, 60, 50) and **one player with no skill rating**.
+- [ ] Have at least **5 active players** available, with varied `cardRank`
+      values (e.g. 99, 96, 90, 79, 62) — the live card number shown on each
+      player card. (Auto-pair balances by `cardRank`, not the static `skillLevel`.)
 - [ ] Logged in as an **ADMIN** or **SUPER_ADMIN** (duo actions require ADMIN).
 
 ---
@@ -42,11 +43,13 @@ existing team match / standings / knockout engines. These hidden duo teams must
    - [ ] In **Duos** → **Pair Duo**, pick Player 1 and Player 2 (selecting a player in one dropdown removes them from the other).
    - [ ] Leave the name blank → Create → duo is named **"Player1 & Player2"** automatically.
    - [ ] Create a second duo, this time typing a custom name → it is saved verbatim.
-   - [ ] Each duo row shows both member avatars, both names, and a combined skill value.
-6. **Auto-pair by skill**
+   - [ ] Each duo row shows both members with their card ranks and an avg-card value.
+6. **Auto-pair by skill (card rank)**
    - [ ] Remove the manual duos first (so players are free), or use fresh players.
-   - [ ] **Auto-pair** → select an **even** set of players (e.g. 95, 88, 74, 60) → Pair.
-   - [ ] Result: strongest+weakest pairing → **95+60** and **88+74** (balanced), 2 duos created.
+   - [ ] **Auto-pair** → select an **even** set of players (e.g. card ranks 96, 90, 79, 62) → Pair.
+   - [ ] Result: strongest+weakest pairing → **96+62** and **90+79** (balanced), 2 duos created.
+   - [ ] If all selected players have the **same** card rank, every duo will show the
+         same combined value — that's expected (nothing to differentiate).
    - [ ] Success notice reports the number of duos created.
 7. **Handle odd player count**
    - [ ] **Auto-pair** → select an **odd** set (e.g. 5 players).
@@ -138,8 +141,8 @@ existing team match / standings / knockout engines. These hidden duo teams must
 - [ ] **Duplicate duo name (auto-generated)** — two duos that would auto-name to
       the same string → second becomes **"… (2)"** (no error).
 - [ ] **Blank duo name** — leave name empty on create → defaults to **"P1 & P2"**.
-- [ ] **Missing skill rating** — a player with no `skillLevel` is treated as **50**
-      for auto-pairing and shows `(50)` in the picker; pairing still balances.
+- [ ] **Missing rating** — `cardRank` defaults to **70**, so a player with the
+      default rating shows `(70)` in the picker; pairing still balances.
 - [ ] **Odd number of players** — covered in step 7; warning surfaced, none dropped.
 - [ ] **Editing a match result** — re-entering a different score recomputes
       standings (group) and re-evaluates knockout advancement correctly.

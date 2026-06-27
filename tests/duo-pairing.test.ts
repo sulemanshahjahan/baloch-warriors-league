@@ -15,7 +15,7 @@ describe("defaultDuoName", () => {
 
 // ─── pairBySkill ───────────────────────────────────────
 
-const p = (id: string, skillLevel: number | null): PairablePlayer => ({ id, name: id, skillLevel });
+const p = (id: string, rating: number | null): PairablePlayer => ({ id, name: id, rating });
 
 describe("pairBySkill", () => {
   it("pairs strongest with weakest (the documented example)", () => {
@@ -29,10 +29,10 @@ describe("pairBySkill", () => {
     expect([duos[1].player1.id, duos[1].player2.id]).toEqual(["B", "C"]);
   });
 
-  it("keeps each duo's combined skill balanced", () => {
+  it("keeps each duo's combined rating balanced", () => {
     const players = [p("A", 95), p("B", 88), p("C", 74), p("D", 60)];
     const { duos } = pairBySkill(players);
-    const totals = duos.map((d) => (d.player1.skillLevel ?? 0) + (d.player2.skillLevel ?? 0));
+    const totals = duos.map((d) => (d.player1.rating ?? 0) + (d.player2.rating ?? 0));
     // 155 vs 162 — closer than naive strong+strong (183) vs weak+weak (134)
     expect(Math.abs(totals[0] - totals[1])).toBeLessThanOrEqual(10);
   });
@@ -47,14 +47,14 @@ describe("pairBySkill", () => {
     expect(unpaired?.id).toBe("C");
   });
 
-  it("treats missing skill as the default (50)", () => {
+  it("treats missing rating as the default (70)", () => {
     const players = [p("A", null), p("B", 90), p("C", null), p("D", 90)];
     const { duos, unpaired } = pairBySkill(players);
     expect(unpaired).toBeNull();
-    // Each duo should pair a 90 with a default-50 player.
+    // Each duo should pair a 90 with a default-70 player.
     for (const d of duos) {
-      const skills = [d.player1.skillLevel ?? 50, d.player2.skillLevel ?? 50].sort();
-      expect(skills).toEqual([50, 90]);
+      const ratings = [d.player1.rating ?? 70, d.player2.rating ?? 70].sort();
+      expect(ratings).toEqual([70, 90]);
     }
   });
 

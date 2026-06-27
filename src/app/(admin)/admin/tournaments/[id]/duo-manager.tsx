@@ -33,7 +33,7 @@ interface AvailablePlayer {
   id: string;
   name: string;
   photoUrl: string | null;
-  skillLevel: number | null;
+  cardRank: number;
 }
 
 interface DuoManagerProps {
@@ -180,7 +180,8 @@ export function DuoManager({ tournamentId, duos, availablePlayers }: DuoManagerP
                   <>
                     <p className="font-medium text-sm truncate">{duo.name}</p>
                     <p className="text-xs text-muted-foreground truncate">
-                      {duo.players.map((p) => p.name).join(" + ")} · skill {duo.combinedSkill}
+                      {duo.players.map((p) => `${p.name} (${p.cardRank})`).join(" + ")} · avg card{" "}
+                      {Math.round(duo.combinedRating / Math.max(1, duo.players.length))}
                     </p>
                   </>
                 )}
@@ -236,7 +237,7 @@ export function DuoManager({ tournamentId, duos, availablePlayers }: DuoManagerP
                   <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                   <SelectContent>
                     {availablePlayers.filter((p) => p.id !== p2).map((p) => (
-                      <SelectItem key={p.id} value={p.id}>{p.name} ({p.skillLevel ?? 50})</SelectItem>
+                      <SelectItem key={p.id} value={p.id}>{p.name} ({p.cardRank})</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -247,7 +248,7 @@ export function DuoManager({ tournamentId, duos, availablePlayers }: DuoManagerP
                   <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                   <SelectContent>
                     {availablePlayers.filter((p) => p.id !== p1).map((p) => (
-                      <SelectItem key={p.id} value={p.id}>{p.name} ({p.skillLevel ?? 50})</SelectItem>
+                      <SelectItem key={p.id} value={p.id}>{p.name} ({p.cardRank})</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -331,7 +332,7 @@ export function DuoManager({ tournamentId, duos, availablePlayers }: DuoManagerP
                     <AvatarFallback className="text-xs">{getInitials(p.name)}</AvatarFallback>
                   </Avatar>
                   <span className="text-sm flex-1">{p.name}</span>
-                  <span className="text-xs text-muted-foreground">{p.skillLevel ?? 50}</span>
+                  <span className="text-xs text-muted-foreground">card {p.cardRank}</span>
                 </label>
               ))}
             </div>

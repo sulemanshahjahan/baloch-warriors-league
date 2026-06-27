@@ -1,11 +1,15 @@
 // Pure, framework-free helpers for 2v2 eFootball duo pairing.
 // Kept dependency-free so they can be unit-tested in isolation and reused
 // by any future 2v2 tournament logic.
+//
+// `rating` is the player strength used to balance duos. In BWL this is the
+// player's live `cardRank` (the FIFA-style card number, 50–99, shown on the
+// player card) — NOT the static `skillLevel` seed field.
 
 export interface PairablePlayer {
   id: string;
   name: string;
-  skillLevel?: number | null;
+  rating?: number | null;
 }
 
 export interface PairedDuo<T extends PairablePlayer = PairablePlayer> {
@@ -19,8 +23,8 @@ export interface PairingResult<T extends PairablePlayer = PairablePlayer> {
   unpaired: T | null;
 }
 
-/** Default skill used when a player has no rating, matching Player.skillLevel's default. */
-export const DEFAULT_SKILL = 50;
+/** Default rating used when a player has no rating (matches Player.cardRank's default). */
+export const DEFAULT_RATING = 70;
 
 /**
  * Build a readable default duo name from two player names.
@@ -31,19 +35,19 @@ export function defaultDuoName(name1: string, name2: string): string {
 }
 
 /**
- * Balanced skill-based auto-pairing.
+ * Balanced rating-based auto-pairing.
  *
- * Sorts players by skill (highest → lowest) then pairs the strongest with the
+ * Sorts players by rating (highest → lowest) then pairs the strongest with the
  * weakest, the second strongest with the second weakest, and so on. This keeps
  * the combined rating of each duo as even as possible.
  *
- * If an odd number of players is supplied, the middle (median-skill) player is
+ * If an odd number of players is supplied, the middle (median-rated) player is
  * returned in `unpaired` rather than being silently dropped — callers must
  * surface this to the admin.
  */
 export function pairBySkill<T extends PairablePlayer>(players: T[]): PairingResult<T> {
   const sorted = [...players].sort(
-    (a, b) => (b.skillLevel ?? DEFAULT_SKILL) - (a.skillLevel ?? DEFAULT_SKILL)
+    (a, b) => (b.rating ?? DEFAULT_RATING) - (a.rating ?? DEFAULT_RATING)
   );
 
   const duos: PairedDuo<T>[] = [];

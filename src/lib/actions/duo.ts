@@ -39,9 +39,9 @@ export interface DuoView {
   teamId: string;
   name: string;
   groupId: string | null;
-  players: { id: string; name: string; photoUrl: string | null; skillLevel: number | null }[];
-  /** Combined skill of both members (sum) — informational. */
-  combinedSkill: number;
+  players: { id: string; name: string; photoUrl: string | null; cardRank: number }[];
+  /** Combined card rank of both members (sum) — informational. */
+  combinedRating: number;
 }
 
 /** List all duos enrolled in a tournament. */
@@ -58,7 +58,7 @@ export async function getTournamentDuos(tournamentId: string): Promise<DuoView[]
           players: {
             where: { isActive: true },
             select: {
-              player: { select: { id: true, name: true, photoUrl: true, skillLevel: true } },
+              player: { select: { id: true, name: true, photoUrl: true, cardRank: true } },
             },
           },
         },
@@ -75,7 +75,7 @@ export async function getTournamentDuos(tournamentId: string): Promise<DuoView[]
       name: e.team.name,
       groupId: e.groupId,
       players,
-      combinedSkill: players.reduce((sum, p) => sum + (p.skillLevel ?? 50), 0),
+      combinedRating: players.reduce((sum, p) => sum + p.cardRank, 0),
     };
   });
 }
@@ -89,8 +89,8 @@ export async function getAvailablePlayersForDuo(tournamentId: string) {
       isActive: true,
       ...(pairedIds.length > 0 && { id: { notIn: pairedIds } }),
     },
-    orderBy: [{ skillLevel: "desc" }, { name: "asc" }],
-    select: { id: true, name: true, photoUrl: true, skillLevel: true },
+    orderBy: [{ cardRank: "desc" }, { name: "asc" }],
+    select: { id: true, name: true, photoUrl: true, cardRank: true },
   });
 }
 
@@ -213,15 +213,16 @@ export async function autoPairDuos(
   const alreadyPaired = await getPairedPlayerIds(tournamentId);
   const eligible = await prisma.player.findMany({
     where: { id: { in: unique }, isActive: true, ...(alreadyPaired.length > 0 && { id: { notIn: alreadyPaired } }) },
-    select: { id: true, name: true, skillLevel: true },
+    select: { id: true, name: true, cardRank: true },
   });
 
   if (eligible.length < 2) {
     return { success: false, error: "Not enough available players to pair (some may already be in a duo)" };
   }
 
+  // Balance duos by live card rank (strongest with weakest).
   const { duos, unpaired } = pairBySkill<PairablePlayer>(
-    eligible.map((p) => ({ id: p.id, name: p.name, skillLevel: p.skillLevel }))
+    eligible.map((p) => ({ id: p.id, name: p.name, rating: p.cardRank }))
   );
 
   let created = 0;
