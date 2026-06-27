@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { executeMatchCompletion } from "./match";
 import { logActivity } from "./activity-log";
 import { auth, getUserRole } from "@/lib/auth";
+import { resolveSideRecipients, teamMembersSelect, ensureMatchTokens } from "@/lib/match-recipients";
 
 const AUTO_CONFIRM_HOURS = 24;
 
@@ -16,8 +17,8 @@ export async function getMatchByToken(token: string) {
     where: { homeToken: token },
     include: {
       tournament: { select: { id: true, name: true, slug: true, gameCategory: true } },
-      homeTeam: { select: { id: true, name: true, shortName: true, logoUrl: true } },
-      awayTeam: { select: { id: true, name: true, shortName: true, logoUrl: true } },
+      homeTeam: { select: { id: true, name: true, shortName: true, logoUrl: true, ...teamMembersSelect } },
+      awayTeam: { select: { id: true, name: true, shortName: true, logoUrl: true, ...teamMembersSelect } },
       homePlayer: { select: { id: true, name: true, slug: true, photoUrl: true, phone: true } },
       awayPlayer: { select: { id: true, name: true, slug: true, photoUrl: true, phone: true } },
       scoreReports: { where: { status: "PENDING" }, take: 1 },
@@ -30,8 +31,8 @@ export async function getMatchByToken(token: string) {
       where: { awayToken: token },
       include: {
         tournament: { select: { id: true, name: true, slug: true, gameCategory: true } },
-        homeTeam: { select: { id: true, name: true, shortName: true, logoUrl: true } },
-        awayTeam: { select: { id: true, name: true, shortName: true, logoUrl: true } },
+        homeTeam: { select: { id: true, name: true, shortName: true, logoUrl: true, ...teamMembersSelect } },
+        awayTeam: { select: { id: true, name: true, shortName: true, logoUrl: true, ...teamMembersSelect } },
         homePlayer: { select: { id: true, name: true, slug: true, photoUrl: true, phone: true } },
         awayPlayer: { select: { id: true, name: true, slug: true, photoUrl: true, phone: true } },
         scoreReports: { where: { status: "PENDING" }, take: 1 },
@@ -239,14 +240,14 @@ export async function sendMatchLinksViaWhatsApp(matchId: string) {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };
 
-  let match = await prisma.match.findUnique({
+  const match = await prisma.match.findUnique({
     where: { id: matchId },
     include: {
       tournament: { select: { name: true } },
-      homePlayer: { select: { name: true, phone: true } },
-      awayPlayer: { select: { name: true, phone: true } },
-      homeTeam: { select: { name: true } },
-      awayTeam: { select: { name: true } },
+      homePlayer: { select: { id: true, name: true, phone: true } },
+      awayPlayer: { select: { id: true, name: true, phone: true } },
+      homeTeam: { select: { name: true, ...teamMembersSelect } },
+      awayTeam: { select: { name: true, ...teamMembersSelect } },
     },
   });
 
@@ -257,28 +258,11 @@ export async function sendMatchLinksViaWhatsApp(matchId: string) {
     return { success: false, error: `Match is ${match.status.toLowerCase()} — no reminder needed` };
   }
 
-  // Auto-generate tokens if they don't exist
-  if (!match.homeToken || !match.awayToken) {
-    const { randomUUID } = await import("crypto");
-    await prisma.match.update({
-      where: { id: matchId },
-      data: {
-        homeToken: match.homeToken || randomUUID(),
-        awayToken: match.awayToken || randomUUID(),
-      },
-    });
-    match = await prisma.match.findUnique({
-      where: { id: matchId },
-      include: {
-        tournament: { select: { name: true } },
-        homePlayer: { select: { name: true, phone: true } },
-        awayPlayer: { select: { name: true, phone: true } },
-        homeTeam: { select: { name: true } },
-        awayTeam: { select: { name: true } },
-      },
-    });
-    if (!match) return { success: false, error: "Match not found" };
-  }
+  // Ensure both report tokens exist (group-stage matches are created without them)
+  const { homeToken, awayToken } = await ensureMatchTokens(matchId, {
+    homeToken: match.homeToken,
+    awayToken: match.awayToken,
+  });
 
   const homeName = match.homePlayer?.name ?? match.homeTeam?.name ?? "Home";
   const awayName = match.awayPlayer?.name ?? match.awayTeam?.name ?? "Away";
@@ -286,6 +270,10 @@ export async function sendMatchLinksViaWhatsApp(matchId: string) {
     ? match.deadline.toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Karachi" }) + " PKT"
     : "No deadline set";
   const baseUrl = "https://bwlleague.com";
+  const tmpl = process.env.WHATSAPP_TEMPLATE_NAME || "match_reminder";
+
+  const homeRecipients = resolveSideRecipients({ player: match.homePlayer, team: match.homeTeam });
+  const awayRecipients = resolveSideRecipients({ player: match.awayPlayer, team: match.awayTeam });
 
   let sent = 0;
   let skipped = 0;
@@ -293,38 +281,38 @@ export async function sendMatchLinksViaWhatsApp(matchId: string) {
 
   const { sendWithLog } = await import("@/lib/whatsapp-log");
 
-  if (match.homePlayer?.phone) {
+  if (homeRecipients.length === 0) errors.push(`${homeName} has no WhatsApp number`);
+  for (const r of homeRecipients) {
     const result = await sendWithLog({
-      to: match.homePlayer.phone,
-      templateName: process.env.WHATSAPP_TEMPLATE_NAME || "match_reminder",
-      parameters: [homeName, awayName, deadlineStr, `${baseUrl}/report/${match.homeToken}`],
-      dedupKey: `reminder:${matchId}:home`,
+      to: r.phone,
+      templateName: tmpl,
+      parameters: [homeName, awayName, deadlineStr, `${baseUrl}/report/${homeToken}`],
+      dedupKey: `reminder:${matchId}:home:${r.playerId}`,
       category: "REMINDER",
       matchId,
+      playerId: r.playerId,
       tournamentId: match.tournamentId,
     });
     if (result.skipped) skipped++;
     else if (result.ok) sent++;
-    else errors.push(`${homeName}: ${result.error || "Unknown error"}`);
-  } else {
-    errors.push(`${homeName} has no WhatsApp number`);
+    else errors.push(`${r.name}: ${result.error || "Unknown error"}`);
   }
 
-  if (match.awayPlayer?.phone) {
+  if (awayRecipients.length === 0) errors.push(`${awayName} has no WhatsApp number`);
+  for (const r of awayRecipients) {
     const result = await sendWithLog({
-      to: match.awayPlayer.phone,
-      templateName: process.env.WHATSAPP_TEMPLATE_NAME || "match_reminder",
-      parameters: [awayName, homeName, deadlineStr, `${baseUrl}/report/${match.awayToken}`],
-      dedupKey: `reminder:${matchId}:away`,
+      to: r.phone,
+      templateName: tmpl,
+      parameters: [awayName, homeName, deadlineStr, `${baseUrl}/report/${awayToken}`],
+      dedupKey: `reminder:${matchId}:away:${r.playerId}`,
       category: "REMINDER",
       matchId,
+      playerId: r.playerId,
       tournamentId: match.tournamentId,
     });
     if (result.skipped) skipped++;
     else if (result.ok) sent++;
-    else errors.push(`${awayName}: ${result.error || "Unknown error"}`);
-  } else {
-    errors.push(`${awayName} has no WhatsApp number`);
+    else errors.push(`${r.name}: ${result.error || "Unknown error"}`);
   }
 
   return {

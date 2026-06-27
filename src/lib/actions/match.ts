@@ -512,57 +512,62 @@ export async function advanceKnockoutWinner(matchId: string, tournamentId: strin
     });
   }
 
-  // Auto-send WhatsApp to both players when next match has both assigned
+  // Auto-send WhatsApp when the next match has both sides assigned.
+  // Works for 1v1 (players) and 2v2 duos (both members of each side).
+  const { resolveSideRecipients, teamMembersSelect } = await import("@/lib/match-recipients");
   const nextMatch = await prisma.match.findFirst({
     where: { tournamentId, roundNumber: nextRound, matchNumber: nextMatchNumber },
     include: {
       tournament: { select: { name: true } },
-      homePlayer: { select: { name: true, phone: true } },
-      awayPlayer: { select: { name: true, phone: true } },
+      homePlayer: { select: { id: true, name: true, phone: true } },
+      awayPlayer: { select: { id: true, name: true, phone: true } },
+      homeTeam: { select: { name: true, ...teamMembersSelect } },
+      awayTeam: { select: { name: true, ...teamMembersSelect } },
     },
   });
 
   // Don't announce a schedule for a match that's already been played or cancelled
   const nextIsPlayable = nextMatch?.status === "SCHEDULED" || nextMatch?.status === "POSTPONED";
 
-  if (nextIsPlayable && nextMatch?.homePlayerId && nextMatch?.awayPlayerId && nextMatch.homePlayer?.phone && nextMatch.awayPlayer?.phone) {
-    const homeName = nextMatch.homePlayer.name;
-    const awayName = nextMatch.awayPlayer.name;
+  const homeAssigned = !!(nextMatch?.homePlayerId || nextMatch?.homeTeamId);
+  const awayAssigned = !!(nextMatch?.awayPlayerId || nextMatch?.awayTeamId);
+
+  if (nextIsPlayable && nextMatch && homeAssigned && awayAssigned) {
+    const homeName = nextMatch.homePlayer?.name ?? nextMatch.homeTeam?.name ?? "Home";
+    const awayName = nextMatch.awayPlayer?.name ?? nextMatch.awayTeam?.name ?? "Away";
+    const homeRecipients = resolveSideRecipients({ player: nextMatch.homePlayer, team: nextMatch.homeTeam });
+    const awayRecipients = resolveSideRecipients({ player: nextMatch.awayPlayer, team: nextMatch.awayTeam });
+    const homeContact = homeRecipients.map((r) => r.phone.replace(/[+\s\-()]/g, "")).join("/") || "N/A";
+    const awayContact = awayRecipients.map((r) => r.phone.replace(/[+\s\-()]/g, "")).join("/") || "N/A";
     const deadlineStr = nextMatch.deadline
       ? nextMatch.deadline.toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Karachi" }) + " PKT"
       : "To be confirmed";
 
     import("@/lib/whatsapp-log").then(async ({ sendWithLog }) => {
-      // Notify home player
-      await sendWithLog({
-        to: nextMatch.homePlayer!.phone!,
-        templateName: "match_schedule",
-        parameters: [
-          homeName,
-          awayName,
-          nextMatch.awayPlayer!.phone!.replace(/[+\s\-()]/g, ""),
-          deadlineStr,
-        ],
-        dedupKey: `schedule:${nextMatch.id}:home`,
-        category: "SCHEDULE",
-        matchId: nextMatch.id,
-        tournamentId: nextMatch.tournamentId,
-      });
-      // Notify away player
-      await sendWithLog({
-        to: nextMatch.awayPlayer!.phone!,
-        templateName: "match_schedule",
-        parameters: [
-          awayName,
-          homeName,
-          nextMatch.homePlayer!.phone!.replace(/[+\s\-()]/g, ""),
-          deadlineStr,
-        ],
-        dedupKey: `schedule:${nextMatch.id}:away`,
-        category: "SCHEDULE",
-        matchId: nextMatch.id,
-        tournamentId: nextMatch.tournamentId,
-      });
+      // Notify everyone on the home side (opponent = away side contacts)
+      for (const r of homeRecipients) {
+        await sendWithLog({
+          to: r.phone,
+          templateName: "match_schedule",
+          parameters: [homeName, awayName, awayContact, deadlineStr],
+          dedupKey: `schedule:${nextMatch.id}:home:${r.playerId}`,
+          category: "SCHEDULE",
+          matchId: nextMatch.id,
+          tournamentId: nextMatch.tournamentId,
+        });
+      }
+      // Notify everyone on the away side
+      for (const r of awayRecipients) {
+        await sendWithLog({
+          to: r.phone,
+          templateName: "match_schedule",
+          parameters: [awayName, homeName, homeContact, deadlineStr],
+          dedupKey: `schedule:${nextMatch.id}:away:${r.playerId}`,
+          category: "SCHEDULE",
+          matchId: nextMatch.id,
+          tournamentId: nextMatch.tournamentId,
+        });
+      }
     }).catch(() => {});
   }
 }

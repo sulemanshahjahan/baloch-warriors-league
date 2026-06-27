@@ -3,6 +3,7 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { sendWithLog } from "@/lib/whatsapp-log";
+import { resolveSideRecipients, teamMembersSelect } from "@/lib/match-recipients";
 
 /**
  * After schedule generation, send ONE WhatsApp message per player
@@ -28,35 +29,35 @@ export async function sendScheduleNotifications(tournamentId: string): Promise<{
   });
   if (!tournament) return { success: false, sent: 0, errors: ["Tournament not found"] };
 
-  // Fetch all playable (not yet completed/cancelled) matches with player details
+  // Fetch all playable (not yet completed/cancelled) matches with player + duo details
   const matches = await prisma.match.findMany({
     where: { tournamentId, status: { in: ["SCHEDULED", "POSTPONED"] } },
     orderBy: [{ scheduledAt: "asc" }, { roundNumber: "asc" }, { matchNumber: "asc" }],
     include: {
-      homePlayer: { select: { id: true, name: true, phone: true, slug: true } },
-      awayPlayer: { select: { id: true, name: true, phone: true, slug: true } },
-      homeTeam: { select: { id: true, name: true } },
-      awayTeam: { select: { id: true, name: true } },
+      homePlayer: { select: { id: true, name: true, phone: true } },
+      awayPlayer: { select: { id: true, name: true, phone: true } },
+      homeTeam: { select: { name: true, ...teamMembersSelect } },
+      awayTeam: { select: { name: true, ...teamMembersSelect } },
     },
   });
 
-  // Group matches by player
-  const playerMatches = new Map<string, {
+  // Group fixtures by recipient (each duo member gets their own summary).
+  const recipients = new Map<string, {
     name: string;
-    phone: string | null;
-    slug: string | null;
-    opponents: { name: string; phone: string; deadline: string }[];
+    phone: string;
+    opponents: { name: string; contact: string; deadline: string }[];
   }>();
 
+  const cleanPhones = (rs: { phone: string }[]) =>
+    rs.map((r) => r.phone.replace(/[+\s\-()]/g, "")).join("/") || "N/A";
+
   for (const match of matches) {
-    const homeName = match.homePlayer?.name ?? match.homeTeam?.name ?? "TBD";
-    const awayName = match.awayPlayer?.name ?? match.awayTeam?.name ?? "TBD";
-    const homeId = match.homePlayer?.id ?? match.homeTeam?.id ?? "";
-    const awayId = match.awayPlayer?.id ?? match.awayTeam?.id ?? "";
-    const homePhone = match.homePlayer?.phone;
-    const awayPhone = match.awayPlayer?.phone;
-    const homeSlug = match.homePlayer?.slug ?? null;
-    const awaySlug = match.awayPlayer?.slug ?? null;
+    const homeLabel = match.homePlayer?.name ?? match.homeTeam?.name ?? "TBD";
+    const awayLabel = match.awayPlayer?.name ?? match.awayTeam?.name ?? "TBD";
+    const homeRec = resolveSideRecipients({ player: match.homePlayer, team: match.homeTeam });
+    const awayRec = resolveSideRecipients({ player: match.awayPlayer, team: match.awayTeam });
+    const homeContact = cleanPhones(homeRec);
+    const awayContact = cleanPhones(awayRec);
 
     const deadlineStr = match.deadline
       ? match.deadline.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "Asia/Karachi" })
@@ -64,61 +65,33 @@ export async function sendScheduleNotifications(tournamentId: string): Promise<{
         ? match.scheduledAt.toLocaleDateString("en-GB", { day: "numeric", month: "short", timeZone: "Asia/Karachi" })
         : "TBC";
 
-    // Add to home player's list
-    if (homeId) {
-      if (!playerMatches.has(homeId)) {
-        playerMatches.set(homeId, { name: homeName, phone: homePhone ?? null, slug: homeSlug, opponents: [] });
-      }
-      playerMatches.get(homeId)!.opponents.push({
-        name: awayName,
-        phone: awayPhone ? awayPhone.replace(/[+\s\-()]/g, "") : "N/A",
-        deadline: deadlineStr,
-      });
+    for (const r of homeRec) {
+      if (!recipients.has(r.playerId)) recipients.set(r.playerId, { name: r.name, phone: r.phone, opponents: [] });
+      recipients.get(r.playerId)!.opponents.push({ name: awayLabel, contact: awayContact, deadline: deadlineStr });
     }
-
-    // Add to away player's list
-    if (awayId) {
-      if (!playerMatches.has(awayId)) {
-        playerMatches.set(awayId, { name: awayName, phone: awayPhone ?? null, slug: awaySlug, opponents: [] });
-      }
-      playerMatches.get(awayId)!.opponents.push({
-        name: homeName,
-        phone: homePhone ? homePhone.replace(/[+\s\-()]/g, "") : "N/A",
-        deadline: deadlineStr,
-      });
+    for (const r of awayRec) {
+      if (!recipients.has(r.playerId)) recipients.set(r.playerId, { name: r.name, phone: r.phone, opponents: [] });
+      recipients.get(r.playerId)!.opponents.push({ name: homeLabel, contact: homeContact, deadline: deadlineStr });
     }
   }
 
   let sent = 0;
   let skipped = 0;
   const errors: string[] = [];
+  const fixturesUrl = `https://bwlleague.com/tournaments/${tournament.slug}`;
 
-  // Send one message per player
-  for (const [playerId, player] of playerMatches) {
-    if (!player.phone) {
-      errors.push(`${player.name}: No WhatsApp number`);
-      continue;
-    }
-
+  // Send one message per recipient
+  for (const [playerId, r] of recipients) {
     // Build match list string with pipe separator (WhatsApp doesn't render \n in params)
-    const matchList = player.opponents
-      .map((o) => `vs ${o.name} +${o.phone} [${o.deadline}]`)
+    const matchList = r.opponents
+      .map((o) => `vs ${o.name} +${o.contact} [${o.deadline}]`)
       .join(" | ");
 
-    const fixturesUrl = player.slug
-      ? `https://bwlleague.com/players/${player.slug}`
-      : `https://bwlleague.com/tournaments/${tournament.slug}`;
-
     const result = await sendWithLog({
-      to: player.phone,
+      to: r.phone,
       templateName: "fixture_summary",
       languageCode: "en",
-      parameters: [
-        player.name,
-        `${player.opponents.length}`,
-        matchList,
-        fixturesUrl,
-      ],
+      parameters: [r.name, `${r.opponents.length}`, matchList, fixturesUrl],
       dedupKey: `fixture:${tournamentId}:${playerId}`,
       category: "FIXTURE",
       tournamentId,
@@ -127,7 +100,7 @@ export async function sendScheduleNotifications(tournamentId: string): Promise<{
 
     if (result.skipped) skipped++;
     else if (result.ok) sent++;
-    else errors.push(`${player.name}: ${result.error || "Failed"}`);
+    else errors.push(`${r.name}: ${result.error || "Failed"}`);
   }
 
   return { success: true, sent, skipped, errors };

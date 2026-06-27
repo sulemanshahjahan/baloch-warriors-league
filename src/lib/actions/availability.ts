@@ -56,34 +56,44 @@ export async function markAvailable(
     ? (match.homePlayer?.name ?? match.homeTeam?.name ?? "Home")
     : (match.awayPlayer?.name ?? match.awayTeam?.name ?? "Away");
 
-  // Notify opponent that this player is ready
-  const opponentPhone = opponentSide === "home"
-    ? match.homePlayer?.phone
-    : match.awayPlayer?.phone;
-  const opponentToken = opponentSide === "home" ? match.homeToken : match.awayToken;
+  // Notify the opponent side that this player/duo is ready — every member for duos.
+  const { resolveSideRecipients, ensureMatchTokens } = await import("@/lib/match-recipients");
+  const opponentRecipients = resolveSideRecipients(
+    opponentSide === "home"
+      ? { player: match.homePlayer, team: match.homeTeam }
+      : { player: match.awayPlayer, team: match.awayTeam }
+  );
 
-  if (opponentPhone && opponentToken) {
+  if (opponentRecipients.length > 0) {
+    const { homeToken, awayToken } = await ensureMatchTokens(match.id, {
+      homeToken: match.homeToken,
+      awayToken: match.awayToken,
+    });
+    const opponentToken = opponentSide === "home" ? homeToken : awayToken;
+
     const parsedPreferred = fromKarachiInputValue(preferredTime ?? null);
     const timeStr = parsedPreferred
       ? parsedPreferred.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Karachi" }) + " PKT"
       : "anytime";
 
     const { sendWithLog } = await import("@/lib/whatsapp-log");
-    await sendWithLog({
-      to: opponentPhone,
-      templateName: "opponent_ready",
-      parameters: [
-        opponentName,
-        playerName,
-        timeStr,
-        `https://bwlleague.com/report/${opponentToken}`,
-      ],
-      // Keyed on (match, side-that-marked-ready) — re-marking clears and re-fires
-      dedupKey: `opponent_ready:${match.id}:${side}`,
-      category: "OPPONENT_READY",
-      matchId: match.id,
-      tournamentId: match.tournamentId,
-    });
+    for (const r of opponentRecipients) {
+      await sendWithLog({
+        to: r.phone,
+        templateName: "opponent_ready",
+        parameters: [
+          opponentName,
+          playerName,
+          timeStr,
+          `https://bwlleague.com/report/${opponentToken}`,
+        ],
+        // Keyed on (match, side-that-marked-ready, recipient) — re-marking re-fires
+        dedupKey: `opponent_ready:${match.id}:${side}:${r.playerId}`,
+        category: "OPPONENT_READY",
+        matchId: match.id,
+        tournamentId: match.tournamentId,
+      });
+    }
   }
 
   // WhatsApp only — no broadcast push notification for availability
