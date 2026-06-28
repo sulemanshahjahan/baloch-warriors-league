@@ -219,7 +219,7 @@ export function DuoManager({ tournamentId, duos, availablePlayers }: DuoManagerP
               </div>
 
               {editingId !== duo.teamId && (
-                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                   <Button
                     size="icon"
                     variant="ghost"

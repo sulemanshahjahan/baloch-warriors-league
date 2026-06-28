@@ -75,7 +75,7 @@ export function TeamsList({ teams }: { teams: Team[] }) {
                       fallbackClassName="text-xl"
                       primaryColor={team.primaryColor}
                     />
-                    <ChevronRight className="w-5 h-5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <ChevronRight className="w-5 h-5 text-muted-foreground opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity" />
                   </div>
 
                   <h3 className="font-bold text-lg mt-4 group-hover:text-primary transition-colors">
