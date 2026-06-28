@@ -259,7 +259,8 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
                         isDuo={match.homeTeam?.isDuo}
                         members={match.homeTeam?.players?.map((p) => p.player)}
                         className="h-20 w-20 ring-2 ring-border hover:ring-primary transition-all"
-                        fallbackClassName="text-lg font-bold"
+                        memberClassName="h-12 w-12 ring-2 ring-border"
+                        fallbackClassName="text-base font-bold"
                       />
                     ) : (
                       <SmartAvatar
@@ -363,7 +364,8 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
                         isDuo={match.awayTeam?.isDuo}
                         members={match.awayTeam?.players?.map((p) => p.player)}
                         className="h-20 w-20 ring-2 ring-border hover:ring-primary transition-all"
-                        fallbackClassName="text-lg font-bold"
+                        memberClassName="h-12 w-12 ring-2 ring-border"
+                        fallbackClassName="text-base font-bold"
                       />
                     ) : (
                       <SmartAvatar

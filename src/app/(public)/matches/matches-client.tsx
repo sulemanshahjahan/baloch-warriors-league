@@ -94,7 +94,7 @@ function MatchCard({ match }: { match: Match }) {
               {match.homePlayer ? (
                 <SmartAvatar type="player" id={match.homePlayer.id} name={homeName} className="h-10 w-10 shrink-0" fallbackClassName="text-sm" />
               ) : match.homeTeam ? (
-                <DuoTeamAvatar id={match.homeTeam.id} name={homeName} isDuo={match.homeTeam.isDuo} members={match.homeTeam.players?.map((p) => p.player)} className="h-10 w-10 shrink-0" fallbackClassName="text-sm" />
+                <DuoTeamAvatar id={match.homeTeam.id} name={homeName} isDuo={match.homeTeam.isDuo} members={match.homeTeam.players?.map((p) => p.player)} className="h-10 w-10 shrink-0" memberClassName="h-8 w-8" fallbackClassName="text-[10px]" />
               ) : null}
               <div className="min-w-0">
                 <p className="font-medium truncate">{homeName}</p>
@@ -134,7 +134,7 @@ function MatchCard({ match }: { match: Match }) {
               {match.awayPlayer ? (
                 <SmartAvatar type="player" id={match.awayPlayer.id} name={awayName} className="h-10 w-10 shrink-0" fallbackClassName="text-sm" />
               ) : match.awayTeam ? (
-                <DuoTeamAvatar id={match.awayTeam.id} name={awayName} isDuo={match.awayTeam.isDuo} members={match.awayTeam.players?.map((p) => p.player)} className="h-10 w-10 shrink-0" fallbackClassName="text-sm" />
+                <DuoTeamAvatar id={match.awayTeam.id} name={awayName} isDuo={match.awayTeam.isDuo} members={match.awayTeam.players?.map((p) => p.player)} className="h-10 w-10 shrink-0" memberClassName="h-8 w-8" fallbackClassName="text-[10px]" />
               ) : null}
             </div>
           </div>

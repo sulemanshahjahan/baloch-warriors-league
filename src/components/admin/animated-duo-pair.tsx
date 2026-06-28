@@ -169,9 +169,9 @@ export function AnimatedDuoPair({ open, players, ratingSource, onClose, onConfir
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 w-full max-w-4xl">
         {revealedDuos.map((d, i) => (
           <div key={`${d.player1.id}-${d.player2.id}`} className="bg-card/80 border border-border/50 rounded-xl p-3 flex items-center gap-3 animate-in slide-in-from-top-2 fade-in duration-500" style={{ animationDelay: `${i * 80}ms` }}>
-            <div className="flex -space-x-2">
-              <SmartAvatar type="player" id={d.player1.id} name={d.player1.name} photoUrl={d.player1.photoUrl} className="h-9 w-9 border-2 border-background" fallbackClassName="text-[10px]" />
-              <SmartAvatar type="player" id={d.player2.id} name={d.player2.name} photoUrl={d.player2.photoUrl} className="h-9 w-9 border-2 border-background" fallbackClassName="text-[10px]" />
+            <div className="flex items-center gap-0.5 shrink-0">
+              <SmartAvatar type="player" id={d.player1.id} name={d.player1.name} photoUrl={d.player1.photoUrl} className="h-9 w-9" fallbackClassName="text-[10px]" />
+              <SmartAvatar type="player" id={d.player2.id} name={d.player2.name} photoUrl={d.player2.photoUrl} className="h-9 w-9" fallbackClassName="text-[10px]" />
             </div>
             <div className="min-w-0">
               <p className="text-white text-sm font-semibold truncate">{d.player1.name} &amp; {d.player2.name}</p>

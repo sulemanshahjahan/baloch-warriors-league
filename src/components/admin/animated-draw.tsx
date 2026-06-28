@@ -25,7 +25,7 @@ function ParticipantAvatar({
 }) {
   if (player.members && player.members.length >= 2) {
     return (
-      <div className="flex -space-x-2">
+      <div className="flex items-center gap-0.5">
         {player.members.slice(0, 2).map((m) => (
           <SmartAvatar
             key={m.id}
@@ -33,7 +33,7 @@ function ParticipantAvatar({
             id={m.id}
             name={m.name}
             photoUrl={m.photoUrl}
-            className={`${className} border-2 border-background`}
+            className={className}
             fallbackClassName={fallbackClassName}
           />
         ))}

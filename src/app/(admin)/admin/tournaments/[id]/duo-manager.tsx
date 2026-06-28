@@ -182,9 +182,9 @@ export function DuoManager({ tournamentId, duos, availablePlayers }: DuoManagerP
           {duos.map((duo) => (
             <div key={duo.teamId} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 group">
               {/* Members */}
-              <div className="flex -space-x-2">
+              <div className="flex items-center gap-0.5 shrink-0">
                 {duo.players.map((pl) => (
-                  <Avatar key={pl.id} className="h-8 w-8 border-2 border-background">
+                  <Avatar key={pl.id} className="h-8 w-8">
                     <AvatarImage src={pl.photoUrl ?? undefined} />
                     <AvatarFallback className="text-xs">{getInitials(pl.name)}</AvatarFallback>
                   </Avatar>

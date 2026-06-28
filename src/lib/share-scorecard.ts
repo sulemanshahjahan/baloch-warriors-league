@@ -201,12 +201,6 @@ export async function generateAndShareScorecard(
       ctx.textBaseline = "alphabetic";
     }
 
-    // Dark separator (helps overlapping duo faces read as two), then coloured ring.
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.strokeStyle = "#0a0a0a";
-    ctx.lineWidth = 6;
-    ctx.stroke();
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
     ctx.strokeStyle = borderColor;
@@ -222,8 +216,9 @@ export async function generateAndShareScorecard(
     label: string,
   ) => {
     if (faces.length >= 2) {
-      drawFace(imgs[0], x - 34, 370, 52, faces[0].name);
-      drawFace(imgs[1], x + 34, 370, 52, faces[1].name); // drawn on top
+      // Side by side, no overlap (8px gap between the two circles).
+      drawFace(imgs[0], x - 52, 370, 48, faces[0].name);
+      drawFace(imgs[1], x + 52, 370, 48, faces[1].name);
     } else {
       drawFace(imgs[0], x, 370, 70, faces[0].name);
     }
