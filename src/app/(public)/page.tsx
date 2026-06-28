@@ -731,43 +731,43 @@ export default async function HomePage() {
                           )}
 
                           <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2 flex-1 justify-end">
-                              <p className="font-semibold text-sm text-right truncate">{homeName}</p>
+                            <div className="flex flex-col items-center gap-1.5 flex-1 min-w-0">
                               {homeId ? (
                                 homeType === "team" ? (
-                                  <DuoTeamAvatar id={homeId} name={homeName} isDuo={match.homeTeam?.isDuo} members={match.homeTeam?.players?.map((p) => p.player)} className="h-8 w-8 shrink-0" fallbackClassName="text-[10px]" />
+                                  <DuoTeamAvatar id={homeId} name={homeName} isDuo={match.homeTeam?.isDuo} members={match.homeTeam?.players?.map((p) => p.player)} className="h-12 w-12 shrink-0" memberClassName="h-9 w-9" fallbackClassName="text-xs" />
                                 ) : (
-                                  <SmartAvatar type="player" id={homeId} name={homeName} className="h-8 w-8 shrink-0" fallbackClassName="text-[10px]" />
+                                  <SmartAvatar type="player" id={homeId} name={homeName} className="h-12 w-12 shrink-0" fallbackClassName="text-xs" />
                                 )
                               ) : (
-                                <Avatar className="h-8 w-8 shrink-0">
-                                  <AvatarFallback className="text-[10px]">{getInitials(homeName)}</AvatarFallback>
+                                <Avatar className="h-12 w-12 shrink-0">
+                                  <AvatarFallback className="text-xs">{getInitials(homeName)}</AvatarFallback>
                                 </Avatar>
                               )}
+                              <p className="font-semibold text-xs text-center leading-tight line-clamp-2 w-full">{homeName}</p>
                             </div>
-                            <div className="text-center px-2 shrink-0">
-                              <span className="text-2xl font-black">
+                            <div className="flex flex-col items-center shrink-0 px-1">
+                              <span className="text-2xl font-black whitespace-nowrap">
                                 {match.homeScore ?? 0}
                                 <span className="text-muted-foreground mx-1 font-light text-lg">–</span>
                                 {match.awayScore ?? 0}
                               </span>
                               {match.homeScorePens != null && match.awayScorePens != null && (
-                                <p className="text-[10px] text-muted-foreground">({match.homeScorePens}–{match.awayScorePens} pens)</p>
+                                <p className="text-[10px] text-muted-foreground whitespace-nowrap">({match.homeScorePens}–{match.awayScorePens} pens)</p>
                               )}
                             </div>
-                            <div className="flex items-center gap-2 flex-1">
+                            <div className="flex flex-col items-center gap-1.5 flex-1 min-w-0">
                               {awayId ? (
                                 awayType === "team" ? (
-                                  <DuoTeamAvatar id={awayId} name={awayName} isDuo={match.awayTeam?.isDuo} members={match.awayTeam?.players?.map((p) => p.player)} className="h-8 w-8 shrink-0" fallbackClassName="text-[10px]" />
+                                  <DuoTeamAvatar id={awayId} name={awayName} isDuo={match.awayTeam?.isDuo} members={match.awayTeam?.players?.map((p) => p.player)} className="h-12 w-12 shrink-0" memberClassName="h-9 w-9" fallbackClassName="text-xs" />
                                 ) : (
-                                  <SmartAvatar type="player" id={awayId} name={awayName} className="h-8 w-8 shrink-0" fallbackClassName="text-[10px]" />
+                                  <SmartAvatar type="player" id={awayId} name={awayName} className="h-12 w-12 shrink-0" fallbackClassName="text-xs" />
                                 )
                               ) : (
-                                <Avatar className="h-8 w-8 shrink-0">
-                                  <AvatarFallback className="text-[10px]">{getInitials(awayName)}</AvatarFallback>
+                                <Avatar className="h-12 w-12 shrink-0">
+                                  <AvatarFallback className="text-xs">{getInitials(awayName)}</AvatarFallback>
                                 </Avatar>
                               )}
-                              <p className="font-semibold text-sm truncate">{awayName}</p>
+                              <p className="font-semibold text-xs text-center leading-tight line-clamp-2 w-full">{awayName}</p>
                             </div>
                           </div>
 
@@ -828,34 +828,34 @@ export default async function HomePage() {
                             </div>
                           )}
                           <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2 flex-1 justify-end">
-                              <p className="font-semibold text-sm text-right truncate">{homeName}</p>
+                            <div className="flex flex-col items-center gap-1.5 flex-1 min-w-0">
                               {homeId ? (
                                 homeType === "team" ? (
-                                  <DuoTeamAvatar id={homeId} name={homeName} isDuo={match.homeTeam?.isDuo} members={match.homeTeam?.players?.map((p) => p.player)} className="h-7 w-7 shrink-0" fallbackClassName="text-[10px]" />
+                                  <DuoTeamAvatar id={homeId} name={homeName} isDuo={match.homeTeam?.isDuo} members={match.homeTeam?.players?.map((p) => p.player)} className="h-12 w-12 shrink-0" memberClassName="h-9 w-9" fallbackClassName="text-xs" />
                                 ) : (
-                                  <SmartAvatar type="player" id={homeId} name={homeName} className="h-7 w-7 shrink-0" fallbackClassName="text-[10px]" />
+                                  <SmartAvatar type="player" id={homeId} name={homeName} className="h-12 w-12 shrink-0" fallbackClassName="text-xs" />
                                 )
                               ) : (
-                                <Avatar className="h-7 w-7 shrink-0">
-                                  <AvatarFallback className="text-[10px]">{getInitials(homeName)}</AvatarFallback>
+                                <Avatar className="h-12 w-12 shrink-0">
+                                  <AvatarFallback className="text-xs">{getInitials(homeName)}</AvatarFallback>
                                 </Avatar>
                               )}
+                              <p className="font-semibold text-xs text-center leading-tight line-clamp-2 w-full">{homeName}</p>
                             </div>
-                            <span className="text-xs text-muted-foreground px-2 shrink-0">vs</span>
-                            <div className="flex items-center gap-2 flex-1">
+                            <span className="text-xs text-muted-foreground px-1 shrink-0">vs</span>
+                            <div className="flex flex-col items-center gap-1.5 flex-1 min-w-0">
                               {awayId ? (
                                 awayType === "team" ? (
-                                  <DuoTeamAvatar id={awayId} name={awayName} isDuo={match.awayTeam?.isDuo} members={match.awayTeam?.players?.map((p) => p.player)} className="h-7 w-7 shrink-0" fallbackClassName="text-[10px]" />
+                                  <DuoTeamAvatar id={awayId} name={awayName} isDuo={match.awayTeam?.isDuo} members={match.awayTeam?.players?.map((p) => p.player)} className="h-12 w-12 shrink-0" memberClassName="h-9 w-9" fallbackClassName="text-xs" />
                                 ) : (
-                                  <SmartAvatar type="player" id={awayId} name={awayName} className="h-7 w-7 shrink-0" fallbackClassName="text-[10px]" />
+                                  <SmartAvatar type="player" id={awayId} name={awayName} className="h-12 w-12 shrink-0" fallbackClassName="text-xs" />
                                 )
                               ) : (
-                                <Avatar className="h-7 w-7 shrink-0">
-                                  <AvatarFallback className="text-[10px]">{getInitials(awayName)}</AvatarFallback>
+                                <Avatar className="h-12 w-12 shrink-0">
+                                  <AvatarFallback className="text-xs">{getInitials(awayName)}</AvatarFallback>
                                 </Avatar>
                               )}
-                              <p className="font-semibold text-sm truncate">{awayName}</p>
+                              <p className="font-semibold text-xs text-center leading-tight line-clamp-2 w-full">{awayName}</p>
                             </div>
                           </div>
                           {match.scheduledAt && (
