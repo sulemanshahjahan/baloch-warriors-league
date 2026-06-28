@@ -46,6 +46,8 @@ interface MatchResultFormProps {
   matchNumber: number | null;
   homePhoto: string | null;
   awayPhoto: string | null;
+  homeMembers?: { name: string; photoUrl: string | null }[];
+  awayMembers?: { name: string; photoUrl: string | null }[];
   // Knockout leg fields
   isKnockout: boolean;
   leg2HomeScore: number | null;
@@ -80,6 +82,8 @@ export function MatchResultForm({
   matchNumber,
   homePhoto,
   awayPhoto,
+  homeMembers,
+  awayMembers,
   isKnockout,
   leg2HomeScore: initialLeg2Home,
   leg2AwayScore: initialLeg2Away,
@@ -116,11 +120,16 @@ export function MatchResultForm({
     const canvas = canvasRef.current;
     if (!canvas) return;
     const legs = getLegScoresFromForm();
+    const motmPlayer = motm ? players.find((p) => p.id === motm) : null;
+    const motmData = motmPlayer
+      ? { name: motmPlayer.name, photoUrl: `/api/image?type=player&id=${motmPlayer.id}` }
+      : null;
     try {
       await generateAndShareScorecard(canvas, {
         homeName, awayName, homeScore: hScore, awayScore: aScore,
         tournamentName, matchId, round, matchNumber,
         homePhoto, awayPhoto,
+        homeMembers, awayMembers, motm: motmData,
         ...legs,
       });
     } catch {

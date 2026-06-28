@@ -501,6 +501,21 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
                   : match.awayTeam ? `/api/image?type=team&id=${match.awayTeam.id}`
                   : null
                 }
+                homeMembers={
+                  match.homeTeam?.isDuo
+                    ? match.homeTeam.players.map((p) => ({ name: p.player.name, photoUrl: `/api/image?type=player&id=${p.player.id}` }))
+                    : undefined
+                }
+                awayMembers={
+                  match.awayTeam?.isDuo
+                    ? match.awayTeam.players.map((p) => ({ name: p.player.name, photoUrl: `/api/image?type=player&id=${p.player.id}` }))
+                    : undefined
+                }
+                motm={
+                  match.motmPlayer
+                    ? { name: match.motmPlayer.name, photoUrl: `/api/image?type=player&id=${match.motmPlayer.id}` }
+                    : null
+                }
                 leg2HomeScore={match.leg2HomeScore}
                 leg2AwayScore={match.leg2AwayScore}
                 leg3HomeScore={match.leg3HomeScore}

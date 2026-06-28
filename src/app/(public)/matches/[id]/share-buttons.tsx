@@ -14,6 +14,9 @@ interface ShareButtonsProps {
   matchNumber: number | null;
   homePhoto?: string | null;
   awayPhoto?: string | null;
+  homeMembers?: { name: string; photoUrl: string | null }[];
+  awayMembers?: { name: string; photoUrl: string | null }[];
+  motm?: { name: string; photoUrl: string | null } | null;
   leg2HomeScore?: number | null;
   leg2AwayScore?: number | null;
   leg3HomeScore?: number | null;
@@ -33,6 +36,9 @@ export function ShareButtons({
   matchNumber,
   homePhoto,
   awayPhoto,
+  homeMembers,
+  awayMembers,
+  motm,
   leg2HomeScore,
   leg2AwayScore,
   leg3HomeScore,
@@ -88,6 +94,7 @@ export function ShareButtons({
     homeName, awayName, homeScore, awayScore,
     tournamentName, matchId, round, matchNumber,
     homePhoto, awayPhoto,
+    homeMembers, awayMembers, motm,
     leg2HomeScore, leg2AwayScore,
     leg3HomeScore, leg3AwayScore,
     leg3HomePens, leg3AwayPens,

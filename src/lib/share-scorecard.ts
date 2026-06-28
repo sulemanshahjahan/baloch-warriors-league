@@ -14,6 +14,11 @@ export interface ScorecardData {
   matchNumber: number | null;
   homePhoto?: string | null;
   awayPhoto?: string | null;
+  // 2v2 duos: both members per side (drawn as a stacked pair of avatars)
+  homeMembers?: { name: string; photoUrl: string | null }[];
+  awayMembers?: { name: string; photoUrl: string | null }[];
+  // Man of the match
+  motm?: { name: string; photoUrl: string | null } | null;
   // 2-legged knockout
   leg2HomeScore?: number | null;
   leg2AwayScore?: number | null;
@@ -102,18 +107,23 @@ export async function generateAndShareScorecard(
   canvas.width = size;
   canvas.height = size;
 
-  // Load all images in parallel
-  const [bgResult, logoResult, homeResult, awayResult] = await Promise.allSettled([
-    loadLocalImage("/scorecard-bg.jpg"),
-    loadLocalImage("/logo.png"),
-    data.homePhoto ? loadExternalImage(data.homePhoto) : Promise.reject("none"),
-    data.awayPhoto ? loadExternalImage(data.awayPhoto) : Promise.reject("none"),
-  ]);
+  const loadOrNull = (url?: string | null): Promise<HTMLImageElement | null> =>
+    url ? loadExternalImage(url).catch(() => null) : Promise.resolve(null);
 
-  const bgImg = bgResult.status === "fulfilled" ? bgResult.value : null;
-  const logoImg = logoResult.status === "fulfilled" ? logoResult.value : null;
-  const homeImg = homeResult.status === "fulfilled" ? homeResult.value : null;
-  const awayImg = awayResult.status === "fulfilled" ? awayResult.value : null;
+  // Each side is either a duo (2 members) or a single competitor.
+  const homeIsDuo = !!(data.homeMembers && data.homeMembers.length >= 2);
+  const awayIsDuo = !!(data.awayMembers && data.awayMembers.length >= 2);
+  const homeFaces = homeIsDuo ? data.homeMembers!.slice(0, 2) : [{ name: data.homeName, photoUrl: data.homePhoto ?? null }];
+  const awayFaces = awayIsDuo ? data.awayMembers!.slice(0, 2) : [{ name: data.awayName, photoUrl: data.awayPhoto ?? null }];
+
+  // Load all images in parallel
+  const [bgImg, logoImg, homeImgs, awayImgs, motmImg] = await Promise.all([
+    loadLocalImage("/scorecard-bg.jpg").catch(() => null),
+    loadLocalImage("/logo.png").catch(() => null),
+    Promise.all(homeFaces.map((f) => loadOrNull(f.photoUrl))),
+    Promise.all(awayFaces.map((f) => loadOrNull(f.photoUrl))),
+    loadOrNull(data.motm?.photoUrl),
+  ]);
 
   // Background
   if (bgImg) {
@@ -156,9 +166,15 @@ export async function generateAndShareScorecard(
     ctx.fillText(matchInfo, size / 2, 215);
   }
 
-  // Avatar helper
-  const drawAvatar = (img: HTMLImageElement | null, x: number, y: number, name: string) => {
-    const r = 70;
+  // Draw a single circular face (photo or initials) with a coloured ring.
+  const drawFace = (
+    img: HTMLImageElement | null,
+    x: number,
+    y: number,
+    r: number,
+    name: string,
+    borderColor = "#ef4444",
+  ) => {
     const initials = name.split(" ").map((n) => n[0] ?? "").join("").slice(0, 2).toUpperCase();
 
     ctx.beginPath();
@@ -178,28 +194,48 @@ export async function generateAndShareScorecard(
       ctx.restore();
     } else {
       ctx.fillStyle = "#fff";
-      ctx.font = "bold 40px system-ui";
+      ctx.font = `bold ${Math.round(r * 0.57)}px system-ui`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(initials, x, y);
       ctx.textBaseline = "alphabetic";
     }
 
+    // Dark separator (helps overlapping duo faces read as two), then coloured ring.
     ctx.beginPath();
     ctx.arc(x, y, r, 0, Math.PI * 2);
-    ctx.strokeStyle = "#ef4444";
+    ctx.strokeStyle = "#0a0a0a";
+    ctx.lineWidth = 6;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.strokeStyle = borderColor;
     ctx.lineWidth = 3;
     ctx.stroke();
+  };
 
+  // Draw one side: a stacked pair for duos, a single avatar otherwise, plus the name label.
+  const drawSide = (
+    imgs: (HTMLImageElement | null)[],
+    faces: { name: string }[],
+    x: number,
+    label: string,
+  ) => {
+    if (faces.length >= 2) {
+      drawFace(imgs[0], x - 34, 370, 52, faces[0].name);
+      drawFace(imgs[1], x + 34, 370, 52, faces[1].name); // drawn on top
+    } else {
+      drawFace(imgs[0], x, 370, 70, faces[0].name);
+    }
     ctx.fillStyle = "#fff";
     ctx.font = "bold 26px system-ui";
     ctx.textAlign = "center";
     ctx.textBaseline = "alphabetic";
-    ctx.fillText(name, x, y + r + 42);
+    ctx.fillText(label, x, 482);
   };
 
-  drawAvatar(homeImg, 200, 370, data.homeName);
-  drawAvatar(awayImg, 600, 370, data.awayName);
+  drawSide(homeImgs, homeFaces, 200, data.homeName);
+  drawSide(awayImgs, awayFaces, 600, data.awayName);
 
   // Score — show aggregate for 2-legged, single score otherwise
   const has2Legs = data.leg2HomeScore != null;
@@ -249,6 +285,31 @@ export async function generateAndShareScorecard(
   ctx.moveTo(80, 540);
   ctx.lineTo(720, 540);
   ctx.stroke();
+
+  // Man of the Match
+  if (data.motm) {
+    ctx.fillStyle = "#fbbf24";
+    ctx.font = "700 22px system-ui";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText("⭐ MAN OF THE MATCH", size / 2, 592);
+
+    const name = data.motm.name;
+    ctx.font = "bold 34px system-ui";
+    const nameW = ctx.measureText(name).width;
+    const avatarD = 72;
+    const gap = 18;
+    const startX = (size - (avatarD + gap + nameW)) / 2;
+    const cy = 642;
+    drawFace(motmImg, startX + avatarD / 2, cy, 36, name, "#fbbf24");
+    ctx.fillStyle = "#fff";
+    ctx.font = "bold 34px system-ui";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillText(name, startX + avatarD + gap, cy);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+  }
 
   // Footer
   ctx.fillStyle = "#ffffff";
