@@ -19,6 +19,8 @@ export interface ScorecardData {
   awayMembers?: { name: string; photoUrl: string | null }[];
   // Man of the match
   motm?: { name: string; photoUrl: string | null } | null;
+  // Goal scorers (⚽ name minute) — shown minimally when there's room
+  goals?: { name: string; minute: number | null; side: "home" | "away" }[];
   // 2-legged knockout
   leg2HomeScore?: number | null;
   leg2AwayScore?: number | null;
@@ -273,32 +275,58 @@ export async function generateAndShareScorecard(
     ctx.textBaseline = "alphabetic";
   }
 
-  // Divider
-  ctx.strokeStyle = "#222";
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(80, 540);
-  ctx.lineTo(720, 540);
-  ctx.stroke();
+  // Goal scorers — minimal "⚽ name minute" lists under each side, if any.
+  const hasMotm = !!data.motm;
+  const homeGoals = (data.goals ?? []).filter((g) => g.side === "home");
+  const awayGoals = (data.goals ?? []).filter((g) => g.side === "away");
+  const maxPerSide = hasMotm ? 3 : 6; // keep room for MOTM + footer
+  let goalsBottom = 520;
 
-  // Man of the Match
+  if (homeGoals.length > 0 || awayGoals.length > 0) {
+    const top = 524;
+    const lh = 27;
+    ctx.font = "500 19px system-ui";
+    ctx.textBaseline = "alphabetic";
+    ctx.textAlign = "center";
+
+    const drawCol = (list: { name: string; minute: number | null }[], x: number) => {
+      const shown = list.slice(0, maxPerSide);
+      shown.forEach((g, i) => {
+        ctx.fillStyle = "rgba(255,255,255,0.85)";
+        const min = g.minute != null ? ` ${g.minute}'` : "";
+        ctx.fillText(`⚽ ${g.name}${min}`, x, top + i * lh);
+      });
+      if (list.length > maxPerSide) {
+        ctx.fillStyle = "rgba(255,255,255,0.4)";
+        ctx.fillText(`+${list.length - maxPerSide} more`, x, top + maxPerSide * lh);
+      }
+    };
+    drawCol(homeGoals, 210);
+    drawCol(awayGoals, 590);
+
+    const linesOf = (n: number) => Math.min(n, maxPerSide) + (n > maxPerSide ? 1 : 0);
+    goalsBottom = top + Math.max(linesOf(homeGoals.length), linesOf(awayGoals.length)) * lh;
+  }
+
+  // Man of the Match (placed below the goals, clamped to leave room for footer)
   if (data.motm) {
+    const labelY = Math.min(Math.max(592, goalsBottom + 28), 656);
     ctx.fillStyle = "#fbbf24";
     ctx.font = "700 22px system-ui";
     ctx.textAlign = "center";
     ctx.textBaseline = "alphabetic";
-    ctx.fillText("⭐ MAN OF THE MATCH", size / 2, 592);
+    ctx.fillText("⭐ MAN OF THE MATCH", size / 2, labelY);
 
     const name = data.motm.name;
-    ctx.font = "bold 34px system-ui";
+    ctx.font = "bold 32px system-ui";
     const nameW = ctx.measureText(name).width;
-    const avatarD = 72;
-    const gap = 18;
+    const avatarD = 68;
+    const gap = 16;
     const startX = (size - (avatarD + gap + nameW)) / 2;
-    const cy = 642;
-    drawFace(motmImg, startX + avatarD / 2, cy, 36, name, "#fbbf24");
+    const cy = labelY + 46;
+    drawFace(motmImg, startX + avatarD / 2, cy, 34, name, "#fbbf24");
     ctx.fillStyle = "#fff";
-    ctx.font = "bold 34px system-ui";
+    ctx.font = "bold 32px system-ui";
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     ctx.fillText(name, startX + avatarD + gap, cy);

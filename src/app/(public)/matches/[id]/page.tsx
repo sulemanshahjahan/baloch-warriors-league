@@ -199,6 +199,23 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
     (a, b) => (a.minute ?? 999) - (b.minute ?? 999)
   );
 
+  // Goal scorers (for the shareable scorecard) — attribute each goal to a side.
+  const goalTypes = new Set(["GOAL", "PENALTY_GOAL"]);
+  const homeMemberIds = new Set((match.homeTeam?.players ?? []).map((p) => p.player.id));
+  const awayMemberIds = new Set((match.awayTeam?.players ?? []).map((p) => p.player.id));
+  const goalSide = (e: (typeof match.events)[number]): "home" | "away" | null => {
+    if (e.teamId && e.teamId === homeId) return "home";
+    if (e.teamId && e.teamId === awayId) return "away";
+    if (e.playerId && (e.playerId === match.homePlayer?.id || homeMemberIds.has(e.playerId))) return "home";
+    if (e.playerId && (e.playerId === match.awayPlayer?.id || awayMemberIds.has(e.playerId))) return "away";
+    return null;
+  };
+  const goalScorers = match.events
+    .filter((e) => goalTypes.has(e.type) && e.player)
+    .map((e) => ({ name: e.player!.name, minute: e.minute, side: goalSide(e) }))
+    .filter((g): g is { name: string; minute: number | null; side: "home" | "away" } => g.side !== null)
+    .sort((a, b) => (a.minute ?? 999) - (b.minute ?? 999));
+
   return (
     <div className="min-h-screen">
       {/* Back */}
@@ -518,6 +535,7 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
                     ? { name: match.motmPlayer.name, photoUrl: `/api/image?type=player&id=${match.motmPlayer.id}` }
                     : null
                 }
+                goals={goalScorers}
                 leg2HomeScore={match.leg2HomeScore}
                 leg2AwayScore={match.leg2AwayScore}
                 leg3HomeScore={match.leg3HomeScore}
