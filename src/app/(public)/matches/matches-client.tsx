@@ -89,35 +89,33 @@ function MatchCard({ match }: { match: Match }) {
             </div>
           )}
 
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-col items-center gap-1.5 flex-1 min-w-0">
               {match.homePlayer ? (
-                <SmartAvatar type="player" id={match.homePlayer.id} name={homeName} className="h-10 w-10 shrink-0" fallbackClassName="text-sm" />
+                <SmartAvatar type="player" id={match.homePlayer.id} name={homeName} className="h-12 w-12 shrink-0" fallbackClassName="text-sm" />
               ) : match.homeTeam ? (
-                <DuoTeamAvatar id={match.homeTeam.id} name={homeName} isDuo={match.homeTeam.isDuo} members={match.homeTeam.players?.map((p) => p.player)} className="h-10 w-10 shrink-0" memberClassName="h-8 w-8" fallbackClassName="text-[10px]" />
+                <DuoTeamAvatar id={match.homeTeam.id} name={homeName} isDuo={match.homeTeam.isDuo} members={match.homeTeam.players?.map((p) => p.player)} className="h-12 w-12 shrink-0" memberClassName="h-9 w-9" fallbackClassName="text-xs" />
               ) : null}
-              <div className="min-w-0">
-                <p className="font-medium truncate">{homeName}</p>
-              </div>
+              <p className="font-medium text-xs text-center leading-tight line-clamp-2 w-full">{homeName}</p>
             </div>
 
-            <div className="text-center min-w-[80px] shrink-0">
+            <div className="text-center shrink-0 px-1">
               {isCompleted || isLive ? (
                 <div>
                   {has2Legs ? (
                     <>
-                      <span className="text-2xl font-black">
+                      <span className="text-2xl font-black whitespace-nowrap">
                         {(match.homeScore ?? 0) + (match.leg2HomeScore ?? 0)} - {(match.awayScore ?? 0) + (match.leg2AwayScore ?? 0)}
                       </span>
                       <p className="text-[10px] text-muted-foreground">Agg</p>
                     </>
                   ) : (
                     <>
-                      <span className="text-2xl font-black">
+                      <span className="text-2xl font-black whitespace-nowrap">
                         {match.homeScore ?? 0} - {match.awayScore ?? 0}
                       </span>
                       {hasPens && (
-                        <p className="text-xs text-muted-foreground">({match.homeScorePens}–{match.awayScorePens} pens)</p>
+                        <p className="text-xs text-muted-foreground whitespace-nowrap">({match.homeScorePens}–{match.awayScorePens} pens)</p>
                       )}
                     </>
                   )}
@@ -127,15 +125,13 @@ function MatchCard({ match }: { match: Match }) {
               )}
             </div>
 
-            <div className="flex items-center gap-3 flex-1 justify-end">
-              <div className="min-w-0 text-right">
-                <p className="font-medium truncate">{awayName}</p>
-              </div>
+            <div className="flex flex-col items-center gap-1.5 flex-1 min-w-0">
               {match.awayPlayer ? (
-                <SmartAvatar type="player" id={match.awayPlayer.id} name={awayName} className="h-10 w-10 shrink-0" fallbackClassName="text-sm" />
+                <SmartAvatar type="player" id={match.awayPlayer.id} name={awayName} className="h-12 w-12 shrink-0" fallbackClassName="text-sm" />
               ) : match.awayTeam ? (
-                <DuoTeamAvatar id={match.awayTeam.id} name={awayName} isDuo={match.awayTeam.isDuo} members={match.awayTeam.players?.map((p) => p.player)} className="h-10 w-10 shrink-0" memberClassName="h-8 w-8" fallbackClassName="text-[10px]" />
+                <DuoTeamAvatar id={match.awayTeam.id} name={awayName} isDuo={match.awayTeam.isDuo} members={match.awayTeam.players?.map((p) => p.player)} className="h-12 w-12 shrink-0" memberClassName="h-9 w-9" fallbackClassName="text-xs" />
               ) : null}
+              <p className="font-medium text-xs text-center leading-tight line-clamp-2 w-full">{awayName}</p>
             </div>
           </div>
 

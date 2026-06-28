@@ -174,7 +174,7 @@ async function getTournamentBySlug(slug: string) {
           points: true,
           teamId: true,
           playerId: true,
-          team: { select: { id: true, slug: true, name: true } },
+          team: { select: { id: true, slug: true, name: true, isDuo: true, players: { where: { isActive: true }, select: { player: { select: { id: true, name: true, photoUrl: true } } } } } },
           player: { select: { id: true, slug: true, name: true } },
         },
       },
