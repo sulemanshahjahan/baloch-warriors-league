@@ -101,11 +101,37 @@ export async function getOverallStats(gameCategory?: string, seasonId?: string) 
       : Promise.resolve([]),
   ]);
 
+  // 2v2 duo matches — each member counts individually for matches/win-rate/clean sheets.
+  // (Goals stay event-based: a duo's scoreline can't be split between members.)
+  const duoMatchesRaw = await prisma.match.findMany({
+    where: {
+      status: "COMPLETED",
+      homeTeam: { isDuo: true },
+      ...(hasTournamentFilter ? { tournament: tournamentFilter } : {}),
+    },
+    select: {
+      homeScore: true, awayScore: true,
+      leg2HomeScore: true, leg2AwayScore: true,
+      leg3HomeScore: true, leg3AwayScore: true,
+      homeTeam: { select: { players: { where: { isActive: true }, select: { playerId: true } } } },
+      awayTeam: { select: { players: { where: { isActive: true }, select: { playerId: true } } } },
+    },
+  });
+  const duoSides = duoMatchesRaw.map((m) => ({
+    homeIds: m.homeTeam?.players.map((p) => p.playerId) ?? [],
+    awayIds: m.awayTeam?.players.map((p) => p.playerId) ?? [],
+    hg: (m.homeScore ?? 0) + (m.leg2HomeScore ?? 0) + (m.leg3HomeScore ?? 0),
+    ag: (m.awayScore ?? 0) + (m.leg2AwayScore ?? 0) + (m.leg3AwayScore ?? 0),
+  }));
+
   // Per-fixture matches played (1 fixture = 1 match, regardless of leg count)
   const matchCounts = new Map<string, number>();
   for (const match of allMatches) {
     if (match.homePlayerId) matchCounts.set(match.homePlayerId, (matchCounts.get(match.homePlayerId) || 0) + 1);
     if (match.awayPlayerId) matchCounts.set(match.awayPlayerId, (matchCounts.get(match.awayPlayerId) || 0) + 1);
+  }
+  for (const d of duoSides) {
+    for (const id of [...d.homeIds, ...d.awayIds]) matchCounts.set(id, (matchCounts.get(id) || 0) + 1);
   }
 
   // Aggregate PUBG kills per player
@@ -177,6 +203,21 @@ export async function getOverallStats(gameCategory?: string, seasonId?: string) 
       if (hg === 0) s.cleanSheets++;
       s.goalsFor += ag;
       s.goalsAgainst += hg;
+    }
+  }
+  // 2v2 duos add to matches/wins/clean sheets (not goals — kept event-based).
+  for (const d of duoSides) {
+    for (const id of d.homeIds) {
+      const s = ensureP(id);
+      s.total++;
+      if (d.hg > d.ag) s.wins++;
+      if (d.ag === 0) s.cleanSheets++;
+    }
+    for (const id of d.awayIds) {
+      const s = ensureP(id);
+      s.total++;
+      if (d.ag > d.hg) s.wins++;
+      if (d.hg === 0) s.cleanSheets++;
     }
   }
 
