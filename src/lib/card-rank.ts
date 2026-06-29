@@ -152,56 +152,38 @@ export async function buildStatsSnapshot(playerId: string): Promise<PlayerStatsS
   let wins = 0, draws = 0, losses = 0;
   let goalsFor = 0, goalsAgainst = 0, cleanSheets = 0;
 
-  // Per-leg accumulators feed into per-leg W/D/L counts and goal totals (matches the ELO model);
-  // clean-sheet count is per-fixture (opponent aggregate across all legs == 0).
-  const tally = (
-    legs: Array<{ playerScore: number; opponentScore: number }>,
-    fixtureOppAgg: number,
-  ) => {
-    for (const l of legs) {
-      goalsFor += l.playerScore;
-      goalsAgainst += l.opponentScore;
-      if (l.playerScore > l.opponentScore) wins++;
-      else if (l.playerScore < l.opponentScore) losses++;
-      else draws++;
-    }
-    if (fixtureOppAgg === 0) cleanSheets++;
+  // Per-FIXTURE counting: a 2-legged knockout tie counts as ONE match, decided
+  // on aggregate. Goals are the aggregate across legs; a clean sheet means the
+  // opponent's aggregate is 0.
+  const tally = (playerAgg: number, oppAgg: number) => {
+    goalsFor += playerAgg;
+    goalsAgainst += oppAgg;
+    if (playerAgg > oppAgg) wins++;
+    else if (playerAgg < oppAgg) losses++;
+    else draws++;
+    if (oppAgg === 0) cleanSheets++;
   };
 
   for (const m of homeMatches) {
-    const legs: Array<{ playerScore: number; opponentScore: number }> = [
-      { playerScore: m.homeScore ?? 0, opponentScore: m.awayScore ?? 0 },
-    ];
-    if (m.leg2HomeScore != null) legs.push({ playerScore: m.leg2HomeScore ?? 0, opponentScore: m.leg2AwayScore ?? 0 });
-    if (m.leg3HomeScore != null) legs.push({ playerScore: m.leg3HomeScore ?? 0, opponentScore: m.leg3AwayScore ?? 0 });
-    const oppAgg = (m.awayScore ?? 0) + (m.leg2AwayScore ?? 0) + (m.leg3AwayScore ?? 0);
-    tally(legs, oppAgg);
+    tally(
+      (m.homeScore ?? 0) + (m.leg2HomeScore ?? 0) + (m.leg3HomeScore ?? 0),
+      (m.awayScore ?? 0) + (m.leg2AwayScore ?? 0) + (m.leg3AwayScore ?? 0),
+    );
   }
 
   for (const m of awayMatches) {
-    const legs: Array<{ playerScore: number; opponentScore: number }> = [
-      { playerScore: m.awayScore ?? 0, opponentScore: m.homeScore ?? 0 },
-    ];
-    if (m.leg2HomeScore != null) legs.push({ playerScore: m.leg2AwayScore ?? 0, opponentScore: m.leg2HomeScore ?? 0 });
-    if (m.leg3HomeScore != null) legs.push({ playerScore: m.leg3AwayScore ?? 0, opponentScore: m.leg3HomeScore ?? 0 });
-    const oppAgg = (m.homeScore ?? 0) + (m.leg2HomeScore ?? 0) + (m.leg3HomeScore ?? 0);
-    tally(legs, oppAgg);
+    tally(
+      (m.awayScore ?? 0) + (m.leg2AwayScore ?? 0) + (m.leg3AwayScore ?? 0),
+      (m.homeScore ?? 0) + (m.leg2HomeScore ?? 0) + (m.leg3HomeScore ?? 0),
+    );
   }
 
-  // 2v2 duo matches — the duo's scoreline from the player's side.
+  // 2v2 duo matches — the duo's aggregate from the player's side.
   for (const m of duoMatches) {
     const isHome = m.homeTeamId != null && teamIdSet.has(m.homeTeamId);
-    const ps = (h: number | null, a: number | null) => (isHome ? h ?? 0 : a ?? 0);
-    const os = (h: number | null, a: number | null) => (isHome ? a ?? 0 : h ?? 0);
-    const legs: Array<{ playerScore: number; opponentScore: number }> = [
-      { playerScore: ps(m.homeScore, m.awayScore), opponentScore: os(m.homeScore, m.awayScore) },
-    ];
-    if (m.leg2HomeScore != null) legs.push({ playerScore: ps(m.leg2HomeScore, m.leg2AwayScore), opponentScore: os(m.leg2HomeScore, m.leg2AwayScore) });
-    if (m.leg3HomeScore != null) legs.push({ playerScore: ps(m.leg3HomeScore, m.leg3AwayScore), opponentScore: os(m.leg3HomeScore, m.leg3AwayScore) });
-    const oppAgg = isHome
-      ? (m.awayScore ?? 0) + (m.leg2AwayScore ?? 0) + (m.leg3AwayScore ?? 0)
-      : (m.homeScore ?? 0) + (m.leg2HomeScore ?? 0) + (m.leg3HomeScore ?? 0);
-    tally(legs, oppAgg);
+    const home = (m.homeScore ?? 0) + (m.leg2HomeScore ?? 0) + (m.leg3HomeScore ?? 0);
+    const away = (m.awayScore ?? 0) + (m.leg2AwayScore ?? 0) + (m.leg3AwayScore ?? 0);
+    tally(isHome ? home : away, isHome ? away : home);
   }
 
   const matches = wins + draws + losses;

@@ -162,41 +162,33 @@ async function getPlayerStats(playerId: string, teamIds: string[] = []) {
     if (!countedIds.has(e.matchId)) { appearances++; countedIds.add(e.matchId); }
   }
 
-  // Wins (each leg counted separately — same as ELO model)
+  // Wins are per-FIXTURE (a 2-legged tie counts once, decided on aggregate).
   let wins = 0;
   // Goals scored from scoreline for 1v1 individual (non-PUBG) matches
   let scorelineGoals = 0;
   let usedScorelineMatches = 0;
   for (const m of individualMatches) {
     const isHome = m.homePlayerId === playerId;
-    const legs: { h: number; a: number }[] = [{ h: m.homeScore ?? 0, a: m.awayScore ?? 0 }];
-    if (m.leg2HomeScore != null) legs.push({ h: m.leg2HomeScore ?? 0, a: m.leg2AwayScore ?? 0 });
-    if (m.leg3HomeScore != null) legs.push({ h: m.leg3HomeScore ?? 0, a: m.leg3AwayScore ?? 0 });
-    for (const leg of legs) {
-      const my = isHome ? leg.h : leg.a;
-      const opp = isHome ? leg.a : leg.h;
-      if (my > opp) wins++;
-    }
+    const homeAgg = (m.homeScore ?? 0) + (m.leg2HomeScore ?? 0) + (m.leg3HomeScore ?? 0);
+    const awayAgg = (m.awayScore ?? 0) + (m.leg2AwayScore ?? 0) + (m.leg3AwayScore ?? 0);
+    const mine = isHome ? homeAgg : awayAgg;
+    const opp = isHome ? awayAgg : homeAgg;
+    if (mine > opp) wins++;
     // Only sum goals from individual non-PUBG tournaments where scoreline is the source of truth
     if (m.tournament.participantType === "INDIVIDUAL" && m.tournament.gameCategory !== "PUBG") {
-      for (const leg of legs) {
-        scorelineGoals += isHome ? leg.h : leg.a;
-      }
+      scorelineGoals += mine;
       usedScorelineMatches++;
     }
   }
 
-  // Team-match wins (the player's duo/team side won the leg)
+  // Team-match wins (the player's duo/team side won the tie on aggregate)
   for (const m of teamMatches) {
     const isHome = m.homeTeamId != null && teamIdSet.has(m.homeTeamId);
-    const legs: { h: number; a: number }[] = [{ h: m.homeScore ?? 0, a: m.awayScore ?? 0 }];
-    if (m.leg2HomeScore != null) legs.push({ h: m.leg2HomeScore ?? 0, a: m.leg2AwayScore ?? 0 });
-    if (m.leg3HomeScore != null) legs.push({ h: m.leg3HomeScore ?? 0, a: m.leg3AwayScore ?? 0 });
-    for (const leg of legs) {
-      const my = isHome ? leg.h : leg.a;
-      const opp = isHome ? leg.a : leg.h;
-      if (my > opp) wins++;
-    }
+    const homeAgg = (m.homeScore ?? 0) + (m.leg2HomeScore ?? 0) + (m.leg3HomeScore ?? 0);
+    const awayAgg = (m.awayScore ?? 0) + (m.leg2AwayScore ?? 0) + (m.leg3AwayScore ?? 0);
+    const mine = isHome ? homeAgg : awayAgg;
+    const opp = isHome ? awayAgg : homeAgg;
+    if (mine > opp) wins++;
   }
 
   // Man of the match is stored on the match (motmPlayerId), not as an event.
