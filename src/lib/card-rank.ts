@@ -91,7 +91,15 @@ export function computeCardRank(stats: PlayerStatsSnapshot): RankBreakdown {
  * Counts each leg of multi-leg matches separately, matching the ELO model.
  */
 export async function buildStatsSnapshot(playerId: string): Promise<PlayerStatsSnapshot> {
-  const [player, homeMatches, awayMatches] = await Promise.all([
+  // The player's team ids (incl. 2v2 duos) so duo matches count toward the card.
+  const teamRows = await prisma.teamPlayer.findMany({
+    where: { playerId, isActive: true },
+    select: { teamId: true },
+  });
+  const teamIds = teamRows.map((t) => t.teamId);
+  const teamIdSet = new Set(teamIds);
+
+  const [player, homeMatches, awayMatches, duoMatches] = await Promise.all([
     prisma.player.findUnique({
       where: { id: playerId },
       select: { eloRating: true },
@@ -122,6 +130,23 @@ export async function buildStatsSnapshot(playerId: string): Promise<PlayerStatsS
         leg3HomeScore: true, leg3AwayScore: true,
       },
     }),
+    // 2v2 duo matches the player took part in (both sides are duos).
+    teamIds.length > 0
+      ? prisma.match.findMany({
+          where: {
+            status: "COMPLETED",
+            homeTeam: { isDuo: true },
+            tournament: { gameCategory: { not: "PUBG" } },
+            OR: [{ homeTeamId: { in: teamIds } }, { awayTeamId: { in: teamIds } }],
+          },
+          select: {
+            homeTeamId: true,
+            homeScore: true, awayScore: true,
+            leg2HomeScore: true, leg2AwayScore: true,
+            leg3HomeScore: true, leg3AwayScore: true,
+          },
+        })
+      : Promise.resolve([] as { homeTeamId: string | null; homeScore: number | null; awayScore: number | null; leg2HomeScore: number | null; leg2AwayScore: number | null; leg3HomeScore: number | null; leg3AwayScore: number | null }[]),
   ]);
 
   let wins = 0, draws = 0, losses = 0;
@@ -160,6 +185,22 @@ export async function buildStatsSnapshot(playerId: string): Promise<PlayerStatsS
     if (m.leg2HomeScore != null) legs.push({ playerScore: m.leg2AwayScore ?? 0, opponentScore: m.leg2HomeScore ?? 0 });
     if (m.leg3HomeScore != null) legs.push({ playerScore: m.leg3AwayScore ?? 0, opponentScore: m.leg3HomeScore ?? 0 });
     const oppAgg = (m.homeScore ?? 0) + (m.leg2HomeScore ?? 0) + (m.leg3HomeScore ?? 0);
+    tally(legs, oppAgg);
+  }
+
+  // 2v2 duo matches — the duo's scoreline from the player's side.
+  for (const m of duoMatches) {
+    const isHome = m.homeTeamId != null && teamIdSet.has(m.homeTeamId);
+    const ps = (h: number | null, a: number | null) => (isHome ? h ?? 0 : a ?? 0);
+    const os = (h: number | null, a: number | null) => (isHome ? a ?? 0 : h ?? 0);
+    const legs: Array<{ playerScore: number; opponentScore: number }> = [
+      { playerScore: ps(m.homeScore, m.awayScore), opponentScore: os(m.homeScore, m.awayScore) },
+    ];
+    if (m.leg2HomeScore != null) legs.push({ playerScore: ps(m.leg2HomeScore, m.leg2AwayScore), opponentScore: os(m.leg2HomeScore, m.leg2AwayScore) });
+    if (m.leg3HomeScore != null) legs.push({ playerScore: ps(m.leg3HomeScore, m.leg3AwayScore), opponentScore: os(m.leg3HomeScore, m.leg3AwayScore) });
+    const oppAgg = isHome
+      ? (m.awayScore ?? 0) + (m.leg2AwayScore ?? 0) + (m.leg3AwayScore ?? 0)
+      : (m.homeScore ?? 0) + (m.leg2HomeScore ?? 0) + (m.leg3HomeScore ?? 0);
     tally(legs, oppAgg);
   }
 
