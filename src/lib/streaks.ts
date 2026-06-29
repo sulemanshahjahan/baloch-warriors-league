@@ -104,6 +104,8 @@ export function matchToLegs(
     completedAt: Date | null;
     homePlayerId: string | null;
     awayPlayerId: string | null;
+    homeTeamId?: string | null;
+    awayTeamId?: string | null;
     homeScore: number | null;
     awayScore: number | null;
     leg2HomeScore: number | null;
@@ -111,11 +113,18 @@ export function matchToLegs(
     leg3HomeScore: number | null;
     leg3AwayScore: number | null;
   },
-  playerId: string
+  playerId: string,
+  // The player's team ids (incl. 2v2 duos) so team matches count too.
+  teamIds?: Set<string>
 ): StreakMatch[] {
   if (!match.completedAt) return [];
-  const isHome = match.homePlayerId === playerId;
-  if (!isHome && match.awayPlayerId !== playerId) return [];
+  const isHome =
+    match.homePlayerId === playerId ||
+    (match.homeTeamId != null && (teamIds?.has(match.homeTeamId) ?? false));
+  const isAway =
+    match.awayPlayerId === playerId ||
+    (match.awayTeamId != null && (teamIds?.has(match.awayTeamId) ?? false));
+  if (!isHome && !isAway) return [];
 
   const legs: Array<{ gf: number | null; ga: number | null }> = [
     { gf: isHome ? match.homeScore : match.awayScore, ga: isHome ? match.awayScore : match.homeScore },

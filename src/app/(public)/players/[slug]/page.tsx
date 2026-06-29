@@ -56,6 +56,8 @@ async function getPlayerBySlug(slug: string) {
     where: { slug },
     include: {
       teams: {
+        // Exclude 2v2 duo teams — they're ephemeral pairings, not club history.
+        where: { team: { isDuo: false } },
         include: { team: { select: { id: true, name: true, slug: true } } },
         orderBy: { joinedAt: "desc" },
       },
@@ -95,7 +97,7 @@ async function getPlayerBySlug(slug: string) {
   });
 }
 
-async function getPlayerStats(playerId: string) {
+async function getPlayerStats(playerId: string, teamIds: string[] = []) {
   const events = await prisma.matchEvent.groupBy({
     by: ["type"],
     where: { playerId },
@@ -106,6 +108,8 @@ async function getPlayerStats(playerId: string) {
   for (const e of events) {
     statsMap[e.type] = e._count.type;
   }
+
+  const teamIdSet = new Set(teamIds);
 
   // 1v1 matches the player participated in (any 1v1 tournament — eFootball etc)
   const individualMatches = await prisma.match.findMany({
@@ -125,18 +129,37 @@ async function getPlayerStats(playerId: string) {
     },
   });
 
-  // Distinct fixture count = one row per match (multi-leg knockouts still count as ONE)
-  let appearances = individualMatches.length;
+  // Team matches the player took part in as a member (2v2 duos, Pro Clubs, …)
+  const teamMatches = teamIds.length > 0
+    ? await prisma.match.findMany({
+        where: {
+          status: "COMPLETED",
+          OR: [{ homeTeamId: { in: teamIds } }, { awayTeamId: { in: teamIds } }],
+        },
+        select: {
+          id: true, homeTeamId: true, awayTeamId: true,
+          homeScore: true, awayScore: true,
+          leg2HomeScore: true, leg2AwayScore: true,
+          leg3HomeScore: true, leg3AwayScore: true,
+        },
+      })
+    : [];
 
-  // Add fixtures from team matches where the player only appears as event author
+  // Distinct fixture count = one row per match (multi-leg knockouts still count as ONE)
+  const countedIds = new Set(individualMatches.map((m) => m.id));
+  let appearances = countedIds.size;
+  for (const m of teamMatches) {
+    if (!countedIds.has(m.id)) { appearances++; countedIds.add(m.id); }
+  }
+
+  // Add any remaining fixtures where the player only appears as an event author
   const eventAppearances = await prisma.matchEvent.findMany({
     where: { playerId, match: { status: "COMPLETED" } },
     select: { matchId: true },
     distinct: ["matchId"],
   });
-  const individualMatchIds = new Set(individualMatches.map((m) => m.id));
   for (const e of eventAppearances) {
-    if (!individualMatchIds.has(e.matchId)) appearances++;
+    if (!countedIds.has(e.matchId)) { appearances++; countedIds.add(e.matchId); }
   }
 
   // Wins (each leg counted separately — same as ELO model)
@@ -163,6 +186,24 @@ async function getPlayerStats(playerId: string) {
     }
   }
 
+  // Team-match wins (the player's duo/team side won the leg)
+  for (const m of teamMatches) {
+    const isHome = m.homeTeamId != null && teamIdSet.has(m.homeTeamId);
+    const legs: { h: number; a: number }[] = [{ h: m.homeScore ?? 0, a: m.awayScore ?? 0 }];
+    if (m.leg2HomeScore != null) legs.push({ h: m.leg2HomeScore ?? 0, a: m.leg2AwayScore ?? 0 });
+    if (m.leg3HomeScore != null) legs.push({ h: m.leg3HomeScore ?? 0, a: m.leg3AwayScore ?? 0 });
+    for (const leg of legs) {
+      const my = isHome ? leg.h : leg.a;
+      const opp = isHome ? leg.a : leg.h;
+      if (my > opp) wins++;
+    }
+  }
+
+  // Man of the match is stored on the match (motmPlayerId), not as an event.
+  const motmCount = await prisma.match.count({
+    where: { motmPlayerId: playerId, status: "COMPLETED" },
+  });
+
   // Average player rating from CUSTOM events with description "PLAYER_RATING"
   const ratingEvents = await prisma.matchEvent.findMany({
     where: { playerId, type: "CUSTOM", description: "PLAYER_RATING", value: { not: null } },
@@ -182,7 +223,7 @@ async function getPlayerStats(playerId: string) {
     assists: statsMap["ASSIST"] ?? 0,
     yellowCards: statsMap["YELLOW_CARD"] ?? 0,
     redCards: statsMap["RED_CARD"] ?? 0,
-    motm: statsMap["MOTM"] ?? 0,
+    motm: Math.max(statsMap["MOTM"] ?? 0, motmCount),
     kills: statsMap["KILL"] ?? 0,
     appearances,
     avgRating,
@@ -190,13 +231,16 @@ async function getPlayerStats(playerId: string) {
   };
 }
 
-async function getPlayerRecentMatches(playerId: string) {
+async function getPlayerRecentMatches(playerId: string, teamIds: string[] = []) {
   return prisma.match.findMany({
     where: {
       status: "COMPLETED",
       OR: [
         { homePlayerId: playerId },
         { awayPlayerId: playerId },
+        ...(teamIds.length > 0
+          ? [{ homeTeamId: { in: teamIds } }, { awayTeamId: { in: teamIds } }]
+          : []),
       ],
     },
     orderBy: { completedAt: "desc" },
@@ -211,13 +255,16 @@ async function getPlayerRecentMatches(playerId: string) {
   });
 }
 
-async function getPlayerUpcomingMatches(playerId: string) {
+async function getPlayerUpcomingMatches(playerId: string, teamIds: string[] = []) {
   return prisma.match.findMany({
     where: {
       status: { in: ["SCHEDULED", "POSTPONED"] },
       OR: [
         { homePlayerId: playerId },
         { awayPlayerId: playerId },
+        ...(teamIds.length > 0
+          ? [{ homeTeamId: { in: teamIds } }, { awayTeamId: { in: teamIds } }]
+          : []),
       ],
     },
     orderBy: { scheduledAt: "asc" },
@@ -248,10 +295,18 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
 
   if (!player) notFound();
 
+  // The player's team ids (incl. 2v2 duos) so team-based matches count everywhere.
+  const teamRows = await prisma.teamPlayer.findMany({
+    where: { playerId: player.id, isActive: true },
+    select: { teamId: true },
+  });
+  const teamIds = teamRows.map((t) => t.teamId);
+  const teamIdSet = new Set(teamIds);
+
   const [stats, recentMatches, upcomingMatches, engagement, allTitles] = await Promise.all([
-    getPlayerStats(player.id),
-    getPlayerRecentMatches(player.id),
-    getPlayerUpcomingMatches(player.id),
+    getPlayerStats(player.id, teamIds),
+    getPlayerRecentMatches(player.id, teamIds),
+    getPlayerUpcomingMatches(player.id, teamIds),
     getPlayerEngagement(player.id),
     getAllPlayerTitles(),
   ]);
@@ -425,7 +480,7 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                 <CardContent>
                   <div className="space-y-3">
                     {upcomingMatches.map((match) => {
-                      const isHome = match.homePlayer?.id === player.id;
+                      const isHome = match.homePlayer?.id === player.id || (!!match.homeTeam?.id && teamIdSet.has(match.homeTeam.id));
                       const opponent = isHome
                         ? (match.awayPlayer ?? match.awayTeam)
                         : (match.homePlayer ?? match.homeTeam);
@@ -493,7 +548,7 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                 <CardContent>
                   <div className="space-y-3">
                     {recentMatches.map((match) => {
-                      const isHome = match.homePlayer?.name === player.name || match.homeTeam?.name === player.name;
+                      const isHome = match.homePlayer?.id === player.id || (!!match.homeTeam?.id && teamIdSet.has(match.homeTeam.id));
                       const opponent = isHome
                         ? (match.awayPlayer ?? match.awayTeam)
                         : (match.homePlayer ?? match.homeTeam);

@@ -17,11 +17,25 @@ export interface PlayerEngagement {
  * Titles are computed separately (need all-players context) — see getAllPlayerTitles.
  */
 export async function getPlayerEngagement(playerId: string): Promise<PlayerEngagement> {
+  // The player's team ids (incl. 2v2 duos) so team-based matches are counted.
+  const teamRows = await prisma.teamPlayer.findMany({
+    where: { playerId, isActive: true },
+    select: { teamId: true },
+  });
+  const teamIds = new Set(teamRows.map((t) => t.teamId));
+  const teamIdList = [...teamIds];
+
   const [matches, eloHistory, tournamentWins, perfectGroupRuns] = await Promise.all([
     prisma.match.findMany({
       where: {
         status: "COMPLETED",
-        OR: [{ homePlayerId: playerId }, { awayPlayerId: playerId }],
+        OR: [
+          { homePlayerId: playerId },
+          { awayPlayerId: playerId },
+          ...(teamIdList.length > 0
+            ? [{ homeTeamId: { in: teamIdList } }, { awayTeamId: { in: teamIdList } }]
+            : []),
+        ],
       },
       orderBy: { completedAt: "asc" },
       select: {
@@ -29,6 +43,8 @@ export async function getPlayerEngagement(playerId: string): Promise<PlayerEngag
         completedAt: true,
         homePlayerId: true,
         awayPlayerId: true,
+        homeTeamId: true,
+        awayTeamId: true,
         homeScore: true,
         awayScore: true,
         leg2HomeScore: true,
@@ -51,7 +67,7 @@ export async function getPlayerEngagement(playerId: string): Promise<PlayerEngag
   ]);
 
   // Build per-leg records for streaks + counting
-  const allLegs = matches.flatMap((m) => matchToLegs(m, playerId));
+  const allLegs = matches.flatMap((m) => matchToLegs(m, playerId, teamIds));
   const totalMatches = allLegs.length;
   let totalWins = 0;
   let cleanSheets = 0;
