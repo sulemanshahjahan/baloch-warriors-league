@@ -14,27 +14,31 @@ function b64url(input: Buffer | string): string {
   return Buffer.from(input).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-export function signState(): string {
-  const payload = b64url(JSON.stringify({ n: randomUUID(), t: Date.now() }));
+// `lt` (link token) is an optional device-generated id used by the mobile-app
+// bridge so the external browser can hand the session back to the app's webview.
+export function signState(extra?: { lt?: string }): string {
+  const payload = b64url(JSON.stringify({ n: randomUUID(), t: Date.now(), ...(extra?.lt ? { lt: extra.lt } : {}) }));
   const sig = b64url(createHmac("sha256", secret()).update(payload).digest());
   return `${payload}.${sig}`;
 }
 
-export function verifyState(state: string | null, maxAgeMs = 10 * 60 * 1000): boolean {
-  if (!state) return false;
+// Returns the decoded claims if the state is authentic + fresh, else null.
+export function verifyState(state: string | null, maxAgeMs = 10 * 60 * 1000): { t: number; lt?: string } | null {
+  if (!state) return null;
   const [payload, sig] = state.split(".");
-  if (!payload || !sig) return false;
+  if (!payload || !sig) return null;
   const expected = b64url(createHmac("sha256", secret()).update(payload).digest());
-  if (sig.length !== expected.length) return false;
+  if (sig.length !== expected.length) return null;
   try {
-    if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return false;
+    if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
   } catch {
-    return false;
+    return null;
   }
   try {
-    const claims = JSON.parse(Buffer.from(payload.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString()) as { t?: number };
-    return typeof claims.t === "number" && Date.now() - claims.t < maxAgeMs;
+    const claims = JSON.parse(Buffer.from(payload.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString()) as { t?: number; lt?: string };
+    if (typeof claims.t !== "number" || Date.now() - claims.t >= maxAgeMs) return null;
+    return { t: claims.t, lt: typeof claims.lt === "string" ? claims.lt : undefined };
   } catch {
-    return false;
+    return null;
   }
 }

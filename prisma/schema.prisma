@@ -545,6 +545,20 @@ model PlayerOtp {
   @@map("player_otps")
 }
 
+// One-time code for the mobile-app OAuth bridge: the external browser writes it
+// after a successful Google login; the app's webview polls + redeems it so the
+// session cookie lands in the webview's cookie jar.
+model PlayerAuthCode {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  playerId  String
+  used      Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("player_auth_codes")
+}
+
 // ─────────────────────────────────────────────────────────────
 // ADMIN REWARD AUDIT LOG (manual XP/coin/respect adjustments)
 // ─────────────────────────────────────────────────────────────

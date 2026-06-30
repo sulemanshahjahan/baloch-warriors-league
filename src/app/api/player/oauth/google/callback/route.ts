@@ -23,9 +23,11 @@ export async function GET(req: NextRequest) {
   const state = url.searchParams.get("state");
   if (!code) return fail("google", "no code");
   // Stateless CSRF: verify the signed state (no cookie — works in mobile apps).
-  if (!verifyState(state)) {
+  const claims = verifyState(state);
+  if (!claims) {
     return fail("google_state", `state=${state ? "present-but-invalid" : "missing"}`);
   }
+  const linkToken = claims.lt; // present => mobile-app bridge flow
 
   const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
@@ -67,6 +69,22 @@ export async function GET(req: NextRequest) {
     select: { id: true, slug: true },
   });
   if (!player) return fail("no_account", `no active player with email=${email}`);
+
+  // Mobile-app bridge: this callback runs in the EXTERNAL browser, whose cookie
+  // jar the app's webview can't read. So instead of a cookie, record a one-time
+  // code the app's webview polls + redeems (where the session cookie belongs).
+  if (linkToken) {
+    await prisma.playerAuthCode.create({
+      data: { code: linkToken, playerId: player.id, expiresAt: new Date(Date.now() + 5 * 60 * 1000) },
+    });
+    return new NextResponse(
+      `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>Signed in</title>
+      <style>body{font-family:system-ui,sans-serif;background:#09090b;color:#fafafa;display:grid;place-items:center;height:100vh;margin:0;text-align:center;padding:24px}
+      .c{max-width:340px}.t{font-size:22px;font-weight:800;margin:0 0 8px}.s{color:#a1a1aa;font-size:15px;line-height:1.5}</style></head>
+      <body><div class="c"><p class="t">✓ Signed in</p><p class="s">You're signed in. <b>Return to the BWL app</b> — it'll finish logging you in automatically. You can close this tab.</p></div></body></html>`,
+      { headers: { "content-type": "text/html; charset=utf-8" } },
+    );
+  }
 
   const token = await signPlayerToken(player.id);
   const res = NextResponse.redirect(`${origin}/players/${player.slug}`);
