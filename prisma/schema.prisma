@@ -529,6 +529,21 @@ model RaffleEntry {
 }
 
 // ─────────────────────────────────────────────────────────────
+// PLAYER OTP LOGIN (one-time codes sent to the profile phone)
+// ─────────────────────────────────────────────────────────────
+
+model PlayerOtp {
+  id        String   @id @default(cuid())
+  phone     String   @unique // normalized digits
+  codeHash  String
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@map("player_otps")
+}
+
+// ─────────────────────────────────────────────────────────────
 // ADMIN REWARD AUDIT LOG (manual XP/coin/respect adjustments)
 // ─────────────────────────────────────────────────────────────
 

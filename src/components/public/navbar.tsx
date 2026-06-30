@@ -8,6 +8,7 @@ import { DownloadAppButton } from "./download-app-button";
 import { SearchDialog } from "./search-dialog";
 import { ThemeToggle } from "./theme-toggle";
 import { PushNotificationButton } from "./push-notification-button";
+import { PlayerAuthButton } from "./player-auth-button";
 import { cn } from "@/lib/utils";
 
 const navLinks = [
@@ -51,6 +52,7 @@ export function PublicNavbar() {
             <SearchDialog />
             <PushNotificationButton />
             <ThemeToggle />
+            <PlayerAuthButton />
           </div>
 
           {/* Desktop nav */}
@@ -68,6 +70,7 @@ export function PublicNavbar() {
             <SearchDialog />
             <PushNotificationButton />
             <ThemeToggle />
+            <PlayerAuthButton />
             <DownloadAppButton variant="navbar-desktop" />
           </div>
 
