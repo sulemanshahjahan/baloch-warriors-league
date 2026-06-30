@@ -97,6 +97,17 @@ export async function createTournament(
   const existing = await prisma.tournament.findUnique({ where: { slug } });
   const finalSlug = existing ? `${slug}-${Date.now().toString(36)}` : slug;
 
+  // Default to the active season when none is chosen, so tournaments stay grouped.
+  let seasonId = data.seasonId || null;
+  if (!seasonId) {
+    const active = await prisma.season.findFirst({
+      where: { isActive: true },
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    });
+    seasonId = active?.id ?? null;
+  }
+
   const tournament = await prisma.tournament.create({
     data: {
       name: data.name,
@@ -116,7 +127,7 @@ export async function createTournament(
       isFeatured: data.isFeatured ?? false,
       eFootballMode: data.eFootballMode || null,
       eFootballType: data.eFootballType || null,
-      ...(data.seasonId ? { season: { connect: { id: data.seasonId } } } : {}),
+      ...(seasonId ? { season: { connect: { id: seasonId } } } : {}),
     },
   });
 

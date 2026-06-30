@@ -15,7 +15,6 @@ import {
   Trophy,
   ArrowLeft,
   Calendar,
-  MapPin,
   Activity,
   Award,
   Swords,
@@ -25,17 +24,16 @@ import {
 } from "lucide-react";
 import { PlayerCard } from "@/components/public/player-card";
 import { LegacyProgressCard } from "@/components/profile/legacy-progress-card";
-import { SeasonProgressCard, ActiveContractsCard, RespectCard } from "@/components/profile/profile-legacy-cards";
-import { MomentsGrid } from "@/components/profile/moments-grid";
+import { SeasonProgressCard } from "@/components/profile/profile-legacy-cards";
 import { resolveCosmetics } from "@/lib/cosmetics";
 import { ProfileBanner } from "@/components/public/profile/profile-banner";
 import { AvatarFrame } from "@/components/public/profile/avatar-frame";
 import { Nameplate } from "@/components/public/profile/nameplate";
 import { TitleStrip } from "@/components/public/profile/title-strip";
+import { CountryFlag } from "@/components/public/country-flag";
 import { StatSummary } from "@/components/public/profile/stat-summary";
 import { EquippedLoadout } from "@/components/public/profile/equipped-loadout";
 import { getActiveSeason, seasonProgress } from "@/lib/rewards/season";
-import { ensurePlayerContracts, dailyPeriodKey, weeklyPeriodKey } from "@/lib/rewards/contracts";
 import { PlayerEngagement } from "@/components/public/player-engagement";
 import { getPlayerEngagement, getAllPlayerTitles } from "@/lib/actions/engagement";
 import {
@@ -314,19 +312,11 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
     select: { id: true, xp: true, coins: true, reason: true, createdAt: true },
   });
 
-  // Season + Contracts + Respect (ensure this period's contracts exist first)
-  await ensurePlayerContracts(player.id);
+  // Season progress (active season)
   const activeSeason = await getActiveSeason();
-  const [seasonProg, periodContracts, respectRow] = await Promise.all([
-    activeSeason
-      ? prisma.playerSeasonProgress.findUnique({ where: { playerId_seasonId: { playerId: player.id, seasonId: activeSeason.id } } })
-      : Promise.resolve(null),
-    prisma.playerContract.findMany({
-      where: { playerId: player.id, period: { in: [dailyPeriodKey(), weeklyPeriodKey()] } },
-      orderBy: [{ status: "asc" }, { type: "asc" }],
-    }),
-    prisma.playerRespect.findUnique({ where: { playerId: player.id } }),
-  ]);
+  const seasonProg = activeSeason
+    ? await prisma.playerSeasonProgress.findUnique({ where: { playerId_seasonId: { playerId: player.id, seasonId: activeSeason.id } } })
+    : null;
   const seasonInfo = activeSeason
     ? {
         name: activeSeason.name,
@@ -334,18 +324,9 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
         daysLeft: activeSeason.endDate ? Math.max(0, Math.ceil((activeSeason.endDate.getTime() - Date.now()) / 86400000)) : null,
       }
     : null;
-  const respect = respectRow ?? { score: 80, label: "Good Standing" };
 
-  // Moments + equipped cosmetics
-  const [moments, equipped] = await Promise.all([
-    prisma.playerMoment.findMany({
-      where: { playerId: player.id },
-      orderBy: [{ isPinned: "desc" }, { createdAt: "desc" }],
-      take: 12,
-      select: { id: true, title: true, description: true, icon: true, rarity: true },
-    }),
-    prisma.playerEquippedCosmetics.findUnique({ where: { playerId: player.id } }),
-  ]);
+  // Equipped cosmetics
+  const equipped = await prisma.playerEquippedCosmetics.findUnique({ where: { playerId: player.id } });
   const cos = resolveCosmetics(equipped);
 
   const [stats, recentMatches, upcomingMatches, engagement, allTitles] = await Promise.all([
@@ -403,23 +384,17 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
             <div className="mt-2">
               <TitleStrip cardRank={player.cardRank} />
             </div>
-            <div className="flex items-center gap-1.5 mt-2 text-xs sm:text-sm flex-wrap">
-              {player.position && (
-                <>
-                  <span className="font-semibold">{player.position}</span>
-                  <span className="text-muted-foreground">·</span>
-                </>
-              )}
+            <div className="flex items-center gap-1.5 mt-2 text-xs sm:text-sm">
               <span className="text-muted-foreground">{player.legacyTier}</span>
               <span className="text-muted-foreground">·</span>
               <span className="text-muted-foreground">Level {player.legacyLevel}</span>
+              {player.nationality && (
+                <>
+                  <span className="text-muted-foreground">·</span>
+                  <CountryFlag value={player.nationality} className="text-base" />
+                </>
+              )}
             </div>
-            {player.nationality && (
-              <div className="flex items-center gap-1 mt-1.5 text-xs sm:text-sm text-muted-foreground">
-                <MapPin className="w-3.5 h-3.5" />
-                {player.nationality}
-              </div>
-            )}
             {currentTeam && (
               <div className="mt-1.5">
                 <Link
@@ -445,7 +420,6 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
           elo={player.eloRating}
           level={player.legacyLevel}
           tier={player.legacyTier}
-          respect={respect.score}
         />
 
         <EquippedLoadout items={cos.equipped} />
@@ -490,17 +464,11 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
               />
             )}
 
-            <ActiveContractsCard contracts={periodContracts} />
-
-            <RespectCard score={respect.score} label={respect.label} />
-
             <PlayerEngagement
               badges={engagement.badges}
               titles={playerTitles}
               streaks={engagement.streaks}
             />
-
-            <MomentsGrid moments={moments} />
 
             {/* Stats */}
             <Card>

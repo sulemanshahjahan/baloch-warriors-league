@@ -7,6 +7,7 @@ import { ArrowLeft, BarChart3, Swords } from "lucide-react";
 import { SmartAvatar } from "@/components/public/smart-avatar";
 import { formatDate } from "@/lib/utils";
 import { PlayerPicker } from "./player-picker";
+import { CountryFlag } from "@/components/public/country-flag";
 
 export const revalidate = 120;
 
@@ -173,7 +174,7 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
                   <p className="font-bold text-lg text-center">{p.name}</p>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     {p.position && <span>{p.position}</span>}
-                    {p.nationality && <span>· {p.nationality}</span>}
+                    {p.nationality && <span className="flex items-center gap-1">· <CountryFlag value={p.nationality} showName /></span>}
                   </div>
                 </Link>
                 <PlayerPicker players={allPlayers} slot={slot} current={p.slug} />

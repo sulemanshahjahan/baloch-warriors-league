@@ -156,8 +156,8 @@ export async function processMatchLegacyRewards(matchId: string): Promise<void> 
 }
 
 /**
- * Full reward pass for a completed match: Legacy XP + Season XP + Contracts +
- * Respect. All pieces are idempotent, so this is safe to re-run.
+ * Full reward pass for a completed match: Legacy XP + Season XP + Contracts.
+ * All pieces are idempotent, so this is safe to re-run.
  */
 export async function processMatchRewards(matchId: string): Promise<void> {
   // Capture tiers before awarding so we can detect tier-ups for notifications.
@@ -203,7 +203,6 @@ export async function processMatchRewards(matchId: string): Promise<void> {
 
   const { getActiveSeason, awardSeasonXp } = await import("./season");
   const { bumpContracts } = await import("./contracts");
-  const { awardRespect } = await import("./respect");
   const season = await getActiveSeason();
 
   for (const side of [{ players: homePlayers, home: true }, { players: awayPlayers, home: false }]) {
@@ -221,14 +220,8 @@ export async function processMatchRewards(matchId: string): Promise<void> {
       await bumpContracts(playerId, "PLAY_MATCHES", 1);
       if (won) await bumpContracts(playerId, "WIN_MATCHES", 1);
       if (cleanSheet) await bumpContracts(playerId, "CLEAN_SHEETS", 1);
-      // Respect — completed a match
-      await awardRespect({ playerId, amount: 1, source: "MATCH_COMPLETED", sourceId: matchId, reason: "Completed a match" });
     }
   }
-
-  // Career moments
-  const { createMomentsForMatch } = await import("./moments");
-  await createMomentsForMatch(matchId);
 
   // Settle any predictions on this match
   const { settlePredictionsForMatch } = await import("./predictions");

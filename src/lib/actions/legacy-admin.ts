@@ -6,7 +6,6 @@ import { auth, getUserRole } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import type { ActionResult } from "@/lib/utils";
 import { awardReward } from "@/lib/rewards/reward-engine";
-import { awardRespect } from "@/lib/rewards/respect";
 import { getStoreItem } from "@/lib/cosmetics";
 
 const LEVELS: Record<string, number> = { SUPER_ADMIN: 3, ADMIN: 2, EDITOR: 1 };
@@ -28,10 +27,10 @@ async function audit(adminId: string, targetPlayerId: string, action: string, re
   });
 }
 
-/** Manually adjust a player's XP / coins / respect (always applies; audited). */
+/** Manually adjust a player's XP / coins (always applies; audited). */
 export async function adjustPlayerLegacy(
   playerId: string,
-  opts: { xp?: number; coins?: number; respect?: number; reason: string },
+  opts: { xp?: number; coins?: number; reason: string },
 ): Promise<ActionResult> {
   const a = await admin();
   if ("error" in a) return { success: false, error: a.error };
@@ -43,9 +42,6 @@ export async function adjustPlayerLegacy(
   const key = randomUUID(); // unique → always applies (not idempotent on purpose)
   if (opts.xp || opts.coins) {
     await awardReward({ playerId, xp: opts.xp ?? 0, coins: opts.coins ?? 0, source: "ADMIN_ADJUST", sourceId: key, reason: `Admin: ${opts.reason}` });
-  }
-  if (opts.respect) {
-    await awardRespect({ playerId, amount: opts.respect, source: "ADMIN_ADJUST", sourceId: key, reason: `Admin: ${opts.reason}` });
   }
 
   const after = await prisma.player.findUnique({ where: { id: playerId }, select: { legacyXp: true, coins: true } });

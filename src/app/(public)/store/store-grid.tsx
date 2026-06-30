@@ -12,7 +12,6 @@ import { buyStoreItem, equipMyCosmetic } from "@/lib/actions/player-economy";
 export interface StoreViewer {
   coins: number;
   level: number;
-  respect: number;
   owned: string[];
   equipped: { profileFrame: string | null; nameColor: string | null; profileBanner: string | null };
 }
@@ -62,7 +61,7 @@ export function StoreGrid({ me }: { me: StoreViewer | null }) {
                 {items.map((item) => {
                   const owned = me?.owned.includes(item.key) ?? false;
                   const isEquipped = me ? equippedKey(me, item) === item.key : false;
-                  const meetsReq = me ? (!item.minLevel || me.level >= item.minLevel) && (!item.minRespect || me.respect >= item.minRespect) : true;
+                  const meetsReq = me ? (!item.minLevel || me.level >= item.minLevel) : true;
                   const affordable = me ? me.coins >= item.cost : false;
                   return (
                     <div key={item.key} className={`rounded-xl border p-3 ${RARITY_BORDER[item.rarity]}`}>
@@ -84,8 +83,8 @@ export function StoreGrid({ me }: { me: StoreViewer | null }) {
                         <span className="text-xs font-bold text-amber-300 flex items-center gap-1"><Coins className="w-3 h-3" />{item.cost.toLocaleString()}</span>
                         <span className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">{item.rarity}</span>
                       </div>
-                      {(item.minLevel || item.minRespect) && (
-                        <p className="text-[11px] text-muted-foreground mb-1">{item.minLevel ? `Lvl ${item.minLevel}+` : ""}{item.minLevel && item.minRespect ? " · " : ""}{item.minRespect ? `Respect ${item.minRespect}+` : ""}</p>
+                      {item.minLevel && (
+                        <p className="text-[11px] text-muted-foreground mb-1">Lvl {item.minLevel}+</p>
                       )}
                       {me && (
                         isEquipped ? (

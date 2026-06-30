@@ -27,7 +27,6 @@ export interface StoreItem {
   /** Metallic tier (frames) — drives progressive richness. */
   tier?: FrameTier;
   minLevel?: number;
-  minRespect?: number;
   /** Semantic `bwl-*` variant class applied where the cosmetic shows. */
   css: string;
   /** CSS class for the loadout thumbnail (when no image asset). */
@@ -41,7 +40,7 @@ export const STORE_ITEMS: StoreItem[] = [
   { key: "frame_bronze", name: "Bronze Frame", displayName: "Bronze Warrior Frame", shortName: "Bronze Warrior", description: "Avatar Frame", type: "PROFILE_FRAME", slot: "FRAME", cost: 300, rarity: "COMMON", tier: "bronze", css: "bwl-frame--bronze", thumbnailAsset: "/profile-assets/loadout-bronze-warrior.webp" },
   { key: "frame_silver", name: "Silver Frame", displayName: "Silver Vanguard Frame", shortName: "Silver Vanguard", description: "Avatar Frame", type: "PROFILE_FRAME", slot: "FRAME", cost: 800, rarity: "RARE", minLevel: 5, tier: "silver", css: "bwl-frame--silver", thumbnailAsset: "/silver-card-bg.jpg" },
   { key: "frame_gold", name: "Gold Frame", displayName: "Gold Champion Frame", shortName: "Gold Champion", description: "Avatar Frame", type: "PROFILE_FRAME", slot: "FRAME", cost: 2000, rarity: "EPIC", minLevel: 10, tier: "gold", css: "bwl-frame--gold", thumbnailAsset: "/gold-card-legendary.jpg" },
-  { key: "frame_trusted", name: "Trusted Frame", displayName: "Trusted Guardian Frame", shortName: "Trusted Guardian", description: "Avatar Frame", type: "PROFILE_FRAME", slot: "FRAME", cost: 1200, rarity: "EPIC", minRespect: 90, tier: "epic", css: "bwl-frame--epic", thumbnailAsset: "/epiccard-bg.jpg" },
+  { key: "frame_trusted", name: "Trusted Frame", displayName: "Trusted Guardian Frame", shortName: "Trusted Guardian", description: "Avatar Frame", type: "PROFILE_FRAME", slot: "FRAME", cost: 1200, rarity: "EPIC", minLevel: 12, tier: "epic", css: "bwl-frame--epic", thumbnailAsset: "/epiccard-bg.jpg" },
   { key: "frame_flame", name: "Elite Flame Frame", displayName: "Elite Flame Frame", shortName: "Elite Flame", description: "Avatar Frame", type: "PROFILE_FRAME", slot: "FRAME", cost: 4000, rarity: "LEGENDARY", minLevel: 20, tier: "legendary", css: "bwl-frame--legendary", thumbnailAsset: "/legendary-card-bg.jpg" },
 
   // ── Nameplates (gradient name treatment) ──

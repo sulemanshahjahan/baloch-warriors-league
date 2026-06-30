@@ -25,15 +25,13 @@ export async function buyStoreItem(itemKey: string): Promise<ActionResult> {
   const item = getStoreItem(itemKey);
   if (!item) return { success: false, error: "Unknown item" };
 
-  const [player, respect, owned] = await Promise.all([
+  const [player, owned] = await Promise.all([
     prisma.player.findUnique({ where: { id: m.id }, select: { coins: true, legacyLevel: true } }),
-    prisma.playerRespect.findUnique({ where: { playerId: m.id }, select: { score: true } }),
     prisma.playerInventoryItem.findUnique({ where: { playerId_itemType_itemKey: { playerId: m.id, itemType: item.type, itemKey } } }),
   ]);
   if (!player) return { success: false, error: "Player not found" };
   if (owned) return { success: false, error: "You already own this item." };
   if (item.minLevel && player.legacyLevel < item.minLevel) return { success: false, error: `Requires Legacy Level ${item.minLevel}.` };
-  if (item.minRespect && (respect?.score ?? 80) < item.minRespect) return { success: false, error: `Requires Respect ${item.minRespect}.` };
 
   // Atomic coin check + deduct
   const dec = await prisma.player.updateMany({ where: { id: m.id, coins: { gte: item.cost } }, data: { coins: { decrement: item.cost } } });
@@ -87,22 +85,6 @@ export async function submitPrediction(matchId: string, pick: "HOME" | "AWAY" | 
   });
   revalidatePath(`/matches/${matchId}`);
   return { success: true, data: undefined, message: "Prediction saved!" };
-}
-
-/** Pin / unpin a career moment (max 3 pinned). */
-export async function pinMyMoment(momentId: string, pinned: boolean): Promise<ActionResult> {
-  const m = await me();
-  if ("error" in m) return { success: false, error: m.error };
-  const moment = await prisma.playerMoment.findUnique({ where: { id: momentId }, select: { playerId: true } });
-  if (!moment || moment.playerId !== m.id) return { success: false, error: "Not your moment." };
-
-  if (pinned) {
-    const count = await prisma.playerMoment.count({ where: { playerId: m.id, isPinned: true } });
-    if (count >= 3) return { success: false, error: "You can pin up to 3 moments." };
-  }
-  await prisma.playerMoment.update({ where: { id: momentId }, data: { isPinned: pinned } });
-  await revalidatePlayer(m.id);
-  return { success: true, data: undefined };
 }
 
 /** Buy raffle tickets with coins. */

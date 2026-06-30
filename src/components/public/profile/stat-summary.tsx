@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BarChart3, Trophy, Star, Shield } from "lucide-react";
+import { BarChart3, Trophy, Star } from "lucide-react";
 
 interface Seg {
   icon: React.ReactNode;
@@ -19,20 +19,15 @@ export function StatSummary({
   elo,
   level,
   tier,
-  respect,
 }: {
   cardRank: number;
   elo: number;
   level: number;
   tier: string;
-  respect: number;
 }) {
-  const hasElo = elo !== 100; // default rating → show Respect instead
   const segs: Seg[] = [
     { icon: <BarChart3 className="w-4 h-4" />, value: cardRank, label: "OVR", sub: "Player Card", tone: "text-primary" },
-    hasElo
-      ? { icon: <Trophy className="w-4 h-4" />, value: elo, label: "ELO", sub: "Ranking", tone: "text-yellow-400", href: "/rankings" }
-      : { icon: <Shield className="w-4 h-4" />, value: respect, label: "RESPECT", sub: "Standing", tone: "text-emerald-400" },
+    { icon: <Trophy className="w-4 h-4" />, value: elo, label: "ELO", sub: "Ranking", tone: "text-yellow-400", href: "/rankings" },
     { icon: <Star className="w-4 h-4" />, value: `Lvl ${level}`, label: tier, sub: "Player Level", tone: "text-amber-300" },
   ];
 

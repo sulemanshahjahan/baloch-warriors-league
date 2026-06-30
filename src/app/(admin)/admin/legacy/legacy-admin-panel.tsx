@@ -24,7 +24,6 @@ export function LegacyAdminPanel({ seasons, players, recentAudit, raffles }: { s
   const [playerId, setPlayerId] = useState("");
   const [xp, setXp] = useState("");
   const [coins, setCoins] = useState("");
-  const [respect, setRespect] = useState("");
   const [reason, setReason] = useState("");
 
   // cosmetic
@@ -78,7 +77,7 @@ export function LegacyAdminPanel({ seasons, players, recentAudit, raffles }: { s
 
       {/* Manual adjust */}
       <Card>
-        <CardHeader><CardTitle className="text-base">Manual XP / Coins / Respect</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">Manual XP / Coins</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           <div className="space-y-1.5">
             <Label>Player</Label>
@@ -89,14 +88,13 @@ export function LegacyAdminPanel({ seasons, players, recentAudit, raffles }: { s
               </SelectContent>
             </Select>
           </div>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1"><Label className="text-xs">XP (±)</Label><Input type="number" value={xp} onChange={(e) => setXp(e.target.value)} /></div>
             <div className="space-y-1"><Label className="text-xs">Coins (±)</Label><Input type="number" value={coins} onChange={(e) => setCoins(e.target.value)} /></div>
-            <div className="space-y-1"><Label className="text-xs">Respect (±)</Label><Input type="number" value={respect} onChange={(e) => setRespect(e.target.value)} /></div>
           </div>
           <Input placeholder="Reason (required)" value={reason} onChange={(e) => setReason(e.target.value)} />
           <Button size="sm" disabled={isPending || !playerId || !reason}
-            onClick={() => run(() => adjustPlayerLegacy(playerId, { xp: Number(xp) || 0, coins: Number(coins) || 0, respect: Number(respect) || 0, reason }), "Adjusted")}>
+            onClick={() => run(() => adjustPlayerLegacy(playerId, { xp: Number(xp) || 0, coins: Number(coins) || 0, reason }), "Adjusted")}>
             Apply
           </Button>
         </CardContent>

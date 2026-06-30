@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { LogIn, Coins, LogOut } from "lucide-react";
+import { Coins, LogOut } from "lucide-react";
 import { playerLogout } from "@/lib/actions/player-auth";
 
 interface Me {
@@ -31,10 +31,9 @@ export function PlayerAuthButton() {
     return (
       <Link
         href="/player/login"
-        aria-label="Sign in"
-        className="inline-flex items-center gap-1.5 text-sm font-medium px-2 sm:px-3 py-1.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+        className="inline-flex items-center text-sm font-medium px-3 py-1.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors whitespace-nowrap"
       >
-        <LogIn className="w-4 h-4" /> <span className="hidden sm:inline">Sign In</span>
+        Sign In
       </Link>
     );
   }

@@ -14,9 +14,8 @@ export default async function StorePage() {
   const session = await getPlayerSession();
   let me: StoreViewer | null = null;
   if (session) {
-    const [player, respect, inventory, equipped] = await Promise.all([
+    const [player, inventory, equipped] = await Promise.all([
       prisma.player.findUnique({ where: { id: session.playerId }, select: { coins: true, legacyLevel: true } }),
-      prisma.playerRespect.findUnique({ where: { playerId: session.playerId }, select: { score: true } }),
       prisma.playerInventoryItem.findMany({ where: { playerId: session.playerId }, select: { itemKey: true } }),
       prisma.playerEquippedCosmetics.findUnique({ where: { playerId: session.playerId } }),
     ]);
@@ -24,7 +23,6 @@ export default async function StorePage() {
       me = {
         coins: player.coins,
         level: player.legacyLevel,
-        respect: respect?.score ?? 80,
         owned: inventory.map((i) => i.itemKey),
         equipped: { profileFrame: equipped?.profileFrame ?? null, nameColor: equipped?.nameColor ?? null, profileBanner: equipped?.profileBanner ?? null },
       };

@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check, X, UserPlus, Phone, MapPin, Loader2 } from "lucide-react";
+import { Check, X, UserPlus, Phone, Loader2 } from "lucide-react";
 import { approveRegistration, rejectRegistration } from "@/lib/actions/registration";
+import { CountryFlag } from "@/components/public/country-flag";
 
 interface Registration {
   id: string;
@@ -85,12 +86,7 @@ function RegistrationCard({ reg }: { reg: Registration }) {
         {reg.position && (
           <span>{reg.position}</span>
         )}
-        {reg.nationality && (
-          <span className="flex items-center gap-1">
-            <MapPin className="w-3 h-3" />
-            {reg.nationality}
-          </span>
-        )}
+        {reg.nationality && <CountryFlag value={reg.nationality} showName />}
         <span>
           {new Date(reg.createdAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Karachi" })} PKT
         </span>

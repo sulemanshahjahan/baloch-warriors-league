@@ -19,6 +19,7 @@ import { Edit, User, Trophy, Award, Activity, ArrowLeft, Calendar, MapPin } from
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getInitials, formatDate, gameLabel } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { CountryFlag } from "@/components/public/country-flag";
 
 interface PlayerDetailPageProps {
   params: Promise<{ id: string }>;
@@ -122,7 +123,7 @@ export default async function PlayerDetailPage({ params }: PlayerDetailPageProps
                     <MapPin className="w-3.5 h-3.5" />
                     Nationality
                   </span>
-                  <span className="text-sm">{player.nationality}</span>
+                  <CountryFlag value={player.nationality} showName className="text-sm" />
                 </div>
               )}
               {player.dateOfBirth && (
