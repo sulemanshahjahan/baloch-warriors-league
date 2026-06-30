@@ -15,6 +15,7 @@ import {
 import { User, Trophy, Search, Target, Swords, SwordsIcon } from "lucide-react";
 import { getInitials } from "@/lib/utils";
 import { SmartAvatar } from "@/components/public/smart-avatar";
+import { AvatarFrame } from "@/components/public/profile/avatar-frame";
 
 type Player = {
   id: string;
@@ -23,6 +24,8 @@ type Player = {
   nickname: string | null;
   position: string | null;
   nationality: string | null;
+  cardRank: number;
+  frameClass: string;
   _count: { matchEvents: number; awards: number };
   teams: { team: { id: string; name: string } }[];
   stats: {
@@ -147,17 +150,23 @@ export function PlayersList({ players }: { players: Player[] }) {
             const currentTeam = player.teams[0]?.team;
             return (
               <Link key={player.id} href={`/players/${player.slug}`}>
-                <Card className="hover:border-primary/50 transition-all hover:-translate-y-0.5 cursor-pointer h-full group overflow-hidden">
+                <Card className="hover:border-primary/50 transition-all hover:-translate-y-0.5 cursor-pointer h-full group">
                   <CardContent className="p-3 sm:p-4">
                     {/* Big Avatar - Centered */}
                     <div className="flex flex-col items-center">
-                      <SmartAvatar
-                        type="player"
-                        id={player.id}
-                        name={player.name}
-                        className="h-20 w-20 sm:h-24 sm:w-24 ring-2 ring-border"
-                        fallbackClassName="text-xl sm:text-2xl bg-muted"
-                      />
+                      <AvatarFrame
+                        frameClassName={player.frameClass || null}
+                        sizeClassName="h-20 w-20 sm:h-24 sm:w-24"
+                        showCrown={player.cardRank >= 90}
+                      >
+                        <SmartAvatar
+                          type="player"
+                          id={player.id}
+                          name={player.name}
+                          className="h-full w-full"
+                          fallbackClassName="text-xl sm:text-2xl bg-muted"
+                        />
+                      </AvatarFrame>
                       
                       {/* Name & Nickname */}
                       <h3 className="font-bold text-sm sm:text-base mt-3 group-hover:text-primary transition-colors text-center truncate w-full">

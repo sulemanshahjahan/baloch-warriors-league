@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { prisma } from "@/lib/db";
 import { Users } from "lucide-react";
 import { PlayersList } from "./players-list";
+import { cssFor } from "@/lib/cosmetics";
 
 export const metadata: Metadata = {
   title: "Players",
@@ -30,6 +31,8 @@ async function getPlayersWithStats() {
         position: true,
         nationality: true,
         eloRating: true,
+        cardRank: true,
+        equipped: { select: { profileFrame: true } },
         _count: { select: { awards: true } },
         teams: {
           where: { isActive: true },
@@ -92,6 +95,8 @@ async function getPlayersWithStats() {
       position: player.position,
       nationality: player.nationality,
       eloRating: player.eloRating,
+      cardRank: player.cardRank,
+      frameClass: cssFor(player.equipped?.profileFrame),
       teams: player.teams,
       _count: { matchEvents: 0, awards: player._count.awards },
       stats: {
