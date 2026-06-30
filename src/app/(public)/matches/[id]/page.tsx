@@ -36,6 +36,8 @@ import {
   getRoundDisplayName,
 } from "@/lib/utils";
 import { ShareButtons } from "./share-buttons";
+import { PredictionWidget } from "./prediction-widget";
+import { getPlayerSession } from "@/lib/player-session";
 import { MatchCountdown } from "@/components/public/match-countdown";
 
 interface MatchPageProps {
@@ -161,6 +163,20 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
 
   const isCompleted = match.status === "COMPLETED";
   const isLive = match.status === "LIVE";
+  const isUpcoming = match.status === "SCHEDULED" || match.status === "POSTPONED";
+
+  // Predictions (only for upcoming matches)
+  let prediction: { loggedIn: boolean; myPick: "HOME" | "AWAY" | "DRAW" | null; counts: { HOME: number; DRAW: number; AWAY: number } } | null = null;
+  if (isUpcoming) {
+    const psession = await getPlayerSession();
+    const [counts, myPred] = await Promise.all([
+      prisma.matchPrediction.groupBy({ by: ["pick"], where: { matchId: match.id }, _count: { pick: true } }),
+      psession ? prisma.matchPrediction.findUnique({ where: { playerId_matchId: { playerId: psession.playerId, matchId: match.id } }, select: { pick: true } }) : Promise.resolve(null),
+    ]);
+    const c = { HOME: 0, DRAW: 0, AWAY: 0 };
+    for (const g of counts) c[g.pick as "HOME" | "DRAW" | "AWAY"] = g._count.pick;
+    prediction = { loggedIn: !!psession, myPick: (myPred?.pick as "HOME" | "AWAY" | "DRAW" | null) ?? null, counts: c };
+  }
   const showScore = isCompleted || isLive;
 
   const homeName = match.homePlayer?.name ?? match.homeTeam?.name ?? "TBD";
@@ -477,6 +493,20 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
                   </span>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* Predict the result (upcoming matches) */}
+          {isUpcoming && prediction && (
+            <div className="max-w-md mx-auto">
+              <PredictionWidget
+                matchId={match.id}
+                homeName={homeName}
+                awayName={awayName}
+                loggedIn={prediction.loggedIn}
+                myPick={prediction.myPick}
+                counts={prediction.counts}
+              />
             </div>
           )}
 
