@@ -255,6 +255,11 @@ model Player {
   legacyTier   String   @default("Rookie")
   legacyTokens Int      @default(0)
   bio              String?   @db.Text
+  // ── Presence (admin "Active Users" panel; approx location from IP headers) ──
+  lastSeenAt   DateTime?
+  lastCountry  String?
+  lastCity     String?
+  lastPath     String?
   isActive         Boolean   @default(true)
   registrationStatus String  @default("APPROVED") // PENDING, APPROVED, REJECTED
   suspendedUntil   DateTime?

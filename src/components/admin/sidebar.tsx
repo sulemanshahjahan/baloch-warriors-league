@@ -24,6 +24,7 @@ import {
   UserPlus,
   Search,
   MessageCircle,
+  Radio,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -50,6 +51,11 @@ const navItems = [
     label: "Match Finder",
     href: "/admin/match-finder",
     icon: Search,
+  },
+  {
+    label: "Active Users",
+    href: "/admin/active",
+    icon: Radio,
   },
   {
     label: "Tournaments",

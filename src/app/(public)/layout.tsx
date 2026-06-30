@@ -4,6 +4,7 @@ import { MobileTabBar } from "@/components/public/mobile-tab-bar";
 import { PushPromptBanner } from "@/components/public/push-notification-button";
 import { LiveRefresh } from "@/components/public/live-refresh";
 import { BackButtonHandler } from "@/components/public/back-button-handler";
+import { PresenceHeartbeat } from "@/components/public/presence-heartbeat";
 
 export default function PublicLayout({
   children,
@@ -15,6 +16,7 @@ export default function PublicLayout({
       <PublicNavbar />
       <LiveRefresh interval={15000} />
       <BackButtonHandler />
+      <PresenceHeartbeat />
       <main className="flex-1 pb-16 md:pb-0">{children}</main>
       <PublicFooter />
       <MobileTabBar />
