@@ -29,8 +29,12 @@ export function PlayerAuthButton() {
 
   if (!me) {
     return (
-      <Link href="/player/login" className="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
-        <LogIn className="w-4 h-4" /> Sign In
+      <Link
+        href="/player/login"
+        aria-label="Sign in"
+        className="inline-flex items-center gap-1.5 text-sm font-medium px-2 sm:px-3 py-1.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+      >
+        <LogIn className="w-4 h-4" /> <span className="hidden sm:inline">Sign In</span>
       </Link>
     );
   }

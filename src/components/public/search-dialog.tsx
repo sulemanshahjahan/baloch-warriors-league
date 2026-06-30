@@ -95,7 +95,8 @@ export function SearchDialog() {
       {/* Trigger button */}
       <button
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-2 px-3 py-2.5 rounded-lg border border-border/50 bg-muted/30 hover:bg-muted/50 transition-colors text-sm text-muted-foreground min-h-[44px]"
+        aria-label="Search"
+        className="inline-flex items-center justify-center gap-2 p-2.5 min-w-[44px] sm:min-w-0 sm:px-3 sm:py-2.5 rounded-lg sm:border sm:border-border/50 sm:bg-muted/30 hover:bg-muted/50 transition-colors text-sm text-muted-foreground min-h-[44px]"
       >
         <Search className="w-4 h-4" />
         <span className="hidden sm:inline">Search...</span>

@@ -30,15 +30,15 @@ export function PublicNavbar() {
   return (
     <nav className="sticky top-0 z-40 w-full border-b border-border/50 bg-background/80 backdrop-blur-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+        <div className="flex items-center justify-between h-16 gap-1">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2.5">
+          <Link href="/" className="flex items-center gap-2 shrink-0">
             <Image
               src="/logo.png"
               alt="BWL Logo"
-              width={36}
-              height={36}
-              className="rounded-lg object-contain"
+              width={32}
+              height={32}
+              className="rounded-lg object-contain w-8 h-8"
             />
             <span className="font-bold tracking-tight">
               <span className="text-primary">BWL</span>
@@ -49,7 +49,7 @@ export function PublicNavbar() {
           </Link>
 
           {/* Mobile Quick Actions - Center (only on mobile) */}
-          <div className="flex md:hidden items-center gap-1">
+          <div className="flex md:hidden items-center gap-0.5">
             <SearchDialog />
             <PushNotificationButton />
             <ThemeToggle />
@@ -87,7 +87,7 @@ export function PublicNavbar() {
 
       {/* Mobile menu */}
       {mobileOpen && (
-        <div className="md:hidden border-t border-border bg-card px-4 py-3 space-y-1">
+        <div className="md:hidden border-t border-border bg-card px-4 py-3 space-y-1 max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain">
           {navLinks.map((link) => (
             <Link
               key={link.href}

@@ -132,7 +132,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   }
 
   return (
-    <nav className="flex-1 px-3 py-4 space-y-1">
+    <nav className="flex-1 min-h-0 overflow-y-auto px-3 py-4 space-y-1">
       {navItems.map((item) => {
         const active = isActive(item.href, item.exact);
         return (
@@ -161,7 +161,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <>
       {/* Logo */}
-      <div className="flex items-center gap-3 px-6 py-4 border-b border-border">
+      <div className="flex items-center gap-3 px-6 py-4 border-b border-border shrink-0">
         <Image
           src="/logo.png"
           alt="BWL"
@@ -179,7 +179,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       <NavLinks onNavigate={onNavigate} />
 
       {/* Footer links */}
-      <div className="px-3 py-4 border-t border-border space-y-1">
+      <div className="px-3 py-4 border-t border-border space-y-1 shrink-0">
         <Link
           href="/"
           target="_blank"
