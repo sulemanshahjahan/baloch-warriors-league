@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomUUID } from "crypto";
 import { prisma } from "@/lib/db";
 import { getPlayerSession } from "@/lib/player-session";
 
 export const dynamic = "force-dynamic";
 
-// Heartbeat from logged-in players → powers the admin "Active Users" panel.
-// Anonymous visitors are a no-op (no DB write); their aggregate stats live in
-// Vercel Web Analytics. Approx location comes from Vercel's IP geo headers — we
-// store country/city only, never the raw IP.
+const VID_COOKIE = "bwl_vid";
+const VID_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
+
+// Heartbeat for the admin "Active Users" panel. Tracks EVERY visitor (browser)
+// via an anonymous cookie — logged-in members get linked to their player.
+// Approx location comes from Vercel IP geo headers (country/city, never raw IP).
 export async function POST(req: NextRequest) {
-  const session = await getPlayerSession();
-  if (!session) return new NextResponse(null, { status: 204 });
+  const session = await getPlayerSession(); // may be null (anonymous visitor)
 
   let path = "/";
   try {
@@ -25,12 +27,32 @@ export async function POST(req: NextRequest) {
   const cityRaw = h.get("x-vercel-ip-city");
   const city = cityRaw ? decodeURIComponent(cityRaw).slice(0, 80) : null;
 
-  await prisma.player
-    .update({
-      where: { id: session.playerId },
-      data: { lastSeenAt: new Date(), lastCountry: country, lastCity: city, lastPath: path },
+  const vid = req.cookies.get(VID_COOKIE)?.value || randomUUID();
+  const playerId = session?.playerId ?? null;
+  const now = new Date();
+
+  await prisma.visitorSession
+    .upsert({
+      where: { id: vid },
+      create: { id: vid, playerId, country, city, lastPath: path, pageViews: 1, lastSeenAt: now },
+      update: { playerId, country, city, lastPath: path, pageViews: { increment: 1 }, lastSeenAt: now },
     })
     .catch(() => {});
 
-  return new NextResponse(null, { status: 204 });
+  // Keep the member's own last-seen fresh too (used elsewhere on the profile).
+  if (playerId) {
+    await prisma.player
+      .update({ where: { id: playerId }, data: { lastSeenAt: now, lastCountry: country, lastCity: city, lastPath: path } })
+      .catch(() => {});
+  }
+
+  const res = new NextResponse(null, { status: 204 });
+  res.cookies.set(VID_COOKIE, vid, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: VID_MAX_AGE,
+  });
+  return res;
 }

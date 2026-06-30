@@ -294,6 +294,7 @@ model Player {
   equipped        PlayerEquippedCosmetics?
   predictions     MatchPrediction[]
   raffleEntries   RaffleEntry[]
+  visitorSessions VisitorSession[]
 
   @@index([isActive])
   @@map("players")
@@ -944,6 +945,26 @@ model NewsPost {
   updatedAt   DateTime  @updatedAt
 
   @@map("news_posts")
+}
+
+// ─────────────────────────────────────────────────────────────
+// VISITOR PRESENCE (admin "Active Users" — every browser, not just members)
+// ─────────────────────────────────────────────────────────────
+
+model VisitorSession {
+  id          String   @id // anonymous visitor cookie id
+  playerId    String? // set once/if the visitor logs in
+  country     String?
+  city        String?
+  lastPath    String?
+  pageViews   Int      @default(1)
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+
+  player Player? @relation(fields: [playerId], references: [id], onDelete: SetNull)
+
+  @@index([lastSeenAt])
+  @@map("visitor_sessions")
 }
 
 // ─────────────────────────────────────────────────────────────
