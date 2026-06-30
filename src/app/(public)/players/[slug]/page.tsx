@@ -28,7 +28,11 @@ import { PlayerCard } from "@/components/public/player-card";
 import { LegacyProgressCard } from "@/components/profile/legacy-progress-card";
 import { SeasonProgressCard, ActiveContractsCard, RespectCard } from "@/components/profile/profile-legacy-cards";
 import { MomentsGrid } from "@/components/profile/moments-grid";
-import { cssFor } from "@/lib/cosmetics";
+import { resolveCosmetics } from "@/lib/cosmetics";
+import { ProfileBanner } from "@/components/public/profile/profile-banner";
+import { AvatarFrame } from "@/components/public/profile/avatar-frame";
+import { Nameplate } from "@/components/public/profile/nameplate";
+import { EquippedItemsRow } from "@/components/public/profile/equipped-items-row";
 import { getActiveSeason, seasonProgress } from "@/lib/rewards/season";
 import { ensurePlayerContracts, dailyPeriodKey, weeklyPeriodKey } from "@/lib/rewards/contracts";
 import { PlayerEngagement } from "@/components/public/player-engagement";
@@ -341,9 +345,7 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
     }),
     prisma.playerEquippedCosmetics.findUnique({ where: { playerId: player.id } }),
   ]);
-  const frameCss = cssFor(equipped?.profileFrame);
-  const nameCss = cssFor(equipped?.nameColor);
-  const bannerCss = cssFor(equipped?.profileBanner);
+  const cos = resolveCosmetics(equipped);
 
   const [stats, recentMatches, upcomingMatches, engagement, allTitles] = await Promise.all([
     getPlayerStats(player.id, teamIds),
@@ -357,104 +359,94 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
 
   return (
     <div className="min-h-screen">
-      {/* Hero */}
-      <section className={`border-b border-border/50 ${bannerCss || "bg-card/30"}`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <Link
-            href="/players"
-            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            All Players
-          </Link>
+      {/* Hero — Identity Zone */}
+      <ProfileBanner bannerClassName={cos.banner?.className} accent={cos.accent}>
+        <Link
+          href="/players"
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          All Players
+        </Link>
 
-          <div className="flex items-start gap-4">
+        <div className="flex items-start gap-4">
+          <AvatarFrame frameClassName={cos.frame?.className} sizeClassName="h-20 w-20 sm:h-24 sm:w-24">
             <SmartAvatar
               type="player"
               id={player.id}
               name={player.name}
-              className={`h-20 w-20 sm:h-24 sm:w-24 shrink-0 ${frameCss}`}
+              className="h-full w-full"
               fallbackClassName="text-2xl sm:text-3xl"
             />
+          </AvatarFrame>
 
-            <div className="min-w-0 flex-1">
-              <h1 className={`text-2xl sm:text-3xl font-black tracking-tight leading-tight ${nameCss}`}>
-                {player.name}
-              </h1>
-              {player.nickname && (
-                <p className="text-base sm:text-lg text-muted-foreground truncate">
-                  &quot;{player.nickname}&quot;
-                </p>
+          <div className="min-w-0 flex-1">
+            <Nameplate name={player.name} nameplate={cos.nameplate} />
+            {player.nickname && (
+              <p className="text-base sm:text-lg text-muted-foreground truncate mt-0.5">
+                &quot;{player.nickname}&quot;
+              </p>
+            )}
+            {player.suspendedUntil && new Date(player.suspendedUntil) > new Date() && (
+              <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-red-500/20 text-red-400 font-medium mt-1">
+                🚫 Suspended until {formatDate(player.suspendedUntil)}
+                {player.suspensionReason && ` — ${player.suspensionReason}`}
+              </span>
+            )}
+            <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+              {player.position && <span className="bwl-chip">{player.position}</span>}
+              <span className="bwl-chip">
+                <BarChart3 className="w-3.5 h-3.5 text-primary" />
+                <span className="font-semibold">{player.cardRank}</span>
+                <span className="text-muted-foreground">card</span>
+              </span>
+              <span className="bwl-chip">
+                <span className="font-bold text-amber-300">Lvl {player.legacyLevel}</span>
+                <span className="text-muted-foreground">{player.legacyTier}</span>
+              </span>
+              <span className="bwl-chip text-emerald-300 font-semibold">⛨ {respect.score}</span>
+              <span className="bwl-chip text-amber-300 font-semibold">🪙 {player.coins.toLocaleString()}</span>
+              {player.eloRating !== 100 && (
+                <Link href="/rankings" className="bwl-chip hover:text-primary transition-colors">
+                  <Trophy className="w-3.5 h-3.5 text-yellow-400" />
+                  <span className="font-bold">{player.eloRating}</span>
+                  <span className="text-muted-foreground">ELO</span>
+                </Link>
               )}
-              {player.suspendedUntil && new Date(player.suspendedUntil) > new Date() && (
-                <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-red-500/20 text-red-400 font-medium mt-1">
-                  🚫 Suspended until {formatDate(player.suspendedUntil)}
-                  {player.suspensionReason && ` — ${player.suspensionReason}`}
+              {player.nationality && (
+                <span className="bwl-chip text-muted-foreground">
+                  <MapPin className="w-3.5 h-3.5" />
+                  {player.nationality}
                 </span>
               )}
-              <div className="flex items-center gap-2 mt-2 flex-wrap">
-                {player.position && (
-                  <span className="text-xs sm:text-sm bg-muted px-2 py-0.5 rounded">
-                    {player.position}
-                  </span>
-                )}
-                <div className="flex items-center gap-1 text-xs sm:text-sm">
-                  <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4 text-primary" />
-                  <span className="font-medium">{player.cardRank}</span>
-                  <span className="text-muted-foreground">card</span>
-                </div>
-                <span className="flex items-center gap-1 text-xs sm:text-sm">
-                  <span className="font-bold text-amber-300">Lvl {player.legacyLevel}</span>
-                  <span className="text-muted-foreground">{player.legacyTier}</span>
+              {player.dateOfBirth && (
+                <span className="bwl-chip text-muted-foreground">
+                  <Calendar className="w-3.5 h-3.5" />
+                  {formatDate(player.dateOfBirth)}
                 </span>
-                <span className="flex items-center gap-1 text-xs sm:text-sm text-emerald-300 font-semibold">
-                  ⛨ {respect.score}
-                </span>
-                <span className="flex items-center gap-1 text-xs sm:text-sm text-amber-300 font-semibold">
-                  🪙 {player.coins.toLocaleString()}
-                </span>
-                {player.eloRating !== 100 && (
-                  <Link href="/rankings" className="flex items-center gap-1 text-xs sm:text-sm hover:text-primary transition-colors">
-                    <Trophy className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-400" />
-                    <span className="font-bold">{player.eloRating}</span>
-                    <span className="text-muted-foreground">ELO</span>
-                  </Link>
-                )}
-                {player.nationality && (
-                  <div className="flex items-center gap-1 text-xs sm:text-sm text-muted-foreground">
-                    <MapPin className="w-3 h-3 sm:w-4 sm:h-4" />
-                    {player.nationality}
-                  </div>
-                )}
-                {player.dateOfBirth && (
-                  <div className="flex items-center gap-1 text-xs sm:text-sm text-muted-foreground">
-                    <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
-                    {formatDate(player.dateOfBirth)}
-                  </div>
-                )}
-              </div>
-              {currentTeam && (
-                <div className="mt-2">
-                  <Link
-                    href={`/teams/${currentTeam.slug}`}
-                    className="inline-flex items-center gap-1.5 text-xs sm:text-sm hover:text-primary"
-                  >
-                    <SmartAvatar
-                      type="team"
-                      id={currentTeam.id}
-                      name={currentTeam.name}
-                      className="h-4 w-4 sm:h-5 sm:w-5"
-                      fallbackClassName="text-[8px]"
-                    />
-                    <span className="truncate">{currentTeam.name}</span>
-                  </Link>
-                </div>
               )}
             </div>
+            {currentTeam && (
+              <div className="mt-2">
+                <Link
+                  href={`/teams/${currentTeam.slug}`}
+                  className="inline-flex items-center gap-1.5 text-xs sm:text-sm hover:text-primary"
+                >
+                  <SmartAvatar
+                    type="team"
+                    id={currentTeam.id}
+                    name={currentTeam.name}
+                    className="h-4 w-4 sm:h-5 sm:w-5"
+                    fallbackClassName="text-[8px]"
+                  />
+                  <span className="truncate">{currentTeam.name}</span>
+                </Link>
+              </div>
+            )}
+            <EquippedItemsRow items={cos.equipped} />
           </div>
-
         </div>
-      </section>
+      </ProfileBanner>
 
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

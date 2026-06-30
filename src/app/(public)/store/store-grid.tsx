@@ -67,11 +67,19 @@ export function StoreGrid({ me }: { me: StoreViewer | null }) {
                   return (
                     <div key={item.key} className={`rounded-xl border p-3 ${RARITY_BORDER[item.rarity]}`}>
                       <div className="h-16 rounded-lg mb-2 flex items-center justify-center bg-muted/40 overflow-hidden">
-                        {item.type === "NAME_COLOR" ? <span className={`text-lg font-black ${item.css}`}>Aa</span>
-                          : item.type === "PROFILE_BANNER" ? <div className={`w-full h-full ${item.css}`} />
-                          : <div className={`h-10 w-10 rounded-full bg-zinc-700 ${item.css}`} />}
+                        {item.type === "NAME_COLOR" ? (
+                          <span className={`bwl-name text-xl font-black ${item.css}`}>Warrior</span>
+                        ) : item.type === "PROFILE_BANNER" ? (
+                          <div className={`bwl-banner w-full h-full ${item.css}`} />
+                        ) : (
+                          <div className={`bwl-frame h-12 w-12 ${item.css}`}>
+                            <div className="bwl-frame__inner">
+                              <div className="w-full h-full bg-zinc-600" />
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <p className="text-sm font-semibold truncate">{item.name}</p>
+                      <p className="text-sm font-semibold truncate" title={item.displayName}>{item.displayName}</p>
                       <div className="flex items-center justify-between mt-1 mb-2">
                         <span className="text-xs font-bold text-amber-300 flex items-center gap-1"><Coins className="w-3 h-3" />{item.cost.toLocaleString()}</span>
                         <span className="text-[10px] uppercase tracking-wider font-bold text-muted-foreground">{item.rarity}</span>

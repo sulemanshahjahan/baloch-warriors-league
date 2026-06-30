@@ -40,11 +40,11 @@ export async function buyStoreItem(itemKey: string): Promise<ActionResult> {
   if (dec.count === 0) return { success: false, error: "Not enough coins." };
 
   await prisma.playerInventoryItem.create({ data: { playerId: m.id, itemType: item.type, itemKey, source: "STORE" } });
-  await prisma.legacyXpTransaction.create({ data: { playerId: m.id, xp: 0, coins: -item.cost, source: "STORE_PURCHASE", sourceId: `${itemKey}:${randomUUID().slice(0, 8)}`, reason: `Bought ${item.name}` } }).catch(() => {});
+  await prisma.legacyXpTransaction.create({ data: { playerId: m.id, xp: 0, coins: -item.cost, source: "STORE_PURCHASE", sourceId: `${itemKey}:${randomUUID().slice(0, 8)}`, reason: `Bought ${item.displayName}` } }).catch(() => {});
 
   await revalidatePlayer(m.id);
   revalidatePath("/store");
-  return { success: true, data: undefined, message: `Bought ${item.name}!` };
+  return { success: true, data: undefined, message: `Bought ${item.displayName}!` };
 }
 
 /** Equip (or clear) an owned cosmetic. */
