@@ -62,6 +62,11 @@ const navItems = [
     icon: Users,
   },
   {
+    label: "Legacy",
+    href: "/admin/legacy",
+    icon: Award,
+  },
+  {
     label: "Players",
     href: "/admin/players",
     icon: User,

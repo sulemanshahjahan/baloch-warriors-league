@@ -197,6 +197,10 @@ export async function processMatchRewards(matchId: string): Promise<void> {
   const { createMomentsForMatch } = await import("./moments");
   await createMomentsForMatch(matchId);
 
+  // Settle any predictions on this match
+  const { settlePredictionsForMatch } = await import("./predictions");
+  await settlePredictionsForMatch(matchId);
+
   // Notify (broadcast) on tier-ups — rare + community-worthy, not spammy.
   const after = await prisma.player.findMany({
     where: { id: { in: preIds } },
