@@ -11,6 +11,10 @@ import { Loader2, KeyRound, Mail } from "lucide-react";
 import { loginWithPassword, requestEmailOtp, verifyEmailOtp } from "@/lib/actions/player-auth";
 import { GoogleLoginButton } from "./google-button";
 
+// Temporarily off until SMTP (email OTP / password reset) is configured.
+// Flip to `true` to restore email + password and email-code login.
+const EMAIL_LOGIN_ENABLED = false;
+
 export function PlayerLoginForm({ initialError }: { initialError?: string } = {}) {
   const router = useRouter();
   const [isPending, start] = useTransition();
@@ -61,6 +65,15 @@ export function PlayerLoginForm({ initialError }: { initialError?: string } = {}
 
         {/* Social login */}
         <GoogleLoginButton onError={setError} />
+
+        {!EMAIL_LOGIN_ENABLED && (
+          <p className="text-xs text-muted-foreground text-center mt-3">
+            Sign in with your Google account to continue.
+          </p>
+        )}
+
+        {EMAIL_LOGIN_ENABLED && (
+        <>
         <div className="flex items-center gap-2 mb-4">
           <div className="h-px flex-1 bg-border" />
           <span className="text-[11px] uppercase tracking-wider text-muted-foreground">or continue with</span>
@@ -114,6 +127,8 @@ export function PlayerLoginForm({ initialError }: { initialError?: string } = {}
             )}
           </TabsContent>
         </Tabs>
+        </>
+        )}
       </CardContent>
     </Card>
   );
