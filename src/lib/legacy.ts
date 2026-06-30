@@ -46,6 +46,37 @@ export function tierForLevel(level: number): string {
   return LEGACY_TIERS.find((t) => level >= t.min && level <= t.max)?.tier ?? "Rookie";
 }
 
+// Legacy Road rewards — what each level unlocks. Auto-granted on level-up.
+export interface LegacyReward {
+  coins?: number;
+  cosmetic?: string; // cosmetic item key (auto-equipped)
+  label: string;
+}
+
+export const LEGACY_LEVEL_REWARDS: Record<number, LegacyReward> = {
+  2: { coins: 200, label: "200 coins" },
+  3: { cosmetic: "frame_bronze", label: "Bronze Frame" },
+  4: { coins: 300, label: "300 coins" },
+  5: { cosmetic: "frame_silver", coins: 300, label: "Silver Frame + 300 coins" },
+  6: { cosmetic: "banner_pitch", label: "Pitch Banner" },
+  8: { cosmetic: "name_cyan", label: "Cyan Name" },
+  10: { cosmetic: "frame_gold", coins: 500, label: "Gold Frame + 500 coins" },
+  12: { cosmetic: "banner_fire", label: "Fire Banner" },
+  15: { cosmetic: "name_gold", coins: 500, label: "Gold Name + 500 coins" },
+  18: { cosmetic: "banner_royal", label: "Royal Banner" },
+  20: { cosmetic: "frame_flame", coins: 1000, label: "Elite Flame Frame + 1000 coins" },
+  25: { cosmetic: "name_rainbow", coins: 1500, label: "Legend Name + 1500 coins" },
+  30: { coins: 3000, label: "3000 coins" },
+};
+
+/** The next level (above `level`) that unlocks a reward, with its label. */
+export function nextLegacyUnlock(level: number): { level: number; reward: LegacyReward } | null {
+  for (let l = level + 1; l <= MAX_LEGACY_LEVEL; l++) {
+    if (LEGACY_LEVEL_REWARDS[l]) return { level: l, reward: LEGACY_LEVEL_REWARDS[l] };
+  }
+  return null;
+}
+
 export interface LegacyProgress {
   level: number;
   tier: string;

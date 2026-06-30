@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { levelFromXp, tierForLevel } from "@/lib/legacy";
+import { levelFromXp, tierForLevel, LEGACY_LEVEL_REWARDS } from "@/lib/legacy";
+import { getStoreItem } from "@/lib/cosmetics";
 
 // Central BWL reward engine. Awards Legacy XP + coins through an idempotent
 // ledger (one row per player+source+event), so match completion can be retried
@@ -33,6 +34,7 @@ export async function awardReward(input: AwardInput): Promise<{ awarded: boolean
   }
 
   if (xp !== 0 || coins !== 0) {
+    const before = await prisma.player.findUnique({ where: { id: playerId }, select: { legacyLevel: true } });
     const updated = await prisma.player.update({
       where: { id: playerId },
       data: { legacyXp: { increment: xp }, coins: { increment: coins } },
@@ -43,9 +45,40 @@ export async function awardReward(input: AwardInput): Promise<{ awarded: boolean
       where: { id: playerId },
       data: { legacyLevel: level, legacyTier: tierForLevel(level) },
     });
+    if (before && level > before.legacyLevel) {
+      await grantLevelRewards(playerId, before.legacyLevel, level);
+    }
   }
 
   return { awarded: true };
+}
+
+/** Grant Legacy Road rewards for every level crossed (coins + auto-equipped cosmetics). */
+async function grantLevelRewards(playerId: string, fromLevel: number, toLevel: number): Promise<void> {
+  for (let level = fromLevel + 1; level <= toLevel; level++) {
+    const reward = LEGACY_LEVEL_REWARDS[level];
+    if (!reward) continue;
+    if (reward.coins) {
+      await awardReward({ playerId, coins: reward.coins, source: "LEVEL_REWARD", sourceId: `level:${level}`, reason: `Level ${level} reward` });
+    }
+    if (reward.cosmetic) {
+      const item = getStoreItem(reward.cosmetic);
+      if (item) {
+        await prisma.playerInventoryItem.upsert({
+          where: { playerId_itemType_itemKey: { playerId, itemType: item.type, itemKey: item.key } },
+          create: { playerId, itemType: item.type, itemKey: item.key, source: "LEGACY_LEVEL" },
+          update: {},
+        });
+        // Auto-equip so the profile visibly upgrades.
+        const field = item.type === "NAME_COLOR" ? "nameColor" : item.type === "PROFILE_BANNER" ? "profileBanner" : item.type === "CARD_BG" ? "cardBg" : "profileFrame";
+        await prisma.playerEquippedCosmetics.upsert({
+          where: { playerId },
+          create: { playerId, [field]: item.key },
+          update: { [field]: item.key },
+        });
+      }
+    }
+  }
 }
 
 // ── XP / coin values for match events ──────────────────────────

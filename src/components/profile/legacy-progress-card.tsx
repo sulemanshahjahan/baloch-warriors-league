@@ -1,5 +1,5 @@
-import { TrendingUp, Coins, Sparkles } from "lucide-react";
-import { legacyProgress } from "@/lib/legacy";
+import { TrendingUp, Coins, Sparkles, Gift } from "lucide-react";
+import { legacyProgress, nextLegacyUnlock } from "@/lib/legacy";
 
 interface RecentXp {
   id: string;
@@ -28,6 +28,7 @@ const TIER_GLOW: Record<string, string> = {
 export function LegacyProgressCard({ totalXp, coins, recent }: LegacyProgressCardProps) {
   const p = legacyProgress(totalXp);
   const glow = TIER_GLOW[p.tier] ?? TIER_GLOW.Rookie;
+  const unlock = nextLegacyUnlock(p.level);
 
   return (
     <div className={`rounded-2xl border bg-gradient-to-br ${glow} p-4 sm:p-5`}>
@@ -65,6 +66,13 @@ export function LegacyProgressCard({ totalXp, coins, recent }: LegacyProgressCar
         <p className="text-[11px] text-foreground/60 mt-1.5">
           {(p.xpForNextLevel - p.xpIntoLevel).toLocaleString()} XP to Level {p.nextLevel}
         </p>
+      )}
+
+      {unlock && (
+        <div className="mt-2 flex items-center gap-1.5 text-xs text-amber-200/90">
+          <Gift className="w-3.5 h-3.5" />
+          <span>Next unlock (Lvl {unlock.level}): <span className="font-semibold">{unlock.reward.label}</span></span>
+        </div>
       )}
 
       {/* Recent XP */}
