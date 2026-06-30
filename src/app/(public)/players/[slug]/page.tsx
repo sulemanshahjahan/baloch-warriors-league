@@ -355,7 +355,6 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
           <AvatarFrame
             frameClassName={cos.frame?.className}
             sizeClassName="h-24 w-24 sm:h-28 sm:w-28"
-            rank={player.cardRank}
             position={player.position}
             showCrown={player.cardRank >= 90}
           >

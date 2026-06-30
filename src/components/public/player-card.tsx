@@ -766,15 +766,18 @@ export function PlayerCard({ name, position, rating, nationality, avatarUrl, pla
 
   return (
     <div className="flex flex-col items-center gap-3">
-      <canvas
-        ref={canvasRef}
-        className="rounded-2xl"
-        style={{
-          width: 320,
-          height: 472,
-          filter: `drop-shadow(0 4px 24px ${theme.colors.glow}30) drop-shadow(0 12px 40px rgba(0,0,0,0.5))`,
-        }}
-      />
+      <div className="relative" style={{ width: 320, height: 472 }}>
+        <canvas
+          ref={canvasRef}
+          className="rounded-2xl block"
+          style={{
+            width: 320,
+            height: 472,
+            filter: `drop-shadow(0 4px 24px ${theme.colors.glow}30) drop-shadow(0 12px 40px rgba(0,0,0,0.5))`,
+          }}
+        />
+        {ready && <span className="bwl-card-sheen" aria-hidden />}
+      </div>
       {ready && (
         <button
           onClick={handleShare}

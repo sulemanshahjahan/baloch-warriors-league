@@ -38,6 +38,7 @@ export function AvatarFrame({
 }) {
   return (
     <div className={cn("bwl-frame shrink-0", frameClassName || "bwl-frame--default", sizeClassName)}>
+      {frameClassName && <span className="bwl-frame-glow" aria-hidden />}
       {showCrown && <Crown />}
       <div className="bwl-frame__inner">{children}</div>
       {position && <span className="bwl-pos-badge">{position}</span>}
