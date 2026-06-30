@@ -1,22 +1,27 @@
 // BWL cosmetics catalog — bought with coins, equipped on the profile.
 // Pure data + style resolvers (no DB). Status only — zero competitive effect.
 //
-// Each item maps to a semantic CSS class (`bwl-*`, defined in globals.css) that
-// renders a premium, layered look (metallic frames, stadium banners, gradient
-// nameplates). Item KEYS are stable + backward-compatible — only their visual
-// treatment and display names were upgraded.
+// Each item maps to a semantic CSS class (`bwl-*`, in globals.css) plus a
+// loadout thumbnail (CSS class or reusable image asset). Item KEYS are stable +
+// backward-compatible — only visual treatment / names were upgraded.
 
 export type CosmeticType = "PROFILE_FRAME" | "PROFILE_BANNER" | "NAME_COLOR" | "CARD_BG";
 export type Rarity = "COMMON" | "RARE" | "EPIC" | "LEGENDARY";
 export type FrameTier = "bronze" | "silver" | "gold" | "epic" | "legendary";
+export type EquipSlot = "FRAME" | "BANNER" | "NAMEPLATE";
 
 export interface StoreItem {
   key: string;
   /** Short legacy name (kept for compatibility). */
   name: string;
-  /** Premium display name shown in store / profile / inventory. */
+  /** Full premium name — store, inventory, purchase messages. */
   displayName: string;
+  /** Compact name for the equipped loadout cards. */
+  shortName: string;
+  /** Loadout subtitle, e.g. "Stadium Background". */
+  description: string;
   type: CosmeticType;
+  slot: EquipSlot;
   cost: number;
   rarity: Rarity;
   /** Metallic tier (frames) — drives progressive richness. */
@@ -25,26 +30,30 @@ export interface StoreItem {
   minRespect?: number;
   /** Semantic `bwl-*` variant class applied where the cosmetic shows. */
   css: string;
+  /** CSS class for the loadout thumbnail (when no image asset). */
+  thumbnailClass?: string;
+  /** Optional image used as the loadout thumbnail (drop-in upgrade path). */
+  thumbnailAsset?: string;
 }
 
 export const STORE_ITEMS: StoreItem[] = [
   // ── Profile frames (metallic ring around the avatar) ──
-  { key: "frame_bronze", name: "Bronze Frame", displayName: "Bronze Warrior Frame", type: "PROFILE_FRAME", cost: 300, rarity: "COMMON", tier: "bronze", css: "bwl-frame--bronze" },
-  { key: "frame_silver", name: "Silver Frame", displayName: "Silver Vanguard Frame", type: "PROFILE_FRAME", cost: 800, rarity: "RARE", minLevel: 5, tier: "silver", css: "bwl-frame--silver" },
-  { key: "frame_gold", name: "Gold Frame", displayName: "Gold Champion Frame", type: "PROFILE_FRAME", cost: 2000, rarity: "EPIC", minLevel: 10, tier: "gold", css: "bwl-frame--gold" },
-  { key: "frame_trusted", name: "Trusted Frame", displayName: "Trusted Guardian Frame", type: "PROFILE_FRAME", cost: 1200, rarity: "EPIC", minRespect: 90, tier: "epic", css: "bwl-frame--epic" },
-  { key: "frame_flame", name: "Elite Flame Frame", displayName: "Elite Flame Frame", type: "PROFILE_FRAME", cost: 4000, rarity: "LEGENDARY", minLevel: 20, tier: "legendary", css: "bwl-frame--legendary" },
+  { key: "frame_bronze", name: "Bronze Frame", displayName: "Bronze Warrior Frame", shortName: "Bronze Warrior", description: "Avatar Frame", type: "PROFILE_FRAME", slot: "FRAME", cost: 300, rarity: "COMMON", tier: "bronze", css: "bwl-frame--bronze", thumbnailAsset: "/bronze-card-bg.jpg" },
+  { key: "frame_silver", name: "Silver Frame", displayName: "Silver Vanguard Frame", shortName: "Silver Vanguard", description: "Avatar Frame", type: "PROFILE_FRAME", slot: "FRAME", cost: 800, rarity: "RARE", minLevel: 5, tier: "silver", css: "bwl-frame--silver", thumbnailAsset: "/silver-card-bg.jpg" },
+  { key: "frame_gold", name: "Gold Frame", displayName: "Gold Champion Frame", shortName: "Gold Champion", description: "Avatar Frame", type: "PROFILE_FRAME", slot: "FRAME", cost: 2000, rarity: "EPIC", minLevel: 10, tier: "gold", css: "bwl-frame--gold", thumbnailAsset: "/gold-card-legendary.jpg" },
+  { key: "frame_trusted", name: "Trusted Frame", displayName: "Trusted Guardian Frame", shortName: "Trusted Guardian", description: "Avatar Frame", type: "PROFILE_FRAME", slot: "FRAME", cost: 1200, rarity: "EPIC", minRespect: 90, tier: "epic", css: "bwl-frame--epic", thumbnailAsset: "/epiccard-bg.jpg" },
+  { key: "frame_flame", name: "Elite Flame Frame", displayName: "Elite Flame Frame", shortName: "Elite Flame", description: "Avatar Frame", type: "PROFILE_FRAME", slot: "FRAME", cost: 4000, rarity: "LEGENDARY", minLevel: 20, tier: "legendary", css: "bwl-frame--legendary", thumbnailAsset: "/legendary-card-bg.jpg" },
 
   // ── Nameplates (gradient name treatment) ──
-  { key: "name_red", name: "Red Name", displayName: "Crimson Strike Nameplate", type: "NAME_COLOR", cost: 600, rarity: "COMMON", css: "bwl-name--crimson" },
-  { key: "name_cyan", name: "Cyan Name", displayName: "Ice Blue Nameplate", type: "NAME_COLOR", cost: 600, rarity: "COMMON", css: "bwl-name--ice" },
-  { key: "name_gold", name: "Gold Name", displayName: "Gold Champion Nameplate", type: "NAME_COLOR", cost: 1500, rarity: "EPIC", minLevel: 10, css: "bwl-name--gold" },
-  { key: "name_rainbow", name: "Legend Name", displayName: "Legendary Flame Nameplate", type: "NAME_COLOR", cost: 3000, rarity: "LEGENDARY", minLevel: 25, css: "bwl-name--legend" },
+  { key: "name_red", name: "Red Name", displayName: "Crimson Strike Nameplate", shortName: "Crimson Strike", description: "Nameplate", type: "NAME_COLOR", slot: "NAMEPLATE", cost: 600, rarity: "COMMON", css: "bwl-name--crimson", thumbnailClass: "bwl-thumb-name bwl-thumb-name--crimson" },
+  { key: "name_cyan", name: "Cyan Name", displayName: "Ice Blue Nameplate", shortName: "Ice Blue", description: "Nameplate", type: "NAME_COLOR", slot: "NAMEPLATE", cost: 600, rarity: "COMMON", css: "bwl-name--ice", thumbnailClass: "bwl-thumb-name bwl-thumb-name--ice" },
+  { key: "name_gold", name: "Gold Name", displayName: "Gold Champion Nameplate", shortName: "Gold Champion", description: "Nameplate", type: "NAME_COLOR", slot: "NAMEPLATE", cost: 1500, rarity: "EPIC", minLevel: 10, css: "bwl-name--gold", thumbnailClass: "bwl-thumb-name bwl-thumb-name--gold" },
+  { key: "name_rainbow", name: "Legend Name", displayName: "Legendary Flame Nameplate", shortName: "Legendary Flame", description: "Nameplate", type: "NAME_COLOR", slot: "NAMEPLATE", cost: 3000, rarity: "LEGENDARY", minLevel: 25, css: "bwl-name--legend", thumbnailClass: "bwl-thumb-name bwl-thumb-name--legend" },
 
   // ── Profile banners (hero background) ──
-  { key: "banner_pitch", name: "Pitch Banner", displayName: "Floodlight Pitch Banner", type: "PROFILE_BANNER", cost: 500, rarity: "COMMON", css: "bwl-banner--pitch" },
-  { key: "banner_fire", name: "Fire Banner", displayName: "Inferno Banner", type: "PROFILE_BANNER", cost: 1500, rarity: "EPIC", minLevel: 8, css: "bwl-banner--fire" },
-  { key: "banner_royal", name: "Royal Banner", displayName: "Royal Crown Banner", type: "PROFILE_BANNER", cost: 2500, rarity: "LEGENDARY", minLevel: 18, css: "bwl-banner--royal" },
+  { key: "banner_pitch", name: "Pitch Banner", displayName: "Floodlight Pitch Banner", shortName: "Floodlight Pitch", description: "Stadium Background", type: "PROFILE_BANNER", slot: "BANNER", cost: 500, rarity: "RARE", css: "bwl-banner--pitch", thumbnailClass: "bwl-thumb-pitch" },
+  { key: "banner_fire", name: "Fire Banner", displayName: "Inferno Banner", shortName: "Inferno", description: "Stadium Background", type: "PROFILE_BANNER", slot: "BANNER", cost: 1500, rarity: "EPIC", minLevel: 8, css: "bwl-banner--fire", thumbnailClass: "bwl-thumb-fire" },
+  { key: "banner_royal", name: "Royal Banner", displayName: "Royal Crown Banner", shortName: "Royal Crown", description: "Stadium Background", type: "PROFILE_BANNER", slot: "BANNER", cost: 2500, rarity: "LEGENDARY", minLevel: 18, css: "bwl-banner--royal", thumbnailClass: "bwl-thumb-royal" },
 ];
 
 export function getStoreItem(key: string | null | undefined): StoreItem | undefined {
@@ -76,17 +85,22 @@ export const RARITY_CHIP: Record<Rarity, string> = {
 export interface ResolvedCosmetic {
   key: string;
   name: string; // premium display name
+  shortName: string;
+  description: string;
   type: CosmeticType;
+  slot: EquipSlot;
   rarity: Rarity;
   tier?: FrameTier;
   className: string; // semantic bwl-* variant
+  thumbnailClass?: string;
+  thumbnailAsset?: string;
 }
 
 export interface ResolvedCosmetics {
   frame: ResolvedCosmetic | null;
   nameplate: ResolvedCosmetic | null;
   banner: ResolvedCosmetic | null;
-  /** Banner → frame → nameplate order, for the Equipped row. */
+  /** Banner → frame → nameplate order, for the loadout. */
   equipped: ResolvedCosmetic[];
   hasAny: boolean;
   /** Cohesive accent colour for the hero (nameplate → frame → banner). */
@@ -104,7 +118,11 @@ const ACCENT_BY_KEY: Record<string, string> = {
 function toResolved(key: string | null | undefined): ResolvedCosmetic | null {
   const it = getStoreItem(key);
   if (!it) return null; // unknown/legacy key → safe no-op
-  return { key: it.key, name: it.displayName, type: it.type, rarity: it.rarity, tier: it.tier, className: it.css };
+  return {
+    key: it.key, name: it.displayName, shortName: it.shortName, description: it.description,
+    type: it.type, slot: it.slot, rarity: it.rarity, tier: it.tier, className: it.css,
+    thumbnailClass: it.thumbnailClass, thumbnailAsset: it.thumbnailAsset,
+  };
 }
 
 export interface EquippedCosmeticKeys {
@@ -125,9 +143,22 @@ export function resolveCosmetics(eq: EquippedCosmeticKeys | null | undefined): R
   return { frame, nameplate, banner, equipped, hasAny: equipped.length > 0, accent };
 }
 
+// ── Player class strip (status label from card rank) ─────────────────────────
+// Distinct from earned achievement titles (those stay in the engagement section).
+
+export interface PlayerClass {
+  label: string;
+  className: string; // bwl-title-strip--* tier
+}
+
+export function playerClassFor(cardRank: number): PlayerClass {
+  if (cardRank >= 95) return { label: "Legendary Player", className: "bwl-title-strip--legendary" };
+  if (cardRank >= 90) return { label: "Elite Player", className: "bwl-title-strip--elite" };
+  if (cardRank >= 80) return { label: "Star Player", className: "bwl-title-strip--star" };
+  return { label: "BWL Player", className: "bwl-title-strip--base" };
+}
+
 // ── Profile skins (sets) — scaffold for future bundled rewards ───────────────
-// A skin applies several cosmetics + an accent colour together. Structured now
-// so a buy/equip flow can be wired later without reworking the render layer.
 
 export interface ProfileSkin {
   key: string;

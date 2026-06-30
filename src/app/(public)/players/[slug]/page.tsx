@@ -19,7 +19,6 @@ import {
   Activity,
   Award,
   Swords,
-  BarChart3,
   TrendingUp,
   TrendingDown,
   Sparkles,
@@ -32,7 +31,9 @@ import { resolveCosmetics } from "@/lib/cosmetics";
 import { ProfileBanner } from "@/components/public/profile/profile-banner";
 import { AvatarFrame } from "@/components/public/profile/avatar-frame";
 import { Nameplate } from "@/components/public/profile/nameplate";
-import { EquippedItemsRow } from "@/components/public/profile/equipped-items-row";
+import { TitleStrip } from "@/components/public/profile/title-strip";
+import { StatSummary } from "@/components/public/profile/stat-summary";
+import { EquippedLoadout } from "@/components/public/profile/equipped-loadout";
 import { getActiveSeason, seasonProgress } from "@/lib/rewards/season";
 import { ensurePlayerContracts, dailyPeriodKey, weeklyPeriodKey } from "@/lib/rewards/contracts";
 import { PlayerEngagement } from "@/components/public/player-engagement";
@@ -369,8 +370,14 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
           All Players
         </Link>
 
-        <div className="flex items-start gap-3 sm:gap-4">
-          <AvatarFrame frameClassName={cos.frame?.className} sizeClassName="h-20 w-20 sm:h-24 sm:w-24">
+        <div className="flex items-start gap-3.5 sm:gap-5">
+          <AvatarFrame
+            frameClassName={cos.frame?.className}
+            sizeClassName="h-24 w-24 sm:h-28 sm:w-28"
+            rank={player.cardRank}
+            position={player.position}
+            showCrown={player.cardRank >= 90}
+          >
             <SmartAvatar
               type="player"
               id={player.id}
@@ -383,51 +390,38 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
           <div className="min-w-0 flex-1">
             <Nameplate name={player.name} nameplate={cos.nameplate} />
             {player.nickname && (
-              <p className="text-base sm:text-lg text-muted-foreground truncate mt-0.5">
+              <p className="text-sm sm:text-base text-muted-foreground truncate mt-0.5">
                 &quot;{player.nickname}&quot;
               </p>
             )}
             {player.suspendedUntil && new Date(player.suspendedUntil) > new Date() && (
-              <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-red-500/20 text-red-400 font-medium mt-1">
+              <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-red-500/20 text-red-400 font-medium mt-1.5">
                 🚫 Suspended until {formatDate(player.suspendedUntil)}
                 {player.suspensionReason && ` — ${player.suspensionReason}`}
               </span>
             )}
-            <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-              {player.position && <span className="bwl-chip">{player.position}</span>}
-              <span className="bwl-chip">
-                <BarChart3 className="w-3.5 h-3.5 text-primary" />
-                <span className="font-semibold">{player.cardRank}</span>
-                <span className="text-muted-foreground">card</span>
-              </span>
-              <span className="bwl-chip">
-                <span className="font-bold text-amber-300">Lvl {player.legacyLevel}</span>
-                <span className="text-muted-foreground">{player.legacyTier}</span>
-              </span>
-              <span className="bwl-chip text-emerald-300 font-semibold">⛨ {respect.score}</span>
-              <span className="bwl-chip text-amber-300 font-semibold">🪙 {player.coins.toLocaleString()}</span>
-              {player.eloRating !== 100 && (
-                <Link href="/rankings" className="bwl-chip hover:text-primary transition-colors">
-                  <Trophy className="w-3.5 h-3.5 text-yellow-400" />
-                  <span className="font-bold">{player.eloRating}</span>
-                  <span className="text-muted-foreground">ELO</span>
-                </Link>
-              )}
-              {player.nationality && (
-                <span className="bwl-chip text-muted-foreground">
-                  <MapPin className="w-3.5 h-3.5" />
-                  {player.nationality}
-                </span>
-              )}
-              {player.dateOfBirth && (
-                <span className="bwl-chip text-muted-foreground">
-                  <Calendar className="w-3.5 h-3.5" />
-                  {formatDate(player.dateOfBirth)}
-                </span>
-              )}
+            <div className="mt-2">
+              <TitleStrip cardRank={player.cardRank} />
             </div>
+            <div className="flex items-center gap-1.5 mt-2 text-xs sm:text-sm flex-wrap">
+              {player.position && (
+                <>
+                  <span className="font-semibold">{player.position}</span>
+                  <span className="text-muted-foreground">·</span>
+                </>
+              )}
+              <span className="text-muted-foreground">{player.legacyTier}</span>
+              <span className="text-muted-foreground">·</span>
+              <span className="text-muted-foreground">Level {player.legacyLevel}</span>
+            </div>
+            {player.nationality && (
+              <div className="flex items-center gap-1 mt-1.5 text-xs sm:text-sm text-muted-foreground">
+                <MapPin className="w-3.5 h-3.5" />
+                {player.nationality}
+              </div>
+            )}
             {currentTeam && (
-              <div className="mt-2">
+              <div className="mt-1.5">
                 <Link
                   href={`/teams/${currentTeam.slug}`}
                   className="inline-flex items-center gap-1.5 text-xs sm:text-sm hover:text-primary"
@@ -443,9 +437,18 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                 </Link>
               </div>
             )}
-            <EquippedItemsRow items={cos.equipped} />
           </div>
         </div>
+
+        <StatSummary
+          cardRank={player.cardRank}
+          elo={player.eloRating}
+          level={player.legacyLevel}
+          tier={player.legacyTier}
+          respect={respect.score}
+        />
+
+        <EquippedLoadout items={cos.equipped} />
       </ProfileBanner>
 
       {/* Content */}

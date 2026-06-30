@@ -245,6 +245,56 @@ body {
   z-index: 2;
 }
 
+/* clean default ring (unequipped) — still gives a framed, professional look */
+.bwl-frame--default {
+  background: linear-gradient(160deg, #3f3f46, #18181b);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), inset 0 0 6px rgba(0, 0, 0, 0.45);
+}
+.bwl-frame--default::after { opacity: 0.25; }
+
+/* attached identity badges + crown (children of .bwl-frame) */
+.bwl-rank-badge {
+  position: absolute;
+  bottom: -7px;
+  right: -8px;
+  z-index: 3;
+  min-width: 30px;
+  padding: 2px 6px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(180deg, #1c1917, #0a0907);
+  border: 1.5px solid #e3b341;
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.55), 0 0 12px rgba(227, 179, 65, 0.4);
+  color: #fde68a;
+  font-weight: 900;
+  font-size: 14px;
+  line-height: 1;
+}
+.bwl-pos-badge {
+  position: absolute;
+  bottom: -7px;
+  left: -7px;
+  z-index: 3;
+  padding: 2px 7px;
+  border-radius: 9px;
+  background: rgba(9, 9, 11, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  color: #fafafa;
+  font-weight: 800;
+  font-size: 11px;
+  line-height: 1;
+}
+.bwl-crown {
+  position: absolute;
+  top: -15px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.55));
+}
+
 .bwl-frame--bronze {
   background: conic-gradient(from 215deg, #46270f, #b9762f, #f4c98c, #ffe7c4, #d68a3e, #7a4420, #3a210e, #c8893f, #46270f);
   box-shadow:
@@ -362,17 +412,21 @@ body {
 .bwl-banner--pitch {
   background:
     /* main floodlight from above */
-    radial-gradient(78% 60% at 50% -14%, rgba(110, 231, 183, 0.26), transparent 60%),
+    radial-gradient(78% 60% at 50% -14%, rgba(110, 231, 183, 0.24), transparent 60%),
     /* twin corner floods */
-    radial-gradient(40% 44% at 12% -6%, rgba(200, 255, 224, 0.13), transparent 70%),
-    radial-gradient(40% 44% at 88% -6%, rgba(200, 255, 224, 0.13), transparent 70%),
+    radial-gradient(40% 44% at 12% -6%, rgba(200, 255, 224, 0.12), transparent 70%),
+    radial-gradient(40% 44% at 88% -6%, rgba(200, 255, 224, 0.12), transparent 70%),
     /* atmospheric haze band */
     radial-gradient(120% 50% at 50% 32%, rgba(120, 220, 170, 0.06), transparent 70%),
     /* eFootball diagonal sheen */
-    repeating-linear-gradient(125deg, rgba(255, 255, 255, 0.028) 0 1px, transparent 1px 24px),
+    repeating-linear-gradient(125deg, rgba(255, 255, 255, 0.026) 0 1px, transparent 1px 24px),
     /* vertical mown-pitch stripes */
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.045) 0 2px, transparent 2px 90px),
-    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.14) 0 1px, transparent 1px 90px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.04) 0 2px, transparent 2px 90px),
+    /* readability overlay — translucent so a stadium photo shows through */
+    linear-gradient(180deg, rgba(8, 30, 20, 0.72) 0%, rgba(6, 22, 14, 0.82) 46%, rgba(2, 11, 8, 0.92) 100%),
+    /* OPTIONAL drop-in stadium photo (safe no-op until /stadium-hero.jpg exists) */
+    url("/stadium-hero.jpg") center 28% / cover no-repeat,
+    /* solid fallback pitch (shown when no photo present) */
     linear-gradient(180deg, #0a2719 0%, #0c2f1f 44%, #04100a 100%);
 }
 .bwl-banner--fire {
@@ -471,4 +525,148 @@ body {
   color: inherit;
   background: color-mix(in srgb, currentColor 16%, transparent);
   box-shadow: 0 0 8px color-mix(in srgb, currentColor 30%, transparent), inset 0 0 0 1px color-mix(in srgb, currentColor 22%, transparent);
+}
+
+/* ── Player-class title strip ───────────────────────────────────────────────*/
+.bwl-title-strip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.28rem 0.85rem;
+  border-radius: 0.4rem;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+.bwl-title-strip::before,
+.bwl-title-strip::after {
+  content: "";
+  width: 14px;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.55;
+}
+.bwl-title-strip--base { color: #d4d4d8; background: linear-gradient(90deg, transparent, rgba(161,161,170,0.18), transparent); border-block: 1px solid rgba(161,161,170,0.25); }
+.bwl-title-strip--star { color: #7dd3fc; background: linear-gradient(90deg, transparent, rgba(56,189,248,0.2), transparent); border-block: 1px solid rgba(56,189,248,0.3); }
+.bwl-title-strip--elite { color: #c4b5fd; background: linear-gradient(90deg, transparent, rgba(167,139,250,0.22), transparent); border-block: 1px solid rgba(167,139,250,0.34); }
+.bwl-title-strip--legendary {
+  color: #fde68a;
+  background: linear-gradient(90deg, transparent, rgba(180,83,9,0.4), rgba(251,191,36,0.18), rgba(180,83,9,0.4), transparent);
+  border-block: 1px solid rgba(251,191,36,0.4);
+  text-shadow: 0 0 10px rgba(251,191,36,0.4);
+}
+
+/* ── Stat summary panel ─────────────────────────────────────────────────────*/
+.bwl-stat-panel {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-radius: 0.85rem;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 4px 16px -6px rgba(0, 0, 0, 0.5);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  overflow: hidden;
+}
+.bwl-stat-seg {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.7rem 0.7rem;
+  min-width: 0;
+}
+.bwl-stat-seg + .bwl-stat-seg { border-left: 1px solid rgba(255, 255, 255, 0.08); }
+.bwl-stat-ico {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, currentColor 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 24%, transparent), 0 0 12px -2px color-mix(in srgb, currentColor 40%, transparent);
+}
+
+/* ── Equipped loadout cards ─────────────────────────────────────────────────*/
+.bwl-loadout-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.bwl-loadout--common { border-color: rgba(161, 161, 170, 0.3); }
+.bwl-loadout--rare { border-color: rgba(56, 189, 248, 0.42); box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 0 18px -8px rgba(56, 189, 248, 0.55); }
+.bwl-loadout--epic { border-color: rgba(167, 139, 250, 0.46); box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 0 18px -8px rgba(167, 139, 250, 0.6); }
+.bwl-loadout--legendary { border-color: rgba(251, 191, 36, 0.5); box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 0 20px -8px rgba(251, 191, 36, 0.65); }
+
+.bwl-loadout-thumb {
+  position: relative;
+  flex: none;
+  width: 92px;
+  height: 58px;
+  border-radius: 0.55rem;
+  overflow: hidden;
+  background-size: cover;
+  background-position: center;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), inset 0 -16px 22px -12px rgba(0, 0, 0, 0.8);
+}
+.bwl-loadout-ico {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* ── Loadout thumbnail looks (CSS, no image needed) ─────────────────────────*/
+.bwl-thumb-pitch {
+  background:
+    radial-gradient(80% 70% at 50% -10%, rgba(110, 231, 183, 0.4), transparent 60%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.06) 0 2px, transparent 2px 16px),
+    linear-gradient(180deg, #0c3522 0%, #06160d 100%);
+}
+.bwl-thumb-fire {
+  background:
+    radial-gradient(80% 70% at 50% -10%, rgba(251, 146, 60, 0.45), transparent 60%),
+    linear-gradient(180deg, #3a1409 0%, #14060a 100%);
+}
+.bwl-thumb-royal {
+  background:
+    radial-gradient(80% 70% at 50% -10%, rgba(167, 139, 250, 0.45), transparent 60%),
+    linear-gradient(180deg, #1f1340 0%, #0c0820 100%);
+}
+.bwl-thumb-name {
+  position: relative;
+  background: linear-gradient(180deg, #1c1c20, #0c0c0e);
+}
+.bwl-thumb-name::after {
+  content: "";
+  position: absolute;
+  left: 14%;
+  right: 14%;
+  top: 50%;
+  height: 30%;
+  transform: translateY(-50%) skewX(-14deg);
+  border-radius: 3px;
+}
+.bwl-thumb-name--crimson::after { background: linear-gradient(180deg, #ff6b6b, #b91c1c); box-shadow: 0 0 14px rgba(225, 29, 47, 0.55); }
+.bwl-thumb-name--ice::after { background: linear-gradient(180deg, #7dd3fc, #0284c7); box-shadow: 0 0 14px rgba(56, 189, 248, 0.5); }
+.bwl-thumb-name--gold::after { background: linear-gradient(180deg, #fde68a, #d4a017); box-shadow: 0 0 14px rgba(250, 204, 21, 0.5); }
+.bwl-thumb-name--legend::after { background: linear-gradient(90deg, #f0abfc, #fcd34d, #67e8f9); box-shadow: 0 0 14px rgba(252, 211, 77, 0.5); }
+
+/* dark wash over image thumbnails so text/badges stay readable */
+.bwl-loadout-thumb--img::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.45));
 }
