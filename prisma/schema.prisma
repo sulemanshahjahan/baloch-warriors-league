@@ -246,6 +246,11 @@ model Player {
   skillLevel  Int?      @default(50) // 0-99 rating for seeding
   eloRating   Int       @default(100)
   cardRank    Int       @default(70) // FIFA-style card rank, 50-99
+  // ── BWL Legacy / economy (status only — never affects ELO/cardRank/matchmaking) ──
+  coins       Int       @default(0)
+  legacyXp    Int       @default(0)
+  legacyLevel Int       @default(1)
+  legacyTier  String    @default("Rookie")
   bio              String?   @db.Text
   isActive         Boolean   @default(true)
   registrationStatus String  @default("APPROVED") // PENDING, APPROVED, REJECTED
@@ -270,9 +275,34 @@ model Player {
   playerOfWeeks   PlayerOfWeek[]
   whatsappLogs    WhatsAppLog[]
   rankChanges     RankChange[]
+  legacyTxns      LegacyXpTransaction[]
 
   @@index([isActive])
   @@map("players")
+}
+
+// ─────────────────────────────────────────────────────────────
+// BWL LEGACY — XP / COIN LEDGER (idempotent reward log)
+// ─────────────────────────────────────────────────────────────
+
+model LegacyXpTransaction {
+  id        String   @id @default(cuid())
+  playerId  String
+  xp        Int      @default(0)
+  coins     Int      @default(0)
+  source    String   // MATCH_PLAYED, MATCH_WIN, CLEAN_SHEET, MOTM, …
+  sourceId  String?  // e.g. matchId — makes the reward idempotent per event
+  reason    String
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  // One reward per (player, source, event) — safe to re-run match completion.
+  @@unique([playerId, source, sourceId])
+  @@index([playerId])
+  @@index([playerId, createdAt])
+  @@map("legacy_xp_transactions")
 }
 
 // ─────────────────────────────────────────────────────────────

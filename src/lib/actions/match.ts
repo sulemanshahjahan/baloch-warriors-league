@@ -176,6 +176,10 @@ export async function executeMatchCompletion(
   const { updateEloAfterMatch } = await import("@/lib/elo");
   await updateEloAfterMatch(matchId);
 
+  // BWL Legacy XP + coins (idempotent — safe to re-run)
+  const { processMatchLegacyRewards } = await import("@/lib/rewards/reward-engine");
+  await processMatchLegacyRewards(matchId);
+
   // Push notification
   const homeName = currentMatch.homePlayerId
     ? (await prisma.player.findUnique({ where: { id: currentMatch.homePlayerId }, select: { name: true } }))?.name
@@ -1279,6 +1283,8 @@ export async function bulkUpdateMatchResults(
       await advanceKnockoutWinner(matchId, match.tournamentId);
       const { updateEloAfterMatch } = await import("@/lib/elo");
       await updateEloAfterMatch(matchId);
+      const { processMatchLegacyRewards } = await import("@/lib/rewards/reward-engine");
+      await processMatchLegacyRewards(matchId);
       updated++;
     } catch (e) {
       errors.push(matchId);

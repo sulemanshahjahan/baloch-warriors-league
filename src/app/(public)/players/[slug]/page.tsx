@@ -25,6 +25,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { PlayerCard } from "@/components/public/player-card";
+import { LegacyProgressCard } from "@/components/profile/legacy-progress-card";
 import { PlayerEngagement } from "@/components/public/player-engagement";
 import { getPlayerEngagement, getAllPlayerTitles } from "@/lib/actions/engagement";
 import {
@@ -295,6 +296,14 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
   const teamIds = teamRows.map((t) => t.teamId);
   const teamIdSet = new Set(teamIds);
 
+  // BWL Legacy: recent XP/coin activity for the progress card
+  const recentLegacy = await prisma.legacyXpTransaction.findMany({
+    where: { playerId: player.id },
+    orderBy: { createdAt: "desc" },
+    take: 6,
+    select: { id: true, xp: true, coins: true, reason: true, createdAt: true },
+  });
+
   const [stats, recentMatches, upcomingMatches, engagement, allTitles] = await Promise.all([
     getPlayerStats(player.id, teamIds),
     getPlayerRecentMatches(player.id, teamIds),
@@ -415,6 +424,12 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                 matches: stats.appearances,
                 motm: stats.motm,
               }}
+            />
+
+            <LegacyProgressCard
+              totalXp={player.legacyXp}
+              coins={player.coins}
+              recent={recentLegacy}
             />
 
             <PlayerEngagement
