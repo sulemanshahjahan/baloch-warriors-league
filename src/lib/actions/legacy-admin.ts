@@ -130,3 +130,35 @@ export async function setActiveSeason(seasonId: string | null): Promise<ActionRe
   revalidatePath("/legacy");
   return { success: true, data: undefined };
 }
+
+// ── Raffles ───────────────────────────────────────────────────
+
+export async function createRaffle(name: string, prize: string, costPerTicket: number): Promise<ActionResult> {
+  const a = await admin();
+  if ("error" in a) return { success: false, error: a.error };
+  if (!name.trim() || !prize.trim()) return { success: false, error: "Name and prize required" };
+  await prisma.raffle.create({ data: { name: name.trim(), prize: prize.trim(), costPerTicket: Math.max(1, costPerTicket || 100), isActive: true } });
+  revalidatePath("/admin/legacy");
+  revalidatePath("/raffles");
+  return { success: true, data: undefined };
+}
+
+/** Draw a weighted-random winner from a raffle's ticket entries. */
+export async function drawRaffle(raffleId: string): Promise<ActionResult<{ winner: string | null }>> {
+  const a = await admin();
+  if ("error" in a) return { success: false, error: a.error } as ActionResult<{ winner: string | null }>;
+
+  const entries = await prisma.raffleEntry.findMany({
+    where: { raffleId },
+    select: { playerId: true, tickets: true, player: { select: { name: true } } },
+  });
+  const pool: { id: string; name: string }[] = [];
+  for (const e of entries) for (let i = 0; i < e.tickets; i++) pool.push({ id: e.playerId, name: e.player.name });
+  if (pool.length === 0) return { success: false, error: "No entries to draw from" };
+
+  const win = pool[Math.floor(Math.random() * pool.length)];
+  await prisma.raffle.update({ where: { id: raffleId }, data: { winnerPlayerId: win.id, isActive: false, drawsAt: new Date() } });
+  revalidatePath("/admin/legacy");
+  revalidatePath("/raffles");
+  return { success: true, data: { winner: win.name } };
+}

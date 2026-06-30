@@ -20,6 +20,7 @@ const navLinks = [
   { href: "/rankings", label: "Rankings" },
   { href: "/legacy", label: "Legacy" },
   { href: "/store", label: "Store" },
+  { href: "/raffles", label: "Raffles" },
   { href: "/news", label: "News" },
 ];
 

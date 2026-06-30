@@ -8,10 +8,11 @@ import { LegacyAdminPanel } from "./legacy-admin-panel";
 export default async function AdminLegacyPage() {
   await requireRole("ADMIN");
 
-  const [seasons, players, recentAudit] = await Promise.all([
+  const [seasons, players, recentAudit, raffles] = await Promise.all([
     prisma.season.findMany({ orderBy: { createdAt: "desc" }, select: { id: true, name: true, isActive: true, startDate: true, endDate: true } }),
     prisma.player.findMany({ where: { isActive: true }, orderBy: { name: "asc" }, select: { id: true, name: true, legacyLevel: true, legacyTier: true, coins: true } }),
     prisma.adminRewardAuditLog.findMany({ orderBy: { createdAt: "desc" }, take: 15, select: { id: true, action: true, reason: true, targetPlayerId: true, createdAt: true } }),
+    prisma.raffle.findMany({ orderBy: { createdAt: "desc" }, select: { id: true, name: true, prize: true, isActive: true, _count: { select: { entries: true } } } }),
   ]);
 
   return (
@@ -22,6 +23,7 @@ export default async function AdminLegacyPage() {
           seasons={seasons.map((s) => ({ ...s, startDate: s.startDate?.toISOString() ?? null, endDate: s.endDate?.toISOString() ?? null }))}
           players={players}
           recentAudit={recentAudit.map((a) => ({ ...a, createdAt: a.createdAt.toISOString() }))}
+          raffles={raffles.map((r) => ({ id: r.id, name: r.name, prize: r.prize, isActive: r.isActive, entries: r._count.entries }))}
         />
       </main>
     </div>

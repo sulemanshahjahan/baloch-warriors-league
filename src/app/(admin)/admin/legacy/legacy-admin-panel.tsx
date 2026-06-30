@@ -8,13 +8,14 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { STORE_ITEMS } from "@/lib/cosmetics";
-import { adjustPlayerLegacy, grantCosmetic, equipCosmetic, createSeason, setActiveSeason } from "@/lib/actions/legacy-admin";
+import { adjustPlayerLegacy, grantCosmetic, equipCosmetic, createSeason, setActiveSeason, createRaffle, drawRaffle } from "@/lib/actions/legacy-admin";
 
 interface Season { id: string; name: string; isActive: boolean; startDate: string | null; endDate: string | null }
 interface PlayerLite { id: string; name: string; legacyLevel: number; legacyTier: string; coins: number }
 interface Audit { id: string; action: string; reason: string; targetPlayerId: string; createdAt: string }
+interface RaffleLite { id: string; name: string; prize: string; isActive: boolean; entries: number }
 
-export function LegacyAdminPanel({ seasons, players, recentAudit }: { seasons: Season[]; players: PlayerLite[]; recentAudit: Audit[] }) {
+export function LegacyAdminPanel({ seasons, players, recentAudit, raffles }: { seasons: Season[]; players: PlayerLite[]; recentAudit: Audit[]; raffles: RaffleLite[] }) {
   const router = useRouter();
   const [isPending, start] = useTransition();
   const [msg, setMsg] = useState("");
@@ -34,6 +35,11 @@ export function LegacyAdminPanel({ seasons, players, recentAudit }: { seasons: S
   const [seasonName, setSeasonName] = useState("");
   const [seasonStart, setSeasonStart] = useState("");
   const [seasonEnd, setSeasonEnd] = useState("");
+
+  // raffle
+  const [raffleName, setRaffleName] = useState("");
+  const [rafflePrize, setRafflePrize] = useState("");
+  const [raffleCost, setRaffleCost] = useState("100");
 
   const run = (fn: () => Promise<{ success: boolean; error?: string }>, ok: string) =>
     start(async () => {
@@ -115,6 +121,25 @@ export function LegacyAdminPanel({ seasons, players, recentAudit }: { seasons: S
             <Button size="sm" disabled={isPending || !cosPlayer || !cosItem} onClick={() => run(() => equipCosmetic(cosPlayer, cosItem), "Equipped")}>Grant & Equip</Button>
             <Button size="sm" variant="ghost" disabled={isPending || !cosPlayer} onClick={() => run(() => equipCosmetic(cosPlayer, null), "Cleared")}>Unequip frame</Button>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Raffles */}
+      <Card>
+        <CardHeader><CardTitle className="text-base">Raffles</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          {raffles.map((r) => (
+            <div key={r.id} className="flex items-center justify-between gap-2 p-2 rounded bg-muted/40">
+              <span className="text-sm font-medium truncate">{r.name} — {r.prize} <span className="text-muted-foreground">({r.entries} entries{r.isActive ? "" : " · drawn"})</span></span>
+              {r.isActive && <Button size="sm" variant="outline" disabled={isPending} onClick={() => run(() => drawRaffle(r.id), "Winner drawn")}>Draw winner</Button>}
+            </div>
+          ))}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-border">
+            <Input placeholder="Raffle name" value={raffleName} onChange={(e) => setRaffleName(e.target.value)} />
+            <Input placeholder="Prize (e.g. BWL Jersey)" value={rafflePrize} onChange={(e) => setRafflePrize(e.target.value)} />
+            <Input type="number" placeholder="Coins / ticket" value={raffleCost} onChange={(e) => setRaffleCost(e.target.value)} />
+          </div>
+          <Button size="sm" disabled={isPending || !raffleName || !rafflePrize} onClick={() => run(() => createRaffle(raffleName, rafflePrize, Number(raffleCost) || 100), "Raffle created")}>Create Raffle</Button>
         </CardContent>
       </Card>
 
