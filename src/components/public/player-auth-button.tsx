@@ -37,7 +37,7 @@ export function PlayerAuthButton() {
 
   return (
     <div className="flex items-center gap-2">
-      <Link href={`/players/${me.slug}`} className="inline-flex items-center gap-1.5 text-sm font-medium px-2.5 py-1.5 rounded-md bg-muted hover:bg-muted/70 transition-colors">
+      <Link href="/player/account" className="inline-flex items-center gap-1.5 text-sm font-medium px-2.5 py-1.5 rounded-md bg-muted hover:bg-muted/70 transition-colors">
         <span className="text-amber-300 flex items-center gap-1"><Coins className="w-3.5 h-3.5" />{me.coins.toLocaleString()}</span>
         <span className="text-muted-foreground hidden sm:inline">·</span>
         <span className="hidden sm:inline truncate max-w-[100px]">{me.name}</span>

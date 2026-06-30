@@ -4,34 +4,43 @@ import { randomInt } from "crypto";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import type { ActionResult } from "@/lib/utils";
-import { createPlayerSession, clearPlayerSession } from "@/lib/player-session";
+import { createPlayerSession, clearPlayerSession, getPlayerSession } from "@/lib/player-session";
+import { sendEmail, otpEmailHtml } from "@/lib/email";
 
-/** Digits only, no leading +/spaces. */
-function normalizePhone(input: string): string {
-  return (input || "").replace(/\D/g, "");
+function normalizeEmail(input: string): string {
+  return (input || "").trim().toLowerCase();
 }
 
-/** Find a player whose stored phone matches (by last 9 digits). */
-async function findPlayerByPhone(digits: string) {
-  if (digits.length < 7) return null;
-  const tail = digits.slice(-9);
+async function playerByEmail(email: string) {
+  if (!email.includes("@")) return null;
   return prisma.player.findFirst({
-    where: { isActive: true, phone: { contains: tail } },
-    select: { id: true, name: true, slug: true, phone: true },
+    where: { isActive: true, email },
+    select: { id: true, name: true, slug: true, email: true, passwordHash: true },
   });
 }
 
-/** Send a one-time login code to the player's WhatsApp number. */
-export async function requestPlayerOtp(phoneInput: string): Promise<ActionResult> {
-  const digits = normalizePhone(phoneInput);
-  const player = await findPlayerByPhone(digits);
-  if (!player) {
-    return { success: false, error: "No active player found with that number. Ask an admin to add your phone." };
-  }
-  const phone = normalizePhone(player.phone ?? digits);
+// ── Email + password login ────────────────────────────────────
 
-  // Rate limit: one code per 60s
-  const existing = await prisma.playerOtp.findUnique({ where: { phone } });
+export async function loginWithPassword(emailInput: string, password: string): Promise<ActionResult<{ slug: string }>> {
+  const email = normalizeEmail(emailInput);
+  const player = await playerByEmail(email);
+  // Same generic error to avoid leaking which emails exist.
+  const fail = { success: false, error: "Incorrect email or password." } as ActionResult<{ slug: string }>;
+  if (!player || !player.passwordHash) return fail;
+  const ok = await bcrypt.compare(password || "", player.passwordHash);
+  if (!ok) return fail;
+  await createPlayerSession(player.id);
+  return { success: true, data: { slug: player.slug } };
+}
+
+// ── Email OTP login ───────────────────────────────────────────
+
+export async function requestEmailOtp(emailInput: string): Promise<ActionResult> {
+  const email = normalizeEmail(emailInput);
+  const player = await playerByEmail(email);
+  if (!player) return { success: false, error: "No active player found with that email. Ask an admin to add it." };
+
+  const existing = await prisma.playerOtp.findUnique({ where: { email } });
   if (existing && Date.now() - existing.createdAt.getTime() < 60_000) {
     return { success: false, error: "Please wait a minute before requesting another code." };
   }
@@ -39,49 +48,46 @@ export async function requestPlayerOtp(phoneInput: string): Promise<ActionResult
   const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
   const codeHash = await bcrypt.hash(code, 8);
   const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
-
   await prisma.playerOtp.upsert({
-    where: { phone },
-    create: { phone, codeHash, expiresAt, attempts: 0 },
+    where: { email },
+    create: { email, codeHash, expiresAt, attempts: 0 },
     update: { codeHash, expiresAt, attempts: 0, createdAt: new Date() },
   });
 
-  // Send via WhatsApp template `login_otp` (body param = the code).
-  const { sendWhatsAppTemplate } = await import("@/lib/whatsapp");
-  const res = await sendWhatsAppTemplate({
-    to: phone,
-    templateName: "login_otp",
-    languageCode: "en",
-    parameters: [code],
-  });
-  if (!res.ok) {
-    return { success: false, error: "Could not send the code via WhatsApp. Try again shortly." };
-  }
-
-  return { success: true, data: undefined, message: `Code sent to the number ending ${phone.slice(-4)}.` };
+  const res = await sendEmail({ to: email, subject: `Your BWL login code: ${code}`, html: otpEmailHtml(code) });
+  if (!res.ok) return { success: false, error: "Could not send the email. Try again shortly." };
+  return { success: true, data: undefined, message: "Code sent to your email." };
 }
 
-/** Verify a code and start a player session. */
-export async function verifyPlayerOtp(phoneInput: string, code: string): Promise<ActionResult> {
-  const digits = normalizePhone(phoneInput);
-  const player = await findPlayerByPhone(digits);
-  if (!player) return { success: false, error: "No active player found with that number." };
-  const phone = normalizePhone(player.phone ?? digits);
+export async function verifyEmailOtp(emailInput: string, code: string): Promise<ActionResult<{ slug: string }>> {
+  const email = normalizeEmail(emailInput);
+  const player = await playerByEmail(email);
+  if (!player) return { success: false, error: "No active player found with that email." };
 
-  const otp = await prisma.playerOtp.findUnique({ where: { phone } });
+  const otp = await prisma.playerOtp.findUnique({ where: { email } });
   if (!otp) return { success: false, error: "Request a code first." };
   if (otp.expiresAt < new Date()) return { success: false, error: "Code expired. Request a new one." };
   if (otp.attempts >= 5) return { success: false, error: "Too many attempts. Request a new code." };
 
   const ok = await bcrypt.compare((code || "").trim(), otp.codeHash);
   if (!ok) {
-    await prisma.playerOtp.update({ where: { phone }, data: { attempts: { increment: 1 } } });
+    await prisma.playerOtp.update({ where: { email }, data: { attempts: { increment: 1 } } });
     return { success: false, error: "Incorrect code." };
   }
-
-  await prisma.playerOtp.delete({ where: { phone } }).catch(() => {});
+  await prisma.playerOtp.delete({ where: { email } }).catch(() => {});
   await createPlayerSession(player.id);
-  return { success: true, data: { slug: player.slug } as unknown as undefined, message: "Logged in" };
+  return { success: true, data: { slug: player.slug } };
+}
+
+// ── Set / change password (requires session) ──────────────────
+
+export async function setMyPassword(password: string): Promise<ActionResult> {
+  const session = await getPlayerSession();
+  if (!session) return { success: false, error: "Please sign in first." };
+  if (!password || password.length < 6) return { success: false, error: "Password must be at least 6 characters." };
+  const passwordHash = await bcrypt.hash(password, 10);
+  await prisma.player.update({ where: { id: session.playerId }, data: { passwordHash } });
+  return { success: true, data: undefined, message: "Password set." };
 }
 
 export async function playerLogout(): Promise<ActionResult> {

@@ -29,6 +29,7 @@ const playerSchema = z.object({
   bio: z.string().optional(),
   dateOfBirth: z.string().optional(),
   phone: z.string().optional(),
+  email: z.string().email().optional().or(z.literal("")),
 });
 
 export async function createPlayer(formData: FormData) {
@@ -60,6 +61,7 @@ export async function createPlayer(formData: FormData) {
       bio: data.bio || null,
       dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null,
       phone: data.phone || null,
+      email: data.email ? data.email.toLowerCase() : null,
     },
   });
 
@@ -101,6 +103,7 @@ export async function updatePlayer(id: string, formData: FormData) {
       bio: data.bio || null,
       dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth) : null,
       phone: data.phone || null,
+      email: data.email ? data.email.toLowerCase() : null,
       suspendedUntil: raw.suspendedUntil ? new Date(raw.suspendedUntil as string) : null,
       suspensionReason: (raw.suspensionReason as string) || null,
     },

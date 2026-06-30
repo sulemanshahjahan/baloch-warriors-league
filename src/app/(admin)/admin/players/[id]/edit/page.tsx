@@ -27,6 +27,7 @@ export default async function EditPlayerPage({ params }: EditPlayerPageProps) {
       skillLevel: true,
       bio: true,
       phone: true,
+      email: true,
       dateOfBirth: true,
       isActive: true,
       suspendedUntil: true,

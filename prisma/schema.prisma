@@ -242,6 +242,8 @@ model Player {
   dateOfBirth DateTime?
   nationality String?
   phone       String?   // WhatsApp number with country code e.g. +923001234567
+  email        String?  @unique // login email (player accounts)
+  passwordHash String?  // bcrypt hash for email+password login
   position    String?
   skillLevel  Int?      @default(50) // 0-99 rating for seeding
   eloRating   Int       @default(100)
@@ -534,7 +536,7 @@ model RaffleEntry {
 
 model PlayerOtp {
   id        String   @id @default(cuid())
-  phone     String   @unique // normalized digits
+  email     String   @unique // login email (lowercased)
   codeHash  String
   expiresAt DateTime
   attempts  Int      @default(0)

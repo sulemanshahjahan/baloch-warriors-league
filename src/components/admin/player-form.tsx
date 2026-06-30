@@ -32,6 +32,7 @@ interface PlayerFormProps {
     skillLevel: number | null;
     bio: string | null;
     phone: string | null;
+    email: string | null;
     dateOfBirth: Date | null;
     isActive: boolean;
     suspendedUntil: Date | null;
@@ -144,6 +145,16 @@ export function PlayerForm({ player }: PlayerFormProps) {
                   type="tel"
                   defaultValue={player.phone ?? ""}
                   placeholder="+923001234567"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Login Email</Label>
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  defaultValue={player.email ?? ""}
+                  placeholder="player@example.com"
                 />
               </div>
               <div className="space-y-2">
