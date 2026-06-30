@@ -42,7 +42,10 @@ export async function POST(req: NextRequest) {
   // Keep the member's own last-seen fresh too (used elsewhere on the profile).
   if (playerId) {
     await prisma.player
-      .update({ where: { id: playerId }, data: { lastSeenAt: now, lastCountry: country, lastCity: city, lastPath: path } })
+      .update({
+        where: { id: playerId },
+        data: { lastSeenAt: now, lastCountry: country, lastCity: city, lastPath: path, pageViews: { increment: 1 } },
+      })
       .catch(() => {});
   }
 

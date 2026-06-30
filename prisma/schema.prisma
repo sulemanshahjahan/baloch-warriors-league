@@ -260,6 +260,7 @@ model Player {
   lastCountry  String?
   lastCity     String?
   lastPath     String?
+  pageViews    Int       @default(0)
   isActive         Boolean   @default(true)
   registrationStatus String  @default("APPROVED") // PENDING, APPROVED, REJECTED
   suspendedUntil   DateTime?

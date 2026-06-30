@@ -48,7 +48,7 @@ export default async function ActiveUsersPage() {
       where: { lastSeenAt: { gte: since } },
       orderBy: { lastSeenAt: "desc" },
       take: 300,
-      select: { id: true, name: true, slug: true, lastSeenAt: true, lastCountry: true, lastCity: true, lastPath: true },
+      select: { id: true, name: true, slug: true, lastSeenAt: true, lastCountry: true, lastCity: true, lastPath: true, pageViews: true },
     }),
     prisma.visitorSession.findMany({
       where: { playerId: null, lastSeenAt: { gte: since } },
@@ -69,6 +69,7 @@ export default async function ActiveUsersPage() {
       city: m.lastCity,
       path: m.lastPath,
       lastSeenAt: m.lastSeenAt!,
+      views: m.pageViews,
     })),
     ...guests.map((g) => ({
       key: `g:${g.id}`,
@@ -128,6 +129,7 @@ export default async function ActiveUsersPage() {
                   <th className="px-3 py-2 font-medium">Status</th>
                   <th className="px-3 py-2 font-medium">Location</th>
                   <th className="px-3 py-2 font-medium">On page</th>
+                  <th className="px-3 py-2 font-medium text-center">Views</th>
                   <th className="px-3 py-2 font-medium text-right">Last seen</th>
                 </tr>
               </thead>
@@ -168,6 +170,7 @@ export default async function ActiveUsersPage() {
                         )}
                       </td>
                       <td className="px-3 py-2 text-muted-foreground truncate max-w-[180px]">{r.path ?? "—"}</td>
+                      <td className="px-3 py-2 text-center text-muted-foreground">{r.views ?? "—"}</td>
                       <td className="px-3 py-2 text-right text-muted-foreground whitespace-nowrap">{timeAgo(r.lastSeenAt)}</td>
                     </tr>
                   );
