@@ -422,10 +422,10 @@ body {
     repeating-linear-gradient(125deg, rgba(255, 255, 255, 0.026) 0 1px, transparent 1px 24px),
     /* vertical mown-pitch stripes */
     repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.04) 0 2px, transparent 2px 90px),
-    /* readability overlay — translucent so a stadium photo shows through */
-    linear-gradient(180deg, rgba(8, 30, 20, 0.72) 0%, rgba(6, 22, 14, 0.82) 46%, rgba(2, 11, 8, 0.92) 100%),
-    /* OPTIONAL drop-in stadium photo (safe no-op until /stadium-hero.jpg exists) */
-    url("/stadium-hero.jpg") center 28% / cover no-repeat,
+    /* readability overlay — translucent so the stadium photo shows through */
+    linear-gradient(180deg, rgba(8, 30, 20, 0.66) 0%, rgba(6, 22, 14, 0.78) 46%, rgba(2, 11, 8, 0.9) 100%),
+    /* stadium floodlight photo */
+    url("/profile-assets/stadium-floodlight-bg.webp") center 30% / cover no-repeat,
     /* solid fallback pitch (shown when no photo present) */
     linear-gradient(180deg, #0a2719 0%, #0c2f1f 44%, #04100a 100%);
 }

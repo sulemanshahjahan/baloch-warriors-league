@@ -1,26 +1,16 @@
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 function Crown() {
   return (
-    <svg className="bwl-crown" width="34" height="20" viewBox="0 0 34 20" fill="none" aria-hidden>
-      <path
-        d="M2 6l6 5 9-9 9 9 6-5-3 12H5L2 6z"
-        fill="url(#bwlCrownG)"
-        stroke="#b45309"
-        strokeWidth="1"
-        strokeLinejoin="round"
-      />
-      <circle cx="2" cy="6" r="2" fill="#fde68a" />
-      <circle cx="32" cy="6" r="2" fill="#fde68a" />
-      <circle cx="17" cy="2" r="2" fill="#fde68a" />
-      <defs>
-        <linearGradient id="bwlCrownG" x1="0" y1="0" x2="0" y2="20" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#fff0b8" />
-          <stop offset="0.5" stopColor="#fbbf24" />
-          <stop offset="1" stopColor="#d97706" />
-        </linearGradient>
-      </defs>
-    </svg>
+    <Image
+      src="/profile-assets/avatar-crown-gold-trim.png"
+      alt=""
+      width={44}
+      height={22}
+      className="bwl-crown"
+      aria-hidden
+    />
   );
 }
 
