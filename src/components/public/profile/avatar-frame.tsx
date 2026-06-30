@@ -4,12 +4,14 @@ import { cn } from "@/lib/utils";
 function Crown() {
   return (
     <Image
-      src="/profile-assets/avatar-crown-gold-trim.png"
+      src="/profile-assets/crown-shine.webp"
       alt=""
-      width={44}
-      height={22}
+      width={48}
+      height={25}
       className="bwl-crown"
       aria-hidden
+      unoptimized
+      priority
     />
   );
 }
