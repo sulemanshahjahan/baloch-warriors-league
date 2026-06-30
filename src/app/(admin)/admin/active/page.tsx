@@ -22,61 +22,102 @@ function timeAgo(d: Date): string {
   return `${Math.floor(h / 24)}d ago`;
 }
 
+type Row = {
+  key: string;
+  kind: "member" | "guest";
+  id: string;
+  name: string;
+  slug?: string;
+  country: string | null;
+  city: string | null;
+  path: string | null;
+  lastSeenAt: Date;
+  views?: number;
+};
+
 export const metadata = { title: "Active Users" };
 
 export default async function ActiveUsersPage() {
   await requireRole("ADMIN");
 
   const since = new Date(Date.now() - WINDOW_MS);
-  const visitors = await prisma.visitorSession.findMany({
-    where: { lastSeenAt: { gte: since } },
-    orderBy: { lastSeenAt: "desc" },
-    take: 300,
-    select: {
-      id: true,
-      country: true,
-      city: true,
-      lastPath: true,
-      lastSeenAt: true,
-      pageViews: true,
-      player: { select: { id: true, name: true, slug: true } },
-    },
-  });
+
+  // Members from the reliable player last-seen; guests from anonymous sessions.
+  const [members, guests] = await Promise.all([
+    prisma.player.findMany({
+      where: { lastSeenAt: { gte: since } },
+      orderBy: { lastSeenAt: "desc" },
+      take: 300,
+      select: { id: true, name: true, slug: true, lastSeenAt: true, lastCountry: true, lastCity: true, lastPath: true },
+    }),
+    prisma.visitorSession.findMany({
+      where: { playerId: null, lastSeenAt: { gte: since } },
+      orderBy: { lastSeenAt: "desc" },
+      take: 300,
+      select: { id: true, country: true, city: true, lastPath: true, lastSeenAt: true, pageViews: true },
+    }),
+  ]);
+
+  const rows: Row[] = [
+    ...members.map((m) => ({
+      key: `m:${m.id}`,
+      kind: "member" as const,
+      id: m.id,
+      name: m.name,
+      slug: m.slug,
+      country: m.lastCountry,
+      city: m.lastCity,
+      path: m.lastPath,
+      lastSeenAt: m.lastSeenAt!,
+    })),
+    ...guests.map((g) => ({
+      key: `g:${g.id}`,
+      kind: "guest" as const,
+      id: g.id,
+      name: "Guest",
+      country: g.country,
+      city: g.city,
+      path: g.lastPath,
+      lastSeenAt: g.lastSeenAt,
+      views: g.pageViews,
+    })),
+  ].sort((a, b) => b.lastSeenAt.getTime() - a.lastSeenAt.getTime());
 
   const now = Date.now();
   const isOnline = (d: Date) => now - d.getTime() < ONLINE_MS;
-  const onlineCount = visitors.filter((v) => isOnline(v.lastSeenAt)).length;
-  const membersOnline = visitors.filter((v) => isOnline(v.lastSeenAt) && v.player).length;
+  const onlineRows = rows.filter((r) => isOnline(r.lastSeenAt));
+  const membersOnline = onlineRows.filter((r) => r.kind === "member").length;
+  const guestsOnline = onlineRows.length - membersOnline;
 
   return (
     <div className="flex flex-col flex-1">
-      <AdminHeader title="Active Users" description={`${onlineCount} online now · ${visitors.length} visitors in last 24h`} />
+      <AdminHeader title="Active Users" description={`${onlineRows.length} online now · ${rows.length} in last 24h`} />
       <LiveRefresh interval={20000} />
 
       <main className="flex-1 p-6 space-y-6">
         <div className="flex flex-wrap gap-3">
           <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3">
             <p className="text-2xl font-black text-emerald-400 flex items-center gap-2">
-              <Radio className="w-5 h-5" /> {onlineCount}
+              <Radio className="w-5 h-5" /> {onlineRows.length}
             </p>
             <p className="text-xs text-muted-foreground">Online now (last 5 min)</p>
           </div>
           <div className="rounded-xl border border-border bg-card px-4 py-3">
-            <p className="text-2xl font-black">{membersOnline}</p>
-            <p className="text-xs text-muted-foreground">Members online · {onlineCount - membersOnline} guests</p>
+            <p className="text-2xl font-black">{membersOnline} <span className="text-base text-muted-foreground font-bold">members</span></p>
+            <p className="text-xs text-muted-foreground">{guestsOnline} guests online</p>
           </div>
           <div className="rounded-xl border border-border bg-card px-4 py-3">
-            <p className="text-2xl font-black">{visitors.length}</p>
-            <p className="text-xs text-muted-foreground">Visitors in last 24h</p>
+            <p className="text-2xl font-black">{rows.length}</p>
+            <p className="text-xs text-muted-foreground">Active in last 24h</p>
           </div>
         </div>
 
         <p className="text-xs text-muted-foreground">
-          Every real visitor (member or guest) that loads the site is shown here. Location is an approximate city/country
-          from the visitor&apos;s IP (no raw IP stored). For full anonymous traffic totals, see your Vercel Analytics dashboard.
+          Every real visitor (member or guest) that loads the site shows here within ~1 minute. Location is an
+          approximate city/country from the IP (no raw IP stored). Full anonymous totals live in Vercel Analytics.
         </p>
 
-        {visitors.length === 0 ? (
+        {rows.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground text-sm">No visitors in the last 24 hours yet.</div>
         ) : (
           <div className="rounded-md border border-border overflow-hidden overflow-x-auto">
@@ -87,27 +128,26 @@ export default async function ActiveUsersPage() {
                   <th className="px-3 py-2 font-medium">Status</th>
                   <th className="px-3 py-2 font-medium">Location</th>
                   <th className="px-3 py-2 font-medium">On page</th>
-                  <th className="px-3 py-2 font-medium text-center">Views</th>
                   <th className="px-3 py-2 font-medium text-right">Last seen</th>
                 </tr>
               </thead>
               <tbody>
-                {visitors.map((v) => {
-                  const online = isOnline(v.lastSeenAt);
+                {rows.map((r) => {
+                  const online = isOnline(r.lastSeenAt);
                   return (
-                    <tr key={v.id} className="border-t border-border/50">
+                    <tr key={r.key} className="border-t border-border/50">
                       <td className="px-3 py-2">
-                        {v.player ? (
-                          <Link href={`/players/${v.player.slug}`} className="flex items-center gap-2 hover:text-primary">
-                            <SmartAvatar type="player" id={v.player.id} name={v.player.name} className="h-7 w-7 shrink-0" fallbackClassName="text-[10px]" />
-                            <span className="font-medium truncate">{v.player.name}</span>
+                        {r.kind === "member" && r.slug ? (
+                          <Link href={`/players/${r.slug}`} className="flex items-center gap-2 hover:text-primary">
+                            <SmartAvatar type="player" id={r.id} name={r.name} className="h-7 w-7 shrink-0" fallbackClassName="text-[10px]" />
+                            <span className="font-medium truncate">{r.name}</span>
                           </Link>
                         ) : (
                           <span className="flex items-center gap-2 text-muted-foreground">
                             <span className="h-7 w-7 shrink-0 rounded-full bg-muted grid place-items-center">
                               <UserRound className="w-4 h-4" />
                             </span>
-                            <span>Guest <span className="text-[11px] opacity-60">#{v.id.slice(0, 4)}</span></span>
+                            <span>Guest <span className="text-[11px] opacity-60">#{r.id.slice(0, 4)}</span></span>
                           </span>
                         )}
                       </td>
@@ -118,18 +158,17 @@ export default async function ActiveUsersPage() {
                         </span>
                       </td>
                       <td className="px-3 py-2">
-                        {v.country || v.city ? (
+                        {r.country || r.city ? (
                           <span className="inline-flex items-center gap-1.5">
-                            {v.country && <CountryFlag value={v.country} className="text-base" />}
-                            <span className="text-muted-foreground">{v.city ?? v.country}</span>
+                            {r.country && <CountryFlag value={r.country} className="text-base" />}
+                            <span className="text-muted-foreground">{r.city ?? r.country}</span>
                           </span>
                         ) : (
                           <span className="text-muted-foreground">—</span>
                         )}
                       </td>
-                      <td className="px-3 py-2 text-muted-foreground truncate max-w-[180px]">{v.lastPath ?? "—"}</td>
-                      <td className="px-3 py-2 text-center text-muted-foreground">{v.pageViews}</td>
-                      <td className="px-3 py-2 text-right text-muted-foreground whitespace-nowrap">{timeAgo(v.lastSeenAt)}</td>
+                      <td className="px-3 py-2 text-muted-foreground truncate max-w-[180px]">{r.path ?? "—"}</td>
+                      <td className="px-3 py-2 text-right text-muted-foreground whitespace-nowrap">{timeAgo(r.lastSeenAt)}</td>
                     </tr>
                   );
                 })}
