@@ -95,6 +95,7 @@ export async function equipCosmetic(playerId: string, itemKey: string | null): P
   await audit(a.id, playerId, "EQUIP_COSMETIC", itemKey ?? "(none)");
   revalidatePath("/admin/legacy");
   if (player?.slug) revalidatePath(`/players/${player.slug}`);
+  revalidatePath("/players");
   return { success: true, data: undefined };
 }
 

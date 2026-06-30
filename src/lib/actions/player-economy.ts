@@ -16,6 +16,7 @@ async function me(): Promise<{ id: string } | { error: string }> {
 async function revalidatePlayer(playerId: string) {
   const p = await prisma.player.findUnique({ where: { id: playerId }, select: { slug: true } });
   if (p?.slug) revalidatePath(`/players/${p.slug}`);
+  revalidatePath("/players"); // the grid shows equipped frames + crown too
 }
 
 /** Buy a cosmetic with coins (checks requirements + ownership). */
