@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { signPlayerToken, PLAYER_COOKIE, PLAYER_MAX_AGE } from "@/lib/player-session";
+import { verifyState } from "@/lib/oauth-state";
 
 export const dynamic = "force-dynamic";
 
@@ -20,10 +21,10 @@ export async function GET(req: NextRequest) {
 
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
-  const cookieState = req.cookies.get("g_state")?.value;
   if (!code) return fail("google", "no code");
-  if (!state || !cookieState || state !== cookieState) {
-    return fail("google_state", `state=${state ? "present" : "missing"} cookie=${cookieState ? "present" : "missing"} match=${state === cookieState}`);
+  // Stateless CSRF: verify the signed state (no cookie — works in mobile apps).
+  if (!verifyState(state)) {
+    return fail("google_state", `state=${state ? "present-but-invalid" : "missing"}`);
   }
 
   const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
@@ -76,6 +77,5 @@ export async function GET(req: NextRequest) {
     path: "/",
     maxAge: PLAYER_MAX_AGE,
   });
-  res.cookies.delete("g_state");
   return res;
 }
