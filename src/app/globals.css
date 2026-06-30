@@ -246,8 +246,12 @@ body {
 }
 
 .bwl-frame--bronze {
-  background: conic-gradient(from 210deg, #5a3216, #c8893f, #f2c389, #91501f, #6b3d1c, #c8893f, #5a3216);
-  box-shadow: 0 0 0 1px rgba(0,0,0,.4), 0 0 16px rgba(202, 138, 76, 0.45), inset 0 0 6px rgba(0,0,0,.4);
+  background: conic-gradient(from 215deg, #46270f, #b9762f, #f4c98c, #ffe7c4, #d68a3e, #7a4420, #3a210e, #c8893f, #46270f);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.5),
+    0 2px 7px rgba(0, 0, 0, 0.5),
+    0 0 18px rgba(202, 138, 76, 0.5),
+    inset 0 0 9px rgba(0, 0, 0, 0.5);
 }
 .bwl-frame--silver {
   background: conic-gradient(from 210deg, #5b6068, #d4d7dd, #ffffff, #9aa0a8, #5b6068, #e6e8ec, #5b6068);
@@ -294,8 +298,8 @@ body {
   -webkit-text-fill-color: transparent;
 }
 .bwl-name--crimson {
-  background-image: linear-gradient(180deg, #ff8a8a 0%, #ef4444 45%, #b91c1c 100%);
-  filter: drop-shadow(0 1px 10px rgba(225, 29, 47, 0.45));
+  background-image: linear-gradient(177deg, #ffd0cf 0%, #ff6b6b 32%, #e11d2f 64%, #9b1020 100%);
+  filter: drop-shadow(0 1px 12px rgba(225, 29, 47, 0.5));
 }
 .bwl-name--ice {
   background-image: linear-gradient(180deg, #e0f2fe 0%, #38bdf8 50%, #0ea5e9 100%);
@@ -310,27 +314,43 @@ body {
   background-size: 220% auto;
   filter: drop-shadow(0 1px 12px rgba(252, 211, 77, 0.4));
 }
-/* small accent slash under an equipped nameplate */
+/* refined accent slash under an equipped nameplate: bright cap + fading tail */
 .bwl-name-accent {
   display: block;
   height: 3px;
-  width: 44px;
-  margin-top: 4px;
+  width: 52px;
+  margin-top: 5px;
   border-radius: 2px;
-  background: linear-gradient(90deg, var(--bwl-accent, #ef4444), transparent);
+  background: linear-gradient(90deg, var(--bwl-accent, #ef4444) 0%, var(--bwl-accent, #ef4444) 22%, color-mix(in srgb, var(--bwl-accent, #ef4444) 40%, transparent) 60%, transparent 100%);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--bwl-accent, #ef4444) 55%, transparent);
+}
+/* soft glow halo behind an equipped name */
+.bwl-name-glow {
+  position: absolute;
+  left: -6px;
+  top: 50%;
+  width: 70%;
+  height: 150%;
+  transform: translateY(-50%);
+  background: radial-gradient(60% 60% at 30% 50%, color-mix(in srgb, var(--bwl-accent, #ef4444) 28%, transparent), transparent 70%);
+  filter: blur(10px);
+  pointer-events: none;
+  z-index: 0;
 }
 
 /* ── Banners (hero background) ─────────────────────────────────────────────
    Layered gradients build texture, floodlight, vignette + faint watermark. */
 .bwl-banner { position: relative; overflow: hidden; }
 .bwl-banner > * { position: relative; z-index: 1; }
+/* depth vignette: darkens edges + bottom so the player info reads on top */
 .bwl-banner::after {
   content: "";
   position: absolute;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  box-shadow: inset 0 -70px 80px -30px rgba(0, 0, 0, 0.75), inset 0 40px 60px -40px rgba(0, 0, 0, 0.5);
+  background: radial-gradient(130% 105% at 50% 30%, transparent 50%, rgba(0, 0, 0, 0.42) 100%);
+  box-shadow: inset 0 -90px 100px -28px rgba(0, 0, 0, 0.85), inset 0 50px 70px -42px rgba(0, 0, 0, 0.55);
 }
 
 .bwl-banner--default {
@@ -341,10 +361,19 @@ body {
 
 .bwl-banner--pitch {
   background:
-    radial-gradient(90% 70% at 50% -20%, rgba(110, 231, 183, 0.18), transparent 62%),
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.04) 0 2px, transparent 2px 84px),
-    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.12) 0 1px, transparent 1px 84px),
-    linear-gradient(180deg, #0a2418 0%, #0c2c1c 48%, #06140d 100%);
+    /* main floodlight from above */
+    radial-gradient(78% 60% at 50% -14%, rgba(110, 231, 183, 0.26), transparent 60%),
+    /* twin corner floods */
+    radial-gradient(40% 44% at 12% -6%, rgba(200, 255, 224, 0.13), transparent 70%),
+    radial-gradient(40% 44% at 88% -6%, rgba(200, 255, 224, 0.13), transparent 70%),
+    /* atmospheric haze band */
+    radial-gradient(120% 50% at 50% 32%, rgba(120, 220, 170, 0.06), transparent 70%),
+    /* eFootball diagonal sheen */
+    repeating-linear-gradient(125deg, rgba(255, 255, 255, 0.028) 0 1px, transparent 1px 24px),
+    /* vertical mown-pitch stripes */
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.045) 0 2px, transparent 2px 90px),
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.14) 0 1px, transparent 1px 90px),
+    linear-gradient(180deg, #0a2719 0%, #0c2f1f 44%, #04100a 100%);
 }
 .bwl-banner--fire {
   background:
@@ -367,11 +396,12 @@ body {
   z-index: 0;
   top: -10px;
   right: -14px;
-  width: 150px;
-  height: 150px;
+  width: 132px;
+  height: 132px;
   background: url("/logo.png") no-repeat center / contain;
-  opacity: 0.06;
-  filter: grayscale(1) brightness(2);
+  opacity: 0.04;
+  filter: grayscale(1) brightness(2.2) blur(0.4px);
+  mix-blend-mode: overlay;
   pointer-events: none;
 }
 
@@ -396,22 +426,49 @@ body {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 12px color-mix(in srgb, var(--bwl-accent, #34d399) 22%, transparent);
 }
 
-/* ── Equipped items row ────────────────────────────────────────────────────*/
+/* ── Equipped items: compact glass panel ───────────────────────────────────*/
+.bwl-equipped-panel {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  max-width: 100%;
+  padding: 0.45rem 0.55rem;
+  border-radius: 0.7rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 2px 10px rgba(0, 0, 0, 0.4);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+.bwl-equip-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+@media (max-width: 359px) {
+  .bwl-equip-grid { grid-template-columns: 1fr; }
+}
 .bwl-equip-chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.22rem 0.55rem;
-  border-radius: 9999px;
+  gap: 0.4rem;
+  min-width: 0;
+  padding: 0.26rem 0.45rem;
+  border-radius: 0.5rem;
   border: 1px solid;
-  font-size: 0.7rem;
+  background: rgba(0, 0, 0, 0.28);
+  font-size: 0.66rem;
   font-weight: 600;
-  line-height: 1;
+  line-height: 1.1;
 }
-.bwl-equip-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 9999px;
-  background: currentColor;
-  box-shadow: 0 0 6px currentColor;
+.bwl-equip-ico {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 0.35rem;
+  color: inherit;
+  background: color-mix(in srgb, currentColor 16%, transparent);
+  box-shadow: 0 0 8px color-mix(in srgb, currentColor 30%, transparent), inset 0 0 0 1px color-mix(in srgb, currentColor 22%, transparent);
 }

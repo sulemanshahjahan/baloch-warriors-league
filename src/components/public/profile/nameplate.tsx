@@ -14,10 +14,11 @@ export function Nameplate({
 }) {
   return (
     <div className="min-w-0">
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="relative flex items-center gap-2 flex-wrap">
+        {nameplate && <span className="bwl-name-glow" aria-hidden />}
         <h1
           className={cn(
-            "bwl-name text-2xl sm:text-3xl font-black tracking-tight leading-tight break-words",
+            "relative bwl-name text-2xl sm:text-3xl font-black tracking-tight leading-tight break-words",
             nameplate?.className,
           )}
         >

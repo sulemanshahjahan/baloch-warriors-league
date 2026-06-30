@@ -363,13 +363,13 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
       <ProfileBanner bannerClassName={cos.banner?.className} accent={cos.accent}>
         <Link
           href="/players"
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-4"
+          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors mb-2.5"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft className="w-3.5 h-3.5" />
           All Players
         </Link>
 
-        <div className="flex items-start gap-4">
+        <div className="flex items-start gap-3 sm:gap-4">
           <AvatarFrame frameClassName={cos.frame?.className} sizeClassName="h-20 w-20 sm:h-24 sm:w-24">
             <SmartAvatar
               type="player"

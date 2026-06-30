@@ -18,7 +18,7 @@ export function ProfileBanner({
       className={cn("bwl-banner border-b border-border/50", bannerClassName || "bwl-banner--default")}
       style={accent ? ({ "--bwl-accent": accent } as React.CSSProperties) : undefined}
     >
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-7 sm:py-8">{children}</div>
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">{children}</div>
     </section>
   );
 }
