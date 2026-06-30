@@ -247,10 +247,11 @@ model Player {
   eloRating   Int       @default(100)
   cardRank    Int       @default(70) // FIFA-style card rank, 50-99
   // ── BWL Legacy / economy (status only — never affects ELO/cardRank/matchmaking) ──
-  coins       Int       @default(0)
-  legacyXp    Int       @default(0)
-  legacyLevel Int       @default(1)
-  legacyTier  String    @default("Rookie")
+  coins        Int      @default(0)
+  legacyXp     Int      @default(0)
+  legacyLevel  Int      @default(1)
+  legacyTier   String   @default("Rookie")
+  legacyTokens Int      @default(0)
   bio              String?   @db.Text
   isActive         Boolean   @default(true)
   registrationStatus String  @default("APPROVED") // PENDING, APPROVED, REJECTED
@@ -281,6 +282,11 @@ model Player {
   contracts       PlayerContract[]
   respect         PlayerRespect?
   respectTxns     RespectTransaction[]
+  moments         PlayerMoment[]
+  inventory       PlayerInventoryItem[]
+  equipped        PlayerEquippedCosmetics?
+  predictions     MatchPrediction[]
+  raffleEntries   RaffleEntry[]
 
   @@index([isActive])
   @@map("players")
@@ -403,6 +409,141 @@ model RespectTransaction {
   @@unique([playerId, source, sourceId])
   @@index([playerId])
   @@map("respect_transactions")
+}
+
+// ─────────────────────────────────────────────────────────────
+// BWL MOMENTS (permanent career memories)
+// ─────────────────────────────────────────────────────────────
+
+model PlayerMoment {
+  id           String   @id @default(cuid())
+  playerId     String
+  type         String   // FIRST_WIN, FIRST_CLEAN_SHEET, REACHED_99, HOT_STREAK_5, TOURNAMENT_WIN …
+  title        String
+  description  String
+  icon         String?
+  rarity       String   @default("COMMON") // COMMON, RARE, EPIC, LEGENDARY
+  matchId      String?
+  tournamentId String?
+  isPinned     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  // Most moments are once-per-player (FIRST_*, REACHED_99). Repeatable ones
+  // include a discriminator in `type` (e.g. TOURNAMENT_WIN:<tournamentId>).
+  @@unique([playerId, type])
+  @@index([playerId])
+  @@map("player_moments")
+}
+
+// ─────────────────────────────────────────────────────────────
+// COSMETICS — owned inventory + equipped slots
+// ─────────────────────────────────────────────────────────────
+
+model PlayerInventoryItem {
+  id         String   @id @default(cuid())
+  playerId   String
+  itemType   String   // PROFILE_FRAME, PROFILE_BANNER, NAME_COLOR, TITLE, CARD_BG
+  itemKey    String
+  source     String   // STORE, LEGACY_LEVEL, SEASON, ADMIN
+  acquiredAt DateTime @default(now())
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, itemType, itemKey])
+  @@index([playerId])
+  @@map("player_inventory_items")
+}
+
+model PlayerEquippedCosmetics {
+  id             String   @id @default(cuid())
+  playerId       String   @unique
+  profileFrame   String?
+  profileBanner  String?
+  nameColor      String?
+  cardBg         String?
+  updatedAt      DateTime @updatedAt
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@map("player_equipped_cosmetics")
+}
+
+// ─────────────────────────────────────────────────────────────
+// PREDICTIONS (predict upcoming match outcomes for coins/XP)
+// ─────────────────────────────────────────────────────────────
+
+model MatchPrediction {
+  id         String    @id @default(cuid())
+  playerId   String
+  matchId    String
+  pick       String    // HOME, AWAY, DRAW
+  settled    Boolean   @default(false)
+  correct    Boolean?
+  createdAt  DateTime  @default(now())
+  settledAt  DateTime?
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  match  Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, matchId])
+  @@index([matchId])
+  @@index([playerId])
+  @@map("match_predictions")
+}
+
+// ─────────────────────────────────────────────────────────────
+// RAFFLES (spend coins on tickets for real prizes)
+// ─────────────────────────────────────────────────────────────
+
+model Raffle {
+  id             String    @id @default(cuid())
+  name           String
+  description    String?
+  prize          String
+  costPerTicket  Int       @default(100)
+  isActive       Boolean   @default(true)
+  drawsAt        DateTime?
+  winnerPlayerId String?
+  createdAt      DateTime  @default(now())
+
+  entries RaffleEntry[]
+
+  @@map("raffles")
+}
+
+model RaffleEntry {
+  id        String   @id @default(cuid())
+  raffleId  String
+  playerId  String
+  tickets   Int      @default(0)
+  createdAt DateTime @default(now())
+
+  raffle Raffle @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([raffleId, playerId])
+  @@index([raffleId])
+  @@map("raffle_entries")
+}
+
+// ─────────────────────────────────────────────────────────────
+// ADMIN REWARD AUDIT LOG (manual XP/coin/respect adjustments)
+// ─────────────────────────────────────────────────────────────
+
+model AdminRewardAuditLog {
+  id           String   @id @default(cuid())
+  adminId      String
+  targetPlayerId String
+  action       String
+  beforeJson   Json?
+  afterJson    Json?
+  reason       String
+  createdAt    DateTime @default(now())
+
+  @@index([targetPlayerId])
+  @@map("admin_reward_audit_logs")
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -602,6 +743,7 @@ model Match {
   scoreReports    ScoreReport[]
   availabilities  MatchAvailability[]
   whatsappLogs    WhatsAppLog[]
+  predictions     MatchPrediction[]
 
   @@index([tournamentId])
   @@index([status])

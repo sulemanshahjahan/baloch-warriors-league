@@ -27,6 +27,8 @@ import {
 import { PlayerCard } from "@/components/public/player-card";
 import { LegacyProgressCard } from "@/components/profile/legacy-progress-card";
 import { SeasonProgressCard, ActiveContractsCard, RespectCard } from "@/components/profile/profile-legacy-cards";
+import { MomentsGrid } from "@/components/profile/moments-grid";
+import { cssFor } from "@/lib/cosmetics";
 import { getActiveSeason, seasonProgress } from "@/lib/rewards/season";
 import { ensurePlayerContracts, dailyPeriodKey, weeklyPeriodKey } from "@/lib/rewards/contracts";
 import { PlayerEngagement } from "@/components/public/player-engagement";
@@ -329,6 +331,20 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
     : null;
   const respect = respectRow ?? { score: 80, label: "Good Standing" };
 
+  // Moments + equipped cosmetics
+  const [moments, equipped] = await Promise.all([
+    prisma.playerMoment.findMany({
+      where: { playerId: player.id },
+      orderBy: [{ isPinned: "desc" }, { createdAt: "desc" }],
+      take: 12,
+      select: { id: true, title: true, description: true, icon: true, rarity: true },
+    }),
+    prisma.playerEquippedCosmetics.findUnique({ where: { playerId: player.id } }),
+  ]);
+  const frameCss = cssFor(equipped?.profileFrame);
+  const nameCss = cssFor(equipped?.nameColor);
+  const bannerCss = cssFor(equipped?.profileBanner);
+
   const [stats, recentMatches, upcomingMatches, engagement, allTitles] = await Promise.all([
     getPlayerStats(player.id, teamIds),
     getPlayerRecentMatches(player.id, teamIds),
@@ -342,7 +358,7 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
   return (
     <div className="min-h-screen">
       {/* Hero */}
-      <section className="border-b border-border/50 bg-card/30">
+      <section className={`border-b border-border/50 ${bannerCss || "bg-card/30"}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <Link
             href="/players"
@@ -357,12 +373,12 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
               type="player"
               id={player.id}
               name={player.name}
-              className="h-20 w-20 sm:h-24 sm:w-24 shrink-0"
+              className={`h-20 w-20 sm:h-24 sm:w-24 shrink-0 ${frameCss}`}
               fallbackClassName="text-2xl sm:text-3xl"
             />
 
             <div className="min-w-0 flex-1">
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight leading-tight">
+              <h1 className={`text-2xl sm:text-3xl font-black tracking-tight leading-tight ${nameCss}`}>
                 {player.name}
               </h1>
               {player.nickname && (
@@ -387,6 +403,16 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                   <span className="font-medium">{player.cardRank}</span>
                   <span className="text-muted-foreground">card</span>
                 </div>
+                <span className="flex items-center gap-1 text-xs sm:text-sm">
+                  <span className="font-bold text-amber-300">Lvl {player.legacyLevel}</span>
+                  <span className="text-muted-foreground">{player.legacyTier}</span>
+                </span>
+                <span className="flex items-center gap-1 text-xs sm:text-sm text-emerald-300 font-semibold">
+                  ⛨ {respect.score}
+                </span>
+                <span className="flex items-center gap-1 text-xs sm:text-sm text-amber-300 font-semibold">
+                  🪙 {player.coins.toLocaleString()}
+                </span>
                 {player.eloRating !== 100 && (
                   <Link href="/rankings" className="flex items-center gap-1 text-xs sm:text-sm hover:text-primary transition-colors">
                     <Trophy className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-400" />
@@ -478,6 +504,8 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
               titles={playerTitles}
               streaks={engagement.streaks}
             />
+
+            <MomentsGrid moments={moments} />
 
             {/* Stats */}
             <Card>

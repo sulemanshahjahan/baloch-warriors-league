@@ -127,6 +127,24 @@ export async function processMatchLegacyRewards(matchId: string): Promise<void> 
  * Respect. All pieces are idempotent, so this is safe to re-run.
  */
 export async function processMatchRewards(matchId: string): Promise<void> {
+  // Capture tiers before awarding so we can detect tier-ups for notifications.
+  const pre = await prisma.match.findUnique({
+    where: { id: matchId },
+    select: {
+      homePlayerId: true, awayPlayerId: true,
+      homeTeam: { select: { players: { where: { isActive: true }, select: { playerId: true } } } },
+      awayTeam: { select: { players: { where: { isActive: true }, select: { playerId: true } } } },
+    },
+  });
+  const preIds = [
+    ...(pre?.homePlayerId ? [pre.homePlayerId] : pre?.homeTeam?.players.map((p) => p.playerId) ?? []),
+    ...(pre?.awayPlayerId ? [pre.awayPlayerId] : pre?.awayTeam?.players.map((p) => p.playerId) ?? []),
+  ];
+  const tierBefore = new Map(
+    (await prisma.player.findMany({ where: { id: { in: preIds } }, select: { id: true, name: true, legacyTier: true } }))
+      .map((p) => [p.id, { name: p.name, tier: p.legacyTier }]),
+  );
+
   await processMatchLegacyRewards(matchId);
 
   const match = await prisma.match.findUnique({
@@ -172,6 +190,29 @@ export async function processMatchRewards(matchId: string): Promise<void> {
       if (cleanSheet) await bumpContracts(playerId, "CLEAN_SHEETS", 1);
       // Respect — completed a match
       await awardRespect({ playerId, amount: 1, source: "MATCH_COMPLETED", sourceId: matchId, reason: "Completed a match" });
+    }
+  }
+
+  // Career moments
+  const { createMomentsForMatch } = await import("./moments");
+  await createMomentsForMatch(matchId);
+
+  // Notify (broadcast) on tier-ups — rare + community-worthy, not spammy.
+  const after = await prisma.player.findMany({
+    where: { id: { in: preIds } },
+    select: { id: true, legacyTier: true, legacyLevel: true },
+  });
+  const tierUps = after.filter((a) => tierBefore.get(a.id) && tierBefore.get(a.id)!.tier !== a.legacyTier);
+  if (tierUps.length > 0) {
+    const { notify } = await import("@/lib/push");
+    for (const up of tierUps) {
+      const name = tierBefore.get(up.id)?.name ?? "A player";
+      notify({
+        title: "🔥 New Legacy Tier!",
+        body: `${name} reached ${up.legacyTier} (Level ${up.legacyLevel}).`,
+        url: "/rankings",
+        tag: `tier-up-${up.id}-${up.legacyTier}`,
+      }).catch(() => {});
     }
   }
 }
