@@ -150,10 +150,12 @@ export interface PlayerClass {
   className: string; // bwl-title-strip--* tier
 }
 
+// Thresholds mirror the player-card tiers (getTheme): 90+ Legendary, 80+ Epic,
+// 70+ Gold — so the badge under the name always matches the card's rarity.
 export function playerClassFor(cardRank: number): PlayerClass {
-  if (cardRank >= 95) return { label: "Legendary Player", className: "bwl-title-strip--legendary" };
-  if (cardRank >= 90) return { label: "Elite Player", className: "bwl-title-strip--elite" };
-  if (cardRank >= 80) return { label: "Star Player", className: "bwl-title-strip--star" };
+  if (cardRank >= 90) return { label: "Legendary Player", className: "bwl-title-strip--legendary" };
+  if (cardRank >= 80) return { label: "Elite Player", className: "bwl-title-strip--elite" };
+  if (cardRank >= 70) return { label: "Star Player", className: "bwl-title-strip--star" };
   return { label: "BWL Player", className: "bwl-title-strip--base" };
 }
 
