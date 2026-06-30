@@ -17,6 +17,8 @@ const navLinks = [
   { href: "/players", label: "Players" },
   { href: "/stats", label: "Stats" },
   { href: "/rankings", label: "Rankings" },
+  { href: "/legacy", label: "Legacy" },
+  { href: "/store", label: "Store" },
   { href: "/news", label: "News" },
 ];
 
