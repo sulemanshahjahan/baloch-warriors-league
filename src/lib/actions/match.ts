@@ -177,8 +177,8 @@ export async function executeMatchCompletion(
   await updateEloAfterMatch(matchId);
 
   // BWL Legacy XP + coins (idempotent — safe to re-run)
-  const { processMatchLegacyRewards } = await import("@/lib/rewards/reward-engine");
-  await processMatchLegacyRewards(matchId);
+  const { processMatchRewards } = await import("@/lib/rewards/reward-engine");
+  await processMatchRewards(matchId);
 
   // Push notification
   const homeName = currentMatch.homePlayerId
@@ -1283,8 +1283,8 @@ export async function bulkUpdateMatchResults(
       await advanceKnockoutWinner(matchId, match.tournamentId);
       const { updateEloAfterMatch } = await import("@/lib/elo");
       await updateEloAfterMatch(matchId);
-      const { processMatchLegacyRewards } = await import("@/lib/rewards/reward-engine");
-      await processMatchLegacyRewards(matchId);
+      const { processMatchRewards } = await import("@/lib/rewards/reward-engine");
+      await processMatchRewards(matchId);
       updated++;
     } catch (e) {
       errors.push(matchId);

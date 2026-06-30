@@ -276,6 +276,11 @@ model Player {
   whatsappLogs    WhatsAppLog[]
   rankChanges     RankChange[]
   legacyTxns      LegacyXpTransaction[]
+  seasonProgress  PlayerSeasonProgress[]
+  seasonTxns      SeasonXpTransaction[]
+  contracts       PlayerContract[]
+  respect         PlayerRespect?
+  respectTxns     RespectTransaction[]
 
   @@index([isActive])
   @@map("players")
@@ -303,6 +308,101 @@ model LegacyXpTransaction {
   @@index([playerId])
   @@index([playerId, createdAt])
   @@map("legacy_xp_transactions")
+}
+
+// ─────────────────────────────────────────────────────────────
+// SEASON PROGRESS (resets each season — uses existing Season.id)
+// ─────────────────────────────────────────────────────────────
+
+model PlayerSeasonProgress {
+  id        String   @id @default(cuid())
+  playerId  String
+  seasonId  String
+  seasonXp  Int      @default(0)
+  level     Int      @default(1)
+  updatedAt DateTime @updatedAt
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, seasonId])
+  @@index([seasonId])
+  @@map("player_season_progress")
+}
+
+model SeasonXpTransaction {
+  id        String   @id @default(cuid())
+  playerId  String
+  seasonId  String
+  xp        Int      @default(0)
+  source    String
+  sourceId  String?
+  reason    String
+  createdAt DateTime @default(now())
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, seasonId, source, sourceId])
+  @@index([playerId, seasonId])
+  @@map("season_xp_transactions")
+}
+
+// ─────────────────────────────────────────────────────────────
+// MATCH CONTRACTS (daily / weekly challenges)
+// ─────────────────────────────────────────────────────────────
+
+model PlayerContract {
+  id          String    @id @default(cuid())
+  playerId    String
+  templateKey String
+  period      String    // "2026-06-30" (daily) or "2026-W26" (weekly)
+  type        String    // DAILY, WEEKLY
+  title       String
+  condition   String    // PLAY_MATCHES, WIN_MATCHES, CLEAN_SHEETS
+  target      Int
+  progress    Int       @default(0)
+  rewardXp    Int       @default(0)
+  rewardCoins Int       @default(0)
+  status      String    @default("ACTIVE") // ACTIVE, COMPLETED
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, templateKey, period])
+  @@index([playerId, status])
+  @@map("player_contracts")
+}
+
+// ─────────────────────────────────────────────────────────────
+// RESPECT SCORE (fair-play reputation, 0-100)
+// ─────────────────────────────────────────────────────────────
+
+model PlayerRespect {
+  id        String   @id @default(cuid())
+  playerId  String   @unique
+  score     Int      @default(80)
+  label     String   @default("Good Standing")
+  updatedAt DateTime @updatedAt
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@map("player_respect")
+}
+
+model RespectTransaction {
+  id        String   @id @default(cuid())
+  playerId  String
+  amount    Int
+  source    String
+  sourceId  String?
+  reason    String
+  createdAt DateTime @default(now())
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, source, sourceId])
+  @@index([playerId])
+  @@map("respect_transactions")
 }
 
 // ─────────────────────────────────────────────────────────────

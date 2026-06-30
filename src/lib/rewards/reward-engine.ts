@@ -121,3 +121,57 @@ export async function processMatchLegacyRewards(matchId: string): Promise<void> 
     await awardReward({ playerId: match.motmPlayerId, ...R.MOTM, source: "MOTM", sourceId: matchId, reason: "Man of the Match" });
   }
 }
+
+/**
+ * Full reward pass for a completed match: Legacy XP + Season XP + Contracts +
+ * Respect. All pieces are idempotent, so this is safe to re-run.
+ */
+export async function processMatchRewards(matchId: string): Promise<void> {
+  await processMatchLegacyRewards(matchId);
+
+  const match = await prisma.match.findUnique({
+    where: { id: matchId },
+    select: {
+      id: true, status: true,
+      homePlayerId: true, awayPlayerId: true,
+      homeScore: true, awayScore: true,
+      leg2HomeScore: true, leg2AwayScore: true,
+      leg3HomeScore: true, leg3AwayScore: true,
+      tournament: { select: { gameCategory: true } },
+      homeTeam: { select: { players: { where: { isActive: true }, select: { playerId: true } } } },
+      awayTeam: { select: { players: { where: { isActive: true }, select: { playerId: true } } } },
+    },
+  });
+  if (!match || match.status !== "COMPLETED") return;
+
+  const homePlayers = match.homePlayerId ? [match.homePlayerId] : (match.homeTeam?.players.map((p) => p.playerId) ?? []);
+  const awayPlayers = match.awayPlayerId ? [match.awayPlayerId] : (match.awayTeam?.players.map((p) => p.playerId) ?? []);
+  if (homePlayers.length === 0 && awayPlayers.length === 0) return;
+
+  const supportsCleanSheet = match.tournament.gameCategory === "EFOOTBALL" || match.tournament.gameCategory === "FOOTBALL";
+
+  const { getActiveSeason, awardSeasonXp } = await import("./season");
+  const { bumpContracts } = await import("./contracts");
+  const { awardRespect } = await import("./respect");
+  const season = await getActiveSeason();
+
+  for (const side of [{ players: homePlayers, home: true }, { players: awayPlayers, home: false }]) {
+    const { mine, opp } = aggregate(side.home, match);
+    const won = mine > opp;
+    const cleanSheet = supportsCleanSheet && opp === 0;
+
+    for (const playerId of side.players) {
+      // Season XP
+      if (season) {
+        await awardSeasonXp({ playerId, seasonId: season.id, xp: 100, source: "MATCH_PLAYED", sourceId: matchId, reason: "Played a match" });
+        if (won) await awardSeasonXp({ playerId, seasonId: season.id, xp: 75, source: "MATCH_WIN", sourceId: matchId, reason: "Won a match" });
+      }
+      // Contracts
+      await bumpContracts(playerId, "PLAY_MATCHES", 1);
+      if (won) await bumpContracts(playerId, "WIN_MATCHES", 1);
+      if (cleanSheet) await bumpContracts(playerId, "CLEAN_SHEETS", 1);
+      // Respect — completed a match
+      await awardRespect({ playerId, amount: 1, source: "MATCH_COMPLETED", sourceId: matchId, reason: "Completed a match" });
+    }
+  }
+}

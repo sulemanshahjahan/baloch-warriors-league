@@ -26,6 +26,9 @@ import {
 } from "lucide-react";
 import { PlayerCard } from "@/components/public/player-card";
 import { LegacyProgressCard } from "@/components/profile/legacy-progress-card";
+import { SeasonProgressCard, ActiveContractsCard, RespectCard } from "@/components/profile/profile-legacy-cards";
+import { getActiveSeason, seasonProgress } from "@/lib/rewards/season";
+import { ensurePlayerContracts, dailyPeriodKey, weeklyPeriodKey } from "@/lib/rewards/contracts";
 import { PlayerEngagement } from "@/components/public/player-engagement";
 import { getPlayerEngagement, getAllPlayerTitles } from "@/lib/actions/engagement";
 import {
@@ -304,6 +307,28 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
     select: { id: true, xp: true, coins: true, reason: true, createdAt: true },
   });
 
+  // Season + Contracts + Respect (ensure this period's contracts exist first)
+  await ensurePlayerContracts(player.id);
+  const activeSeason = await getActiveSeason();
+  const [seasonProg, periodContracts, respectRow] = await Promise.all([
+    activeSeason
+      ? prisma.playerSeasonProgress.findUnique({ where: { playerId_seasonId: { playerId: player.id, seasonId: activeSeason.id } } })
+      : Promise.resolve(null),
+    prisma.playerContract.findMany({
+      where: { playerId: player.id, period: { in: [dailyPeriodKey(), weeklyPeriodKey()] } },
+      orderBy: [{ status: "asc" }, { type: "asc" }],
+    }),
+    prisma.playerRespect.findUnique({ where: { playerId: player.id } }),
+  ]);
+  const seasonInfo = activeSeason
+    ? {
+        name: activeSeason.name,
+        ...seasonProgress(seasonProg?.seasonXp ?? 0),
+        daysLeft: activeSeason.endDate ? Math.max(0, Math.ceil((activeSeason.endDate.getTime() - Date.now()) / 86400000)) : null,
+      }
+    : null;
+  const respect = respectRow ?? { score: 80, label: "Good Standing" };
+
   const [stats, recentMatches, upcomingMatches, engagement, allTitles] = await Promise.all([
     getPlayerStats(player.id, teamIds),
     getPlayerRecentMatches(player.id, teamIds),
@@ -431,6 +456,22 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
               coins={player.coins}
               recent={recentLegacy}
             />
+
+            {seasonInfo && (
+              <SeasonProgressCard
+                name={seasonInfo.name}
+                level={seasonInfo.level}
+                xpIntoLevel={seasonInfo.xpIntoLevel}
+                xpForNextLevel={seasonInfo.xpForNextLevel}
+                progressPercent={seasonInfo.progressPercent}
+                nextLevel={seasonInfo.nextLevel}
+                daysLeft={seasonInfo.daysLeft}
+              />
+            )}
+
+            <ActiveContractsCard contracts={periodContracts} />
+
+            <RespectCard score={respect.score} label={respect.label} />
 
             <PlayerEngagement
               badges={engagement.badges}
