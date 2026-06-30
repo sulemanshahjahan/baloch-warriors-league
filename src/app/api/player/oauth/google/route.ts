@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 // Start the Google OAuth flow for player login.
 export async function GET(req: NextRequest) {
   const origin = new URL(req.url).origin;
-  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
   if (!clientId) {
     return NextResponse.redirect(`${origin}/player/login?error=google_not_configured`);
   }

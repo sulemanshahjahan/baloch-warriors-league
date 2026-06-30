@@ -8,7 +8,10 @@ export const metadata = { title: "Player Login | BWL" };
 
 const OAUTH_ERRORS: Record<string, string> = {
   google: "Google sign-in failed. Please try again.",
-  google_not_configured: "Google sign-in isn't set up yet.",
+  google_not_configured: "Google sign-in isn't set up yet (missing GOOGLE_CLIENT_ID / SECRET).",
+  google_state: "Sign-in session was lost. Start from the same address registered in Google (e.g. always www.bwlleague.com) and don't switch between www and non-www.",
+  google_token: "Google rejected the credentials — usually a wrong GOOGLE_CLIENT_SECRET or a redirect-URI that doesn't exactly match.",
+  google_userinfo: "Couldn't read your Google profile. Please try again.",
   google_email: "Your Google email isn't verified.",
   no_account: "No BWL player has that email. Ask an admin to add it to your profile.",
 };

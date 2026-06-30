@@ -9,15 +9,25 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const origin = url.origin;
   const loginUrl = `${origin}/player/login`;
-  const fail = (err: string) => NextResponse.redirect(`${loginUrl}?error=${err}`);
+  const fail = (err: string, detail?: string) => {
+    console.error(`[google-oauth] fail=${err}`, detail ?? "");
+    return NextResponse.redirect(`${loginUrl}?error=${err}`);
+  };
+
+  // Google can return an explicit error (e.g. access_denied)
+  const oauthErr = url.searchParams.get("error");
+  if (oauthErr) return fail("google", `google returned error=${oauthErr}`);
 
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
   const cookieState = req.cookies.get("g_state")?.value;
-  if (!code || !state || !cookieState || state !== cookieState) return fail("google");
+  if (!code) return fail("google", "no code");
+  if (!state || !cookieState || state !== cookieState) {
+    return fail("google_state", `state=${state ? "present" : "missing"} cookie=${cookieState ? "present" : "missing"} match=${state === cookieState}`);
+  }
 
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
   if (!clientId || !clientSecret) return fail("google_not_configured");
 
   // Exchange the code for tokens
@@ -32,15 +42,21 @@ export async function GET(req: NextRequest) {
       grant_type: "authorization_code",
     }),
   });
-  if (!tokenRes.ok) return fail("google");
+  if (!tokenRes.ok) {
+    const body = await tokenRes.text().catch(() => "");
+    return fail("google_token", `status=${tokenRes.status} body=${body.slice(0, 300)}`);
+  }
   const tokens = (await tokenRes.json()) as { access_token?: string };
-  if (!tokens.access_token) return fail("google");
+  if (!tokens.access_token) return fail("google_token", "no access_token in response");
 
   // Fetch the verified email
   const infoRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
     headers: { Authorization: `Bearer ${tokens.access_token}` },
   });
-  if (!infoRes.ok) return fail("google");
+  if (!infoRes.ok) {
+    const body = await infoRes.text().catch(() => "");
+    return fail("google_userinfo", `status=${infoRes.status} body=${body.slice(0, 200)}`);
+  }
   const info = (await infoRes.json()) as { email?: string; email_verified?: boolean };
   const email = (info.email ?? "").toLowerCase();
   if (!email || info.email_verified === false) return fail("google_email");
@@ -49,7 +65,7 @@ export async function GET(req: NextRequest) {
     where: { isActive: true, email },
     select: { id: true, slug: true },
   });
-  if (!player) return fail("no_account");
+  if (!player) return fail("no_account", `no active player with email=${email}`);
 
   const token = await signPlayerToken(player.id);
   const res = NextResponse.redirect(`${origin}/players/${player.slug}`);
