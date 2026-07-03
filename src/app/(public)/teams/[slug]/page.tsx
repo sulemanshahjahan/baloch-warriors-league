@@ -100,7 +100,7 @@ async function getTeamBySlug(slug: string) {
 const AWARD_TYPE_LABELS: Record<string, string> = {
   GOLDEN_BOOT: "Golden Boot",
   TOP_ASSISTS: "Top Assists",
-  BEST_PLAYER: "Best Player",
+  BEST_PLAYER: "Player of the Tournament",
   BEST_GOALKEEPER: "Best Goalkeeper",
   FAIR_PLAY: "Fair Play",
   TOURNAMENT_MVP: "Tournament MVP",

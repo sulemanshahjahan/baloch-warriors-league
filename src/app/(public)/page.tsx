@@ -17,6 +17,7 @@ import {
   getRoundDisplayName,
 } from "@/lib/utils";
 import { SmartAvatar } from "@/components/public/smart-avatar";
+import { AvatarFrame } from "@/components/public/profile/avatar-frame";
 import { DuoTeamAvatar } from "@/components/public/duo-team-avatar";
 
 async function getHomeData() {
@@ -257,6 +258,7 @@ async function getHomeData() {
       slug: true,
       gameCategory: true,
       endDate: true,
+      bannerUrl: true,
       awards: {
         where: {
           type: {
@@ -278,7 +280,12 @@ async function getHomeData() {
           customName: true,
           description: true,
           player: { select: { id: true, name: true, slug: true } },
-          team: { select: { id: true, name: true, slug: true, logoUrl: true } },
+          team: {
+            select: {
+              id: true, name: true, slug: true, logoUrl: true, isDuo: true,
+              players: { where: { isActive: true }, select: { player: { select: { id: true, name: true, slug: true } } } },
+            },
+          },
         },
       },
     },
@@ -286,10 +293,12 @@ async function getHomeData() {
 
   const seasonChampion = (() => {
     if (!completedTournament) return null;
-    const winnerAward = completedTournament.awards.find(
-      (a) => a.type === "TOURNAMENT_WINNER",
-    );
+    // Prefer the team winner award (the primary), falling back to a player winner.
+    const winnerAward =
+      completedTournament.awards.find((a) => a.type === "TOURNAMENT_WINNER" && a.team) ??
+      completedTournament.awards.find((a) => a.type === "TOURNAMENT_WINNER");
     if (!winnerAward) return null;
+    const members = winnerAward.team?.players.map((p) => p.player) ?? [];
     return {
       tournament: {
         id: completedTournament.id,
@@ -297,8 +306,10 @@ async function getHomeData() {
         slug: completedTournament.slug,
         gameCategory: completedTournament.gameCategory,
         endDate: completedTournament.endDate,
+        bannerUrl: completedTournament.bannerUrl,
       },
       winnerAward,
+      members, // duo/team members to highlight as winners
       otherAwards: completedTournament.awards.filter(
         (a) => a.type !== "TOURNAMENT_WINNER",
       ),
@@ -426,6 +437,20 @@ export default async function HomePage() {
               <div className="absolute -top-20 left-1/4 w-96 h-96 bg-amber-400/10 rounded-full blur-3xl" />
               <div className="absolute -bottom-20 right-1/4 w-96 h-96 bg-yellow-400/10 rounded-full blur-3xl" />
             </div>
+            {/* Continuous fireworks */}
+            <div className="bwl-fireworks">
+              {[
+                { left: "12%", top: "16%", color: "#fbbf24", delay: "0s" },
+                { left: "84%", top: "20%", color: "#ef4444", delay: "0.7s" },
+                { left: "26%", top: "40%", color: "#f97316", delay: "1.3s" },
+                { left: "70%", top: "44%", color: "#fde68a", delay: "1.9s" },
+                { left: "48%", top: "12%", color: "#fbbf24", delay: "1.0s" },
+                { left: "92%", top: "58%", color: "#f59e0b", delay: "1.6s" },
+                { left: "6%", top: "56%", color: "#ef4444", delay: "2.2s" },
+              ].map((f, i) => (
+                <span key={i} className="bwl-fw" style={{ left: f.left, top: f.top, color: f.color, animationDelay: f.delay }} />
+              ))}
+            </div>
             <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
               <div className="flex flex-col items-center text-center mb-8">
                 <div className="flex items-center gap-2 text-xs font-bold text-amber-400 tracking-[0.2em] uppercase mb-3">
@@ -440,42 +465,54 @@ export default async function HomePage() {
                 </Link>
               </div>
 
-              <Link
-                href={winnerHref}
-                className="flex flex-col items-center group"
-              >
-                <div className="relative mb-4">
-                  <div className="absolute inset-0 bg-gradient-to-br from-amber-400 to-yellow-600 rounded-full blur-xl opacity-50 group-hover:opacity-75 transition-opacity" />
-                  <div className="relative">
-                    {w.player ? (
-                      <SmartAvatar
-                        type="player"
-                        id={w.player.id}
-                        name={w.player.name}
-                        className="h-32 w-32 sm:h-40 sm:w-40 ring-4 ring-amber-400/60"
-                        fallbackClassName="text-4xl"
-                      />
-                    ) : (
-                      <SmartAvatar
-                        type="team"
-                        id={w.team?.id ?? ""}
-                        name={winnerName}
-                        className="h-32 w-32 sm:h-40 sm:w-40 ring-4 ring-amber-400/60"
-                        fallbackClassName="text-4xl"
-                      />
-                    )}
-                    <div className="absolute -top-2 -right-2 text-4xl">🏆</div>
-                  </div>
-                </div>
-                <h2 className="text-3xl sm:text-5xl font-black tracking-tight bg-gradient-to-br from-amber-300 via-yellow-400 to-orange-400 bg-clip-text text-transparent group-hover:scale-105 transition-transform">
-                  {winnerName}
+              {/* Champion poster (set the tournament banner to show it) */}
+              {seasonChampion.tournament.bannerUrl && (
+                <Link
+                  href={`/tournaments/${seasonChampion.tournament.slug}`}
+                  className="relative block max-w-md mx-auto mb-8 rounded-2xl overflow-hidden ring-2 ring-amber-400/50 shadow-2xl shadow-amber-900/40"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={seasonChampion.tournament.bannerUrl} alt={`${winnerName} — Champions`} className="w-full h-auto block" />
+                </Link>
+              )}
+
+              {/* Champions title */}
+              <div className="relative flex flex-col items-center">
+                <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-center bg-gradient-to-br from-amber-300 via-yellow-400 to-orange-400 bg-clip-text text-transparent">
+                  {winnerName}{w.team ? " Champions" : ""}
                 </h2>
-                {w.description && (
-                  <p className="text-sm text-muted-foreground mt-2 max-w-xl">
-                    {w.description}
-                  </p>
+                <p className="text-xs sm:text-sm font-bold text-amber-300/90 tracking-[0.2em] uppercase mt-2 flex items-center gap-2">
+                  <Trophy className="w-4 h-4" /> Grand Final Winners
+                </p>
+
+                {/* Winning duo/team members, highlighted */}
+                {seasonChampion.members.length > 0 ? (
+                  <div className="flex items-start justify-center gap-6 sm:gap-12 mt-8">
+                    {seasonChampion.members.map((m) => (
+                      <Link key={m.id} href={`/players/${m.slug}`} className="group flex flex-col items-center">
+                        <AvatarFrame frameClassName="bwl-frame--gold" sizeClassName="h-24 w-24 sm:h-28 sm:w-28" showCrown>
+                          <SmartAvatar type="player" id={m.id} name={m.name} className="h-full w-full" fallbackClassName="text-3xl" />
+                        </AvatarFrame>
+                        <span className="mt-4 font-bold text-base sm:text-lg group-hover:text-amber-300 transition-colors">{m.name}</span>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <Link href={winnerHref} className="group mt-6 flex flex-col items-center">
+                    <AvatarFrame frameClassName="bwl-frame--gold" sizeClassName="h-28 w-28 sm:h-36 sm:w-36" showCrown>
+                      {w.player ? (
+                        <SmartAvatar type="player" id={w.player.id} name={w.player.name} className="h-full w-full" fallbackClassName="text-4xl" />
+                      ) : (
+                        <SmartAvatar type="team" id={w.team?.id ?? ""} name={winnerName} className="h-full w-full" fallbackClassName="text-4xl" />
+                      )}
+                    </AvatarFrame>
+                  </Link>
                 )}
-              </Link>
+
+                {w.description && (
+                  <p className="text-sm text-muted-foreground mt-5 max-w-xl text-center">{w.description}</p>
+                )}
+              </div>
 
               {seasonChampion.otherAwards.length > 0 && (
                 <div className="mt-10 pt-8 border-t border-amber-500/10">

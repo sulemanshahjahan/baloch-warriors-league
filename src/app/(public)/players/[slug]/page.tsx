@@ -175,7 +175,6 @@ async function getPlayerStats(playerId: string, teamIds: string[] = []) {
   let wins = 0;
   // Goals scored from scoreline for 1v1 individual (non-PUBG) matches
   let scorelineGoals = 0;
-  let usedScorelineMatches = 0;
   for (const m of individualMatches) {
     const isHome = m.homePlayerId === playerId;
     const homeAgg = (m.homeScore ?? 0) + (m.leg2HomeScore ?? 0) + (m.leg3HomeScore ?? 0);
@@ -186,7 +185,6 @@ async function getPlayerStats(playerId: string, teamIds: string[] = []) {
     // Only sum goals from individual non-PUBG tournaments where scoreline is the source of truth
     if (m.tournament.participantType === "INDIVIDUAL" && m.tournament.gameCategory !== "PUBG") {
       scorelineGoals += mine;
-      usedScorelineMatches++;
     }
   }
 
@@ -214,9 +212,13 @@ async function getPlayerStats(playerId: string, teamIds: string[] = []) {
     ? Math.round((ratingEvents.reduce((sum, e) => sum + (e.value ?? 0), 0) / ratingEvents.length) * 10) / 10
     : null;
 
-  // For 1v1 players, scoreline is authoritative.
-  // For team-only players (no individual matches), fall back to event count.
-  const goals = usedScorelineMatches > 0 ? scorelineGoals : (statsMap["GOAL"] ?? 0);
+  // Goals = 1v1 scoreline (authoritative) + 2v2/team goal events (a team score
+  // can't be attributed to an individual, so those are tracked as GOAL events).
+  // Counting only TEAM-tournament events avoids double-counting 1v1 events.
+  const teamGoalEvents = await prisma.matchEvent.count({
+    where: { playerId, type: "GOAL", match: { tournament: { participantType: "TEAM" } } },
+  });
+  const goals = scorelineGoals + teamGoalEvents;
 
   return {
     wins,
@@ -282,7 +284,7 @@ async function getPlayerUpcomingMatches(playerId: string, teamIds: string[] = []
 const AWARD_TYPE_LABELS: Record<string, string> = {
   GOLDEN_BOOT: "Golden Boot",
   TOP_ASSISTS: "Top Assists",
-  BEST_PLAYER: "Best Player",
+  BEST_PLAYER: "Player of the Tournament",
   BEST_GOALKEEPER: "Best Goalkeeper",
   FAIR_PLAY: "Fair Play",
   TOURNAMENT_MVP: "Tournament MVP",

@@ -32,7 +32,7 @@ const AWARD_TYPES = [
   { value: "TOURNAMENT_MVP", label: "Tournament MVP" },
   { value: "GOLDEN_BOOT", label: "Golden Boot (Top Scorer)" },
   { value: "TOP_ASSISTS", label: "Top Assists / Playmaker" },
-  { value: "BEST_PLAYER", label: "Best Player" },
+  { value: "BEST_PLAYER", label: "Player of the Tournament" },
   { value: "BEST_GOALKEEPER", label: "Best Goalkeeper" },
   { value: "CUSTOM", label: "Custom Award" },
 ];

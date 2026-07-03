@@ -56,9 +56,10 @@ async function getPlayersWithStats() {
         leg3HomeScore: true, leg3AwayScore: true,
       },
     }),
+    // 2v2/team goal events only — combined with 1v1 scoreline below (no double count).
     prisma.matchEvent.groupBy({
       by: ["playerId"],
-      where: { type: "GOAL", playerId: { not: null } },
+      where: { type: "GOAL", playerId: { not: null }, match: { tournament: { participantType: "TEAM" } } },
       _count: { type: true },
     }),
   ]);
@@ -81,12 +82,12 @@ async function getPlayersWithStats() {
     else if (ag > hg) away.wins++;
   }
 
-  const eventGoalsMap = new Map(eventGoalCounts.map((g) => [g.playerId!, g._count.type]));
+  const teamGoalsMap = new Map(eventGoalCounts.map((g) => [g.playerId!, g._count.type]));
 
   return players.map((player) => {
     const a = acc.get(player.id);
-    // Scoreline is authoritative when the player has 1v1 matches; fall back to events for team-only players.
-    const goals = a && a.matches > 0 ? a.goals : (eventGoalsMap.get(player.id) ?? 0);
+    // 1v1 scoreline goals + 2v2/team goal events (each player is credited in both formats).
+    const goals = (a?.goals ?? 0) + (teamGoalsMap.get(player.id) ?? 0);
     return {
       id: player.id,
       name: player.name,

@@ -221,18 +221,25 @@ export async function getOverallStats(gameCategory?: string, seasonId?: string) 
     }
   }
 
-  // For top scorers, prefer scoreline goals (authoritative for 1v1 individual tournaments).
-  // If a player has no individual matches but has GOAL events (team football), fall back to events.
-  const eventGoalsMap = new Map(topScorers.map((s) => [s.playerId!, s._count.type]));
+  // Goals per player = 1v1 scoreline (authoritative for individual matches) PLUS
+  // 2v2/team goal events (scoreline can't attribute a team score to a player).
+  // Counting only TEAM-tournament events avoids double-counting 1v1 events.
+  const teamGoalRows = await prisma.matchEvent.groupBy({
+    by: ["playerId"],
+    where: {
+      type: "GOAL",
+      playerId: { not: null },
+      match: { tournament: { participantType: "TEAM", ...(hasTournamentFilter ? tournamentFilter : {}) } },
+    },
+    _count: { type: true },
+  });
+  const teamGoalsMap = new Map(teamGoalRows.map((r) => [r.playerId!, r._count.type]));
   const goalsForLeaderboard = new Map<string, number>();
   for (const [playerId, ps] of pStats.entries()) {
     if (ps.goalsFor > 0) goalsForLeaderboard.set(playerId, ps.goalsFor);
   }
-  for (const [playerId, eventGoals] of eventGoalsMap.entries()) {
-    // Players with no individual-match record but with event goals (team football)
-    if (!goalsForLeaderboard.has(playerId) && eventGoals > 0) {
-      goalsForLeaderboard.set(playerId, eventGoals);
-    }
+  for (const [playerId, teamGoals] of teamGoalsMap.entries()) {
+    goalsForLeaderboard.set(playerId, (goalsForLeaderboard.get(playerId) ?? 0) + teamGoals);
   }
   const sortedTopScorers = [...goalsForLeaderboard.entries()]
     .sort((a, b) => b[1] - a[1])

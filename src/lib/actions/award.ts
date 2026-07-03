@@ -64,6 +64,12 @@ export async function createAward(formData: FormData): Promise<ActionResult> {
     },
   });
 
+  // A team winning a tournament → each member is a champion too, so the winner
+  // badge shows on their profile/card. Idempotent (skip members already awarded).
+  if (data.type === "TOURNAMENT_WINNER" && data.teamId && !data.playerId) {
+    await propagateTeamWinnerToMembers(data.tournamentId, data.teamId, data.description || null);
+  }
+
   await logActivity({
     action: "ASSIGN_AWARD",
     entityType: "AWARD",
@@ -80,6 +86,43 @@ export async function createAward(formData: FormData): Promise<ActionResult> {
   revalidatePath("/admin/awards");
 
   return { success: true, data: undefined };
+}
+
+/** Grant each active member of a winning team a personal TOURNAMENT_WINNER award. */
+export async function propagateTeamWinnerToMembers(
+  tournamentId: string,
+  teamId: string,
+  description: string | null,
+): Promise<number> {
+  const [team, existing] = await Promise.all([
+    prisma.team.findUnique({
+      where: { id: teamId },
+      select: { name: true, players: { where: { isActive: true }, select: { playerId: true } } },
+    }),
+    prisma.award.findMany({
+      where: { tournamentId, type: "TOURNAMENT_WINNER", playerId: { not: null } },
+      select: { playerId: true },
+    }),
+  ]);
+  if (!team) return 0;
+  const already = new Set(existing.map((a) => a.playerId));
+  const toAdd = team.players.map((p) => p.playerId).filter((pid) => !already.has(pid));
+  if (toAdd.length === 0) return 0;
+
+  await prisma.award.createMany({
+    data: toAdd.map((playerId) => ({
+      tournamentId,
+      type: "TOURNAMENT_WINNER" as const,
+      playerId,
+      teamId,
+      description: description ?? `Champion — ${team.name}`,
+    })),
+  });
+
+  const players = await prisma.player.findMany({ where: { id: { in: toAdd } }, select: { slug: true } });
+  for (const p of players) revalidatePath(`/players/${p.slug}`);
+  revalidatePath("/players");
+  return toAdd.length;
 }
 
 export async function deleteAward(id: string, tournamentId: string): Promise<ActionResult> {
