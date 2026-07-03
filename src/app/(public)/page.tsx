@@ -465,22 +465,31 @@ export default async function HomePage() {
                 </Link>
               </div>
 
-              {/* Champion poster (set the tournament banner to show it) */}
+              {/* Champion poster in a premium gold frame */}
               {seasonChampion.tournament.bannerUrl && (
-                <Link
-                  href={`/tournaments/${seasonChampion.tournament.slug}`}
-                  className="relative block max-w-md mx-auto mb-8 rounded-2xl overflow-hidden ring-2 ring-amber-400/50 shadow-2xl shadow-amber-900/40"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={seasonChampion.tournament.bannerUrl} alt={`${winnerName} — Champions`} className="w-full h-auto block" />
-                </Link>
+                <div className="relative max-w-sm mx-auto mb-10">
+                  <div className="absolute -inset-4 rounded-[2rem] bg-gradient-to-br from-amber-400/30 via-yellow-500/20 to-orange-500/30 blur-2xl pointer-events-none" />
+                  <Link
+                    href={`/tournaments/${seasonChampion.tournament.slug}`}
+                    className="bwl-poster-frame group relative block rounded-2xl p-1.5 transition-transform hover:scale-[1.015]"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={seasonChampion.tournament.bannerUrl}
+                      alt={`${winnerName} — Champions`}
+                      className="w-full h-auto block rounded-[0.7rem]"
+                    />
+                  </Link>
+                </div>
               )}
 
               {/* Champions title */}
               <div className="relative flex flex-col items-center">
-                <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-center bg-gradient-to-br from-amber-300 via-yellow-400 to-orange-400 bg-clip-text text-transparent">
-                  {winnerName}{w.team ? " Champions" : ""}
-                </h2>
+                {!seasonChampion.tournament.bannerUrl && (
+                  <h2 className="text-3xl sm:text-5xl font-black tracking-tight text-center bg-gradient-to-br from-amber-300 via-yellow-400 to-orange-400 bg-clip-text text-transparent">
+                    {winnerName}{w.team ? " Champions" : ""}
+                  </h2>
+                )}
                 <p className="text-xs sm:text-sm font-bold text-amber-300/90 tracking-[0.2em] uppercase mt-2 flex items-center gap-2">
                   <Trophy className="w-4 h-4" /> Grand Final Winners
                 </p>

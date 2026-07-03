@@ -751,3 +751,9 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .bwl-fireworks { display: none; }
 }
+
+/* ── Champion poster frame (homepage) ──────────────────────────────────────*/
+.bwl-poster-frame {
+  background: conic-gradient(from 210deg, #7a5a0f, #e3b341, #fff0b8, #c9971f, #7a5a0f, #ffe08a, #7a5a0f);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45), 0 0 46px -10px rgba(227, 179, 65, 0.65), 0 24px 60px -16px rgba(0, 0, 0, 0.75);
+}
