@@ -549,7 +549,12 @@ export async function getTournamentStats(tournamentId: string) {
       count: s._count.type,
     })).filter(s => s.player),
     allStats: Array.from(playerStats.values())
-      .sort((a, b) => (b.goals + b.assists) - (a.goals + a.assists)),
+      .sort((a, b) =>
+        (b.goals + b.assists) - (a.goals + a.assists) || // goal contributions
+        b.goals - a.goals ||                              // then most goals
+        b.motm - a.motm ||                                // then most MOTM
+        b.points - a.points ||                            // then tournament points
+        (a.player?.name ?? "").localeCompare(b.player?.name ?? "")), // stable final tiebreak
     totals: {
       matches: matches.length,
       goals: matches.reduce((sum, m) => sum + (m.homeScore || 0) + (m.awayScore || 0), 0),
