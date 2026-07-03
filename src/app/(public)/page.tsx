@@ -519,7 +519,7 @@ export default async function HomePage() {
                   <p className="text-center text-xs font-bold text-muted-foreground tracking-widest uppercase mb-5">
                     Season Honours
                   </p>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 max-w-5xl mx-auto">
+                  <div className="flex flex-wrap justify-center gap-3 max-w-5xl mx-auto">
                     {seasonChampion.otherAwards.map((a) => {
                       const recipientName = a.player?.name ?? a.team?.name ?? "—";
                       const recipientHref = a.player
@@ -563,11 +563,11 @@ export default async function HomePage() {
                         </div>
                       );
                       return recipientHref ? (
-                        <Link key={a.id} href={recipientHref}>
+                        <Link key={a.id} href={recipientHref} className="w-[calc(50%-0.375rem)] sm:w-56">
                           {inner}
                         </Link>
                       ) : (
-                        <div key={a.id}>{inner}</div>
+                        <div key={a.id} className="w-[calc(50%-0.375rem)] sm:w-56">{inner}</div>
                       );
                     })}
                   </div>
