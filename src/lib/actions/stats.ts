@@ -431,6 +431,8 @@ export async function getTournamentStats(tournamentId: string) {
         id: true,
         homePlayerId: true,
         awayPlayerId: true,
+        homeTeamId: true,
+        awayTeamId: true,
         homeScore: true,
         awayScore: true,
       },
@@ -441,15 +443,30 @@ export async function getTournamentStats(tournamentId: string) {
     }),
   ]);
 
-  // Calculate matches played per player in this tournament
+  // Map each participating team → its active members (for 2v2/team tournaments,
+  // matches belong to teams, not individual home/away players).
+  const teamIdsInvolved = [...new Set(matches.flatMap((m) => [m.homeTeamId, m.awayTeamId]).filter(Boolean) as string[])];
+  const teamMembers = teamIdsInvolved.length > 0
+    ? await prisma.teamPlayer.findMany({
+        where: { teamId: { in: teamIdsInvolved }, isActive: true },
+        select: { teamId: true, playerId: true },
+      })
+    : [];
+  const teamToPlayers = new Map<string, string[]>();
+  for (const tp of teamMembers) {
+    const arr = teamToPlayers.get(tp.teamId) ?? [];
+    arr.push(tp.playerId);
+    teamToPlayers.set(tp.teamId, arr);
+  }
+
+  // Calculate matches played per player — via home/away player (1v1) OR team membership (2v2/team).
   const matchCounts = new Map<string, number>();
+  const bump = (pid: string) => matchCounts.set(pid, (matchCounts.get(pid) || 0) + 1);
   for (const match of matches) {
-    if (match.homePlayerId) {
-      matchCounts.set(match.homePlayerId, (matchCounts.get(match.homePlayerId) || 0) + 1);
-    }
-    if (match.awayPlayerId) {
-      matchCounts.set(match.awayPlayerId, (matchCounts.get(match.awayPlayerId) || 0) + 1);
-    }
+    if (match.homePlayerId) bump(match.homePlayerId);
+    else if (match.homeTeamId) (teamToPlayers.get(match.homeTeamId) ?? []).forEach(bump);
+    if (match.awayPlayerId) bump(match.awayPlayerId);
+    else if (match.awayTeamId) (teamToPlayers.get(match.awayTeamId) ?? []).forEach(bump);
   }
 
   // Get player details
@@ -467,17 +484,28 @@ export async function getTournamentStats(tournamentId: string) {
 
   const playerMap = new Map(players.map(p => [p.id, p]));
 
-  // Get tournament points from standings (overall standings, not group-specific)
-  const standings = await prisma.standing.findMany({
-    where: { 
-      tournamentId,
-      playerId: { in: playerIds },
-      groupId: null, // Overall standings only
-    },
-    select: { playerId: true, points: true },
-  });
-
-  const standingPoints = new Map(standings.map(s => [s.playerId!, s.points]));
+  // Tournament points from overall standings (not group-specific). For team
+  // tournaments the standing is per-team, so credit each member with the team's points.
+  const [playerStandings, teamStandings] = await Promise.all([
+    prisma.standing.findMany({
+      where: { tournamentId, playerId: { in: playerIds }, groupId: null },
+      select: { playerId: true, points: true },
+    }),
+    teamIdsInvolved.length > 0
+      ? prisma.standing.findMany({
+          where: { tournamentId, teamId: { in: teamIdsInvolved }, groupId: null },
+          select: { teamId: true, points: true },
+        })
+      : Promise.resolve([]),
+  ]);
+  const standingPoints = new Map<string, number>();
+  for (const s of playerStandings) if (s.playerId) standingPoints.set(s.playerId, s.points);
+  for (const s of teamStandings) {
+    if (!s.teamId) continue;
+    for (const pid of teamToPlayers.get(s.teamId) ?? []) {
+      standingPoints.set(pid, (standingPoints.get(pid) ?? 0) + s.points);
+    }
+  }
 
   // Build comprehensive player stats
   const playerStats = new Map();
