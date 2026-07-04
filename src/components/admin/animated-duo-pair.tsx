@@ -120,13 +120,14 @@ export function AnimatedDuoPair({ open, players, ratingSource, onClose, onConfir
   const current = revealedIndex >= 0 && revealedIndex < duos.length ? duos[revealedIndex] : null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-4 animate-in fade-in duration-300">
-      <div className="absolute top-4 right-4">
-        <Button variant="ghost" size="icon" onClick={handleCancel} className="text-white/60 hover:text-white">
+    <div className="fixed inset-0 z-50 bg-black/90 overflow-y-auto overscroll-contain animate-in fade-in duration-300">
+      <div className="fixed top-4 right-4 z-[60]">
+        <Button variant="ghost" size="icon" onClick={handleCancel} className="text-white/60 hover:text-white bg-black/40 rounded-full">
           <X className="w-6 h-6" />
         </Button>
       </div>
 
+      <div className="min-h-full flex flex-col items-center justify-center p-4 py-16">
       <h1 className="text-2xl sm:text-3xl font-black text-white mb-2 text-center">
         {state === "idle" && "Duo Draw"}
         {state === "drawing" && "Pairing..."}
@@ -214,6 +215,7 @@ export function AnimatedDuoPair({ open, players, ratingSource, onClose, onConfir
           <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${((revealedIndex + 1) / duos.length) * 100}%` }} />
         </div>
       )}
+      </div>
     </div>
   );
 }
