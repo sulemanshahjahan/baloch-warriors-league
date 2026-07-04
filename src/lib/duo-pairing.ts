@@ -34,6 +34,53 @@ export function defaultDuoName(name1: string, name2: string): string {
   return `${name1.trim()} & ${name2.trim()}`;
 }
 
+// ── Fixed-partner constraints ──────────────────────────────────────────────
+// Business rule (not surfaced in the UI): certain players may ONLY be auto-paired
+// with a specific allow-list of partners. Matched by player name — the subject by
+// exact full name (so "Suleman" ≠ "Suleman Baloch"), partners by first name.
+const PAIR_CONSTRAINTS: { player: string; allowed: Set<string> }[] = [
+  { player: "umar", allowed: new Set(["ayaz", "adnan", "nazeer", "rehan", "waleed"]) },
+  { player: "suleman", allowed: new Set(["haroon", "rafay", "yousuf", "usman", "feroz", "sheraz"]) },
+];
+
+const normName = (s: string) => s.trim().toLowerCase();
+const firstName = (s: string) => normName(s).split(/\s+/)[0];
+const rateOf = (p: PairablePlayer) => p.rating ?? DEFAULT_RATING;
+
+/**
+ * Pull out constrained players and force-pair each with a RANDOM allowed partner
+ * present in the pool. Returns the forced duos, the players still to pair, and any
+ * constrained players with no eligible partner (left unpaired — never paired with
+ * a disallowed player). Shared by both pairing strategies.
+ */
+function applyPairConstraints<T extends PairablePlayer>(
+  players: T[]
+): { forced: PairedDuo<T>[]; remaining: T[]; leftover: T[] } {
+  const forced: PairedDuo<T>[] = [];
+  const leftover: T[] = [];
+  const used = new Set<string>();
+
+  for (const c of PAIR_CONSTRAINTS) {
+    const subject = players.find((p) => !used.has(p.id) && normName(p.name) === c.player);
+    if (!subject) continue;
+    const candidates = players.filter(
+      (p) => !used.has(p.id) && p.id !== subject.id && c.allowed.has(firstName(p.name))
+    );
+    if (candidates.length === 0) {
+      used.add(subject.id);
+      leftover.push(subject); // no allowed partner available → leave unpaired
+      continue;
+    }
+    const partner = candidates[Math.floor(Math.random() * candidates.length)];
+    used.add(subject.id);
+    used.add(partner.id);
+    const [strong, weak] = rateOf(subject) >= rateOf(partner) ? [subject, partner] : [partner, subject];
+    forced.push({ player1: strong, player2: weak });
+  }
+
+  return { forced, remaining: players.filter((p) => !used.has(p.id)), leftover };
+}
+
 /**
  * Balanced rating-based auto-pairing.
  *
@@ -46,7 +93,8 @@ export function defaultDuoName(name1: string, name2: string): string {
  * surface this to the admin.
  */
 export function pairBySkill<T extends PairablePlayer>(players: T[]): PairingResult<T> {
-  const sorted = [...players].sort(
+  const { forced, remaining, leftover } = applyPairConstraints(players);
+  const sorted = [...remaining].sort(
     (a, b) => (b.rating ?? DEFAULT_RATING) - (a.rating ?? DEFAULT_RATING)
   );
 
@@ -61,9 +109,9 @@ export function pairBySkill<T extends PairablePlayer>(players: T[]): PairingResu
   }
 
   // lo === hi means one player sits exactly in the middle → unpaired.
-  const unpaired = lo === hi ? sorted[lo] : null;
+  const unpaired = lo === hi ? sorted[lo] : leftover[0] ?? null;
 
-  return { duos, unpaired };
+  return { duos: [...forced, ...duos], unpaired };
 }
 
 /** Fisher–Yates shuffle (non-mutating). */
@@ -88,11 +136,12 @@ function shuffle<T>(arr: T[]): T[] {
  * Odd player count: the median player is returned in `unpaired`, never dropped.
  */
 export function pairBalancedRandom<T extends PairablePlayer>(players: T[]): PairingResult<T> {
-  const sorted = [...players].sort(
+  const { forced, remaining, leftover } = applyPairConstraints(players);
+  const sorted = [...remaining].sort(
     (a, b) => (b.rating ?? DEFAULT_RATING) - (a.rating ?? DEFAULT_RATING)
   );
 
-  let unpaired: T | null = null;
+  let unpaired: T | null = leftover[0] ?? null;
   let pool = sorted;
   if (sorted.length % 2 === 1) {
     const midIdx = Math.floor(sorted.length / 2);
@@ -106,5 +155,5 @@ export function pairBalancedRandom<T extends PairablePlayer>(players: T[]): Pair
 
   const duos: PairedDuo<T>[] = strong.map((s, i) => ({ player1: s, player2: weak[i] }));
 
-  return { duos, unpaired };
+  return { duos: [...forced, ...duos], unpaired };
 }
