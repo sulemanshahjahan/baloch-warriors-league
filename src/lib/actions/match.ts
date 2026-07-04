@@ -812,7 +812,7 @@ export async function recomputeTournamentStandings(tournamentId: string) {
   return { success: true, data: undefined };
 }
 
-async function recomputeStandings(tournamentId: string) {
+export async function recomputeStandings(tournamentId: string) {
   // Get tournament info
   const tournament = await prisma.tournament.findUnique({
     where: { id: tournamentId },

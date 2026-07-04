@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { MatchStatus } from "@prisma/client";
 import { randomUUID } from "crypto";
 import { atKarachiHour, fromKarachiInputValue } from "@/lib/utils";
+import { recomputeStandings } from "@/lib/actions/match";
 
 // Role hierarchy levels
 const ROLE_LEVELS: Record<string, number> = {
@@ -417,8 +418,14 @@ export async function generateSchedule(options: GenerateScheduleOptions) {
     }
   }
 
+  // Seed standings (all teams/players at 0) so group + league tables show
+  // immediately, before any match is played.
+  await recomputeStandings(tournamentId);
+
+  const sched = await prisma.tournament.findUnique({ where: { id: tournamentId }, select: { slug: true } });
   revalidatePath(`/admin/tournaments/${tournamentId}`);
   revalidatePath("/admin/matches");
+  if (sched?.slug) revalidatePath(`/tournaments/${sched.slug}`);
 
   return { success: true, count: createdMatches };
 }
@@ -746,12 +753,15 @@ export async function assignTeamToGroup(tournamentTeamId: string, groupId: strin
   if (!session) return { success: false, error: "Unauthorized" };
   if (!hasRole(session, "EDITOR")) return { success: false, error: "Forbidden: Insufficient permissions" };
 
-  await prisma.tournamentTeam.update({
+  const updated = await prisma.tournamentTeam.update({
     where: { id: tournamentTeamId },
     data: { groupId },
+    select: { tournamentId: true, tournament: { select: { slug: true } } },
   });
 
-  revalidatePath(`/admin/tournaments/${(await prisma.tournamentTeam.findUnique({ where: { id: tournamentTeamId }, select: { tournamentId: true } }))?.tournamentId}`);
+  await recomputeStandings(updated.tournamentId);
+  revalidatePath(`/admin/tournaments/${updated.tournamentId}`);
+  if (updated.tournament?.slug) revalidatePath(`/tournaments/${updated.tournament.slug}`);
   return { success: true };
 }
 
@@ -762,7 +772,7 @@ export async function assignPlayerToGroup(tournamentPlayerId: string, groupId: s
 
   const tournamentPlayer = await prisma.tournamentPlayer.findUnique({
     where: { id: tournamentPlayerId },
-    select: { tournamentId: true },
+    select: { tournamentId: true, tournament: { select: { slug: true } } },
   });
 
   await prisma.tournamentPlayer.update({
@@ -771,7 +781,9 @@ export async function assignPlayerToGroup(tournamentPlayerId: string, groupId: s
   });
 
   if (tournamentPlayer) {
+    await recomputeStandings(tournamentPlayer.tournamentId);
     revalidatePath(`/admin/tournaments/${tournamentPlayer.tournamentId}`);
+    if (tournamentPlayer.tournament?.slug) revalidatePath(`/tournaments/${tournamentPlayer.tournament.slug}`);
   }
   return { success: true };
 }
@@ -795,6 +807,7 @@ export async function bulkAssignPlayersToGroups(
   }
 
   if (tournamentId) {
+    await recomputeStandings(tournamentId);
     revalidatePath(`/admin/tournaments/${tournamentId}`);
     const t = await prisma.tournament.findUnique({ where: { id: tournamentId }, select: { slug: true } });
     if (t?.slug) revalidatePath(`/tournaments/${t.slug}`);
@@ -834,6 +847,7 @@ export async function bulkAssignTeamsToGroups(
   }
 
   if (tournamentId) {
+    await recomputeStandings(tournamentId);
     revalidatePath(`/admin/tournaments/${tournamentId}`);
     const t = await prisma.tournament.findUnique({ where: { id: tournamentId }, select: { slug: true } });
     if (t?.slug) revalidatePath(`/tournaments/${t.slug}`);
@@ -976,10 +990,12 @@ export async function randomDrawToGroups(options: RandomDrawOptions) {
     }
   }
 
+  await recomputeStandings(tournamentId);
   revalidatePath(`/admin/tournaments/${tournamentId}`);
-  
-  return { 
-    success: true, 
+  if (tournament.slug) revalidatePath(`/tournaments/${tournament.slug}`);
+
+  return {
+    success: true,
     count: assignments.length,
     assignments: assignments.map((a) => a.name),
   };
