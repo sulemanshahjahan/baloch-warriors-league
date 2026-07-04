@@ -111,7 +111,8 @@ export function pairBySkill<T extends PairablePlayer>(players: T[]): PairingResu
   // lo === hi means one player sits exactly in the middle → unpaired.
   const unpaired = lo === hi ? sorted[lo] : leftover[0] ?? null;
 
-  return { duos: [...forced, ...duos], unpaired };
+  // Shuffle so forced/constrained pairs don't always reveal in the same slots.
+  return { duos: shuffle([...forced, ...duos]), unpaired };
 }
 
 /** Fisher–Yates shuffle (non-mutating). */
@@ -155,5 +156,6 @@ export function pairBalancedRandom<T extends PairablePlayer>(players: T[]): Pair
 
   const duos: PairedDuo<T>[] = strong.map((s, i) => ({ player1: s, player2: weak[i] }));
 
-  return { duos: [...forced, ...duos], unpaired };
+  // Shuffle so forced/constrained pairs don't always reveal in the same slots.
+  return { duos: shuffle([...forced, ...duos]), unpaired };
 }
