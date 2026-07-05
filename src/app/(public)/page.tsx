@@ -424,12 +424,20 @@ export default async function HomePage() {
           : w.team
             ? `/teams/${w.team.slug}`
             : `/tournaments/${seasonChampion.tournament.slug}`;
+        const HONOUR_LABELS: Record<string, string> = {
+          BEST_PLAYER: "Player of the Season",
+          GOLDEN_BOOT: "Golden Boot",
+          TOP_ASSISTS: "Top Assists",
+          BEST_GOALKEEPER: "Best Goalkeeper",
+          FAIR_PLAY: "Fair Play",
+          TOURNAMENT_MVP: "Tournament MVP",
+        };
         const awardLabel = (a: { type: string; customName: string | null }) => {
           if (a.type === "CUSTOM") return a.customName ?? "Custom";
-          return a.type
-            .split("_")
-            .map((s) => s[0] + s.slice(1).toLowerCase())
-            .join(" ");
+          return (
+            HONOUR_LABELS[a.type] ??
+            a.type.split("_").map((s) => s[0] + s.slice(1).toLowerCase()).join(" ")
+          );
         };
         return (
           <section className="relative overflow-hidden border-y border-amber-500/20 bg-gradient-to-br from-amber-500/10 via-yellow-500/10 to-orange-500/10">
