@@ -225,7 +225,13 @@ async function getTournamentBySlug(slug: string) {
   }),
     // Awards
     prisma.award.findMany({
-    where: { tournamentId: tid },
+    where: {
+      tournamentId: tid,
+      // Hide per-member winner awards (team win propagated to each player — they
+      // have both playerId + teamId). The team card already lists its members,
+      // and these still show on each player's own profile.
+      NOT: { type: "TOURNAMENT_WINNER", playerId: { not: null }, teamId: { not: null } },
+    },
     select: {
       id: true,
       type: true,
