@@ -240,7 +240,11 @@ async function getHomeData() {
     select: { id: true, title: true, slug: true, excerpt: true, publishedAt: true },
   });
 
+  // Only show Player of the Week if it was computed recently (within ~2 weeks) —
+  // otherwise hide it rather than surfacing a stale winner from an idle period.
+  const potwCutoff = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
   const playerOfWeek = await prisma.playerOfWeek.findFirst({
+    where: { weekEnd: { gte: potwCutoff } },
     orderBy: { weekStart: "desc" },
     include: { player: { select: { id: true, name: true, slug: true } } },
   });
