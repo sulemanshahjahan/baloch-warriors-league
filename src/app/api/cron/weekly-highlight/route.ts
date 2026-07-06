@@ -29,33 +29,49 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: true, skipped: true, reason: "already computed for this week" });
   }
 
-  const [matches, elo] = await Promise.all([
+  const window = { gte: weekStart, lte: weekEnd };
+  const [matches, teamMatches, teamGoals, elo] = await Promise.all([
+    // 1v1 individual matches — goals from scoreline
+    prisma.match.findMany({
+      where: { status: "COMPLETED", completedAt: window, homePlayerId: { not: null }, awayPlayerId: { not: null } },
+      select: {
+        homePlayerId: true, awayPlayerId: true,
+        homeScore: true, awayScore: true,
+        leg2HomeScore: true, leg2AwayScore: true,
+        leg3HomeScore: true, leg3AwayScore: true,
+      },
+    }),
+    // 2v2/team matches — wins/clean sheets from the team aggregate, per member
     prisma.match.findMany({
       where: {
-        status: "COMPLETED",
-        completedAt: { gte: weekStart, lte: weekEnd },
-        homePlayerId: { not: null },
-        awayPlayerId: { not: null },
+        status: "COMPLETED", completedAt: window,
+        OR: [{ homeTeamId: { not: null } }, { awayTeamId: { not: null } }],
       },
       select: {
-        homePlayerId: true,
-        awayPlayerId: true,
-        homeScore: true,
-        awayScore: true,
-        leg2HomeScore: true,
-        leg2AwayScore: true,
-        leg3HomeScore: true,
-        leg3AwayScore: true,
+        homeScore: true, awayScore: true,
+        leg2HomeScore: true, leg2AwayScore: true,
+        leg3HomeScore: true, leg3AwayScore: true,
+        homeTeam: { select: { players: { where: { isActive: true }, select: { playerId: true } } } },
+        awayTeam: { select: { players: { where: { isActive: true }, select: { playerId: true } } } },
       },
+    }),
+    // Goals for team matches come from GOAL events (a team score can't be attributed)
+    prisma.matchEvent.groupBy({
+      by: ["playerId"],
+      where: {
+        type: "GOAL", playerId: { not: null },
+        match: { status: "COMPLETED", completedAt: window, OR: [{ homeTeamId: { not: null } }, { awayTeamId: { not: null } }] },
+      },
+      _count: { type: true },
     }),
     prisma.eloHistory.groupBy({
       by: ["playerId"],
-      where: { createdAt: { gte: weekStart, lte: weekEnd } },
+      where: { createdAt: window },
       _sum: { change: true },
     }),
   ]);
 
-  if (matches.length === 0) {
+  if (matches.length === 0 && teamMatches.length === 0) {
     return NextResponse.json({ ok: true, skipped: true, reason: "no matches this week" });
   }
 
@@ -72,6 +88,7 @@ export async function GET(req: NextRequest) {
     return s;
   }
 
+  // 1v1 (per leg, scoreline)
   for (const m of matches) {
     const hp = m.homePlayerId!;
     const ap = m.awayPlayerId!;
@@ -91,6 +108,30 @@ export async function GET(req: NextRequest) {
       if (leg.h > leg.a) home.wins++;
       else if (leg.h < leg.a) away.wins++;
     }
+  }
+
+  // 2v2/team (per fixture, aggregate) — credit each active member
+  for (const m of teamMatches) {
+    const hAgg = (m.homeScore ?? 0) + (m.leg2HomeScore ?? 0) + (m.leg3HomeScore ?? 0);
+    const aAgg = (m.awayScore ?? 0) + (m.leg2AwayScore ?? 0) + (m.leg3AwayScore ?? 0);
+    const homeWon = hAgg > aAgg;
+    const awayWon = aAgg > hAgg;
+    for (const p of m.homeTeam?.players ?? []) {
+      const s = ensure(p.playerId);
+      s.matchesPlayed++;
+      if (homeWon) s.wins++;
+      if (aAgg === 0) s.cleanSheets++;
+    }
+    for (const p of m.awayTeam?.players ?? []) {
+      const s = ensure(p.playerId);
+      s.matchesPlayed++;
+      if (awayWon) s.wins++;
+      if (hAgg === 0) s.cleanSheets++;
+    }
+  }
+  // Team-match goals (attributed via events)
+  for (const g of teamGoals) {
+    if (g.playerId) ensure(g.playerId).goals += g._count.type;
   }
 
   const eloMap = new Map<string, number>();
