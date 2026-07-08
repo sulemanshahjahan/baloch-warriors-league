@@ -4,8 +4,10 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Swords, Calendar, ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Swords, Calendar, ArrowRight, ChevronLeft, ChevronRight, Search, X, ArrowDownUp, Trophy, Gamepad2 } from "lucide-react";
 import {
   formatDateTime,
   gameLabel,
@@ -16,6 +18,8 @@ import {
 } from "@/lib/utils";
 import { SmartAvatar } from "@/components/public/smart-avatar";
 import { DuoTeamAvatar } from "@/components/public/duo-team-avatar";
+
+type Facets = { tournaments: { slug: string; name: string; gameCategory: string }[]; games: string[] };
 
 type Match = {
   id: string;
@@ -165,126 +169,182 @@ function EmptyState({ message = "No matches found." }: { message?: string }) {
 
 export function MatchesClient() {
   const [matches, setMatches] = useState<Match[]>([]);
+  const [facets, setFacets] = useState<Facets>({ tournaments: [], games: [] });
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [tab, setTab] = useState("all");
 
-  const fetchMatches = useCallback(async (p: number, status?: string) => {
+  // Filters
+  const [tab, setTab] = useState("all"); // status quick filter
+  const [search, setSearch] = useState("");
+  const [q, setQ] = useState(""); // debounced search
+  const [sort, setSort] = useState("latest");
+  const [game, setGame] = useState("all");
+  const [tournament, setTournament] = useState("all");
+
+  // Debounce the search box → q
+  useEffect(() => {
+    const t = setTimeout(() => { setQ(search.trim()); setPage(1); }, 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  const statusOf = (t: string) =>
+    t === "upcoming" ? "SCHEDULED" : t === "completed" ? "COMPLETED" : t === "live" ? "LIVE" : undefined;
+
+  const fetchMatches = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ page: String(p), limit: String(ITEMS_PER_PAGE) });
+      const params = new URLSearchParams({ page: String(page), limit: String(ITEMS_PER_PAGE), sort });
+      const status = statusOf(tab);
       if (status) params.set("status", status);
+      if (q) params.set("q", q);
+      if (game !== "all") params.set("game", game);
+      if (tournament !== "all") params.set("tournament", tournament);
       const res = await fetch(`/api/matches?${params}`);
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
       setMatches(data.matches);
       setTotal(data.total);
       setTotalPages(data.totalPages);
+      if (data.facets) setFacets(data.facets);
+      setError(false);
     } catch {
       setError(true);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page, tab, q, sort, game, tournament]);
 
-  useEffect(() => {
-    const status = tab === "upcoming" ? "SCHEDULED" : tab === "completed" ? "COMPLETED" : tab === "live" ? "LIVE" : undefined;
-    fetchMatches(page, status);
-  }, [page, tab, fetchMatches]);
+  useEffect(() => { fetchMatches(); }, [fetchMatches]);
 
-  function handleTabChange(newTab: string) {
-    setTab(newTab);
-    setPage(1);
-  }
+  const resetPage = () => setPage(1);
+  const hasFilters = q !== "" || game !== "all" || tournament !== "all" || sort !== "latest" || tab !== "all";
+  const clearAll = () => { setSearch(""); setQ(""); setGame("all"); setTournament("all"); setSort("latest"); setTab("all"); setPage(1); };
 
   return (
     <div className="min-h-screen">
       {/* Hero */}
       <section className="border-b border-border/50 bg-card/30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="flex items-center gap-3 mb-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+          <div className="flex items-center gap-3 mb-3">
             <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10 border border-primary/20">
               <Swords className="w-5 h-5 text-primary" />
             </div>
-            <span className="text-sm font-semibold text-primary tracking-widest uppercase">
-              Matches
-            </span>
+            <span className="text-sm font-semibold text-primary tracking-widest uppercase">Matches</span>
           </div>
-          <h1 className="text-3xl sm:text-4xl font-black tracking-tight">
-            All Fixtures & Results
-          </h1>
-          <p className="text-muted-foreground mt-2 max-w-2xl">
-            View upcoming fixtures and match results from all BWL tournaments.
-          </p>
+          <h1 className="text-3xl sm:text-4xl font-black tracking-tight">All Fixtures &amp; Results</h1>
+          <p className="text-muted-foreground mt-2 max-w-2xl">Search, filter and sort every BWL match.</p>
         </div>
       </section>
 
       {/* Content */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Filter bar */}
+        <div className="space-y-3 mb-5">
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search player, duo or tournament…"
+              className="pl-9 pr-9 h-11"
+              inputMode="search"
+            />
+            {search && (
+              <button onClick={() => setSearch("")} aria-label="Clear search" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1">
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          {/* Selects */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <Select value={sort} onValueChange={(v) => { setSort(v); resetPage(); }}>
+              <SelectTrigger className="h-10"><ArrowDownUp className="w-4 h-4 mr-1.5 text-muted-foreground shrink-0" /><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="latest">Latest first</SelectItem>
+                <SelectItem value="oldest">Oldest first</SelectItem>
+                <SelectItem value="goals">Most goals</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={tournament} onValueChange={(v) => { setTournament(v); resetPage(); }}>
+              <SelectTrigger className="h-10"><Trophy className="w-4 h-4 mr-1.5 text-muted-foreground shrink-0" /><SelectValue placeholder="Tournament" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All tournaments</SelectItem>
+                {facets.tournaments.map((t) => (
+                  <SelectItem key={t.slug} value={t.slug}>{t.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={game} onValueChange={(v) => { setGame(v); resetPage(); }}>
+              <SelectTrigger className="h-10 col-span-2 sm:col-span-1"><Gamepad2 className="w-4 h-4 mr-1.5 text-muted-foreground shrink-0" /><SelectValue placeholder="Game" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All games</SelectItem>
+                {facets.games.map((g) => (
+                  <SelectItem key={g} value={g}>{gameLabel(g)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Status tabs */}
+          <Tabs value={tab} onValueChange={(v) => { setTab(v); resetPage(); }}>
+            <TabsList className="bg-muted/50 w-full grid grid-cols-4">
+              <TabsTrigger value="all">All</TabsTrigger>
+              <TabsTrigger value="live">Live</TabsTrigger>
+              <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
+              <TabsTrigger value="completed">Results</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          {/* Result count + clear */}
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">
+              {loading ? "Loading…" : `${total} match${total === 1 ? "" : "es"}`}
+            </span>
+            {hasFilters && (
+              <button onClick={clearAll} className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80">
+                <X className="w-3.5 h-3.5" /> Clear filters
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* List */}
         {error ? (
           <div className="text-center py-16">
             <p className="text-muted-foreground">Failed to load matches. Please refresh.</p>
           </div>
+        ) : loading ? (
+          <MatchSkeleton />
+        ) : matches.length === 0 ? (
+          <EmptyState message={q ? `No matches found for “${q}”.` : "No matches match your filters."} />
         ) : (
-          <>
-            <Tabs value={tab} onValueChange={handleTabChange} className="space-y-6">
-              <TabsList className="bg-muted/50">
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
-                <TabsTrigger value="completed">Results</TabsTrigger>
-              </TabsList>
+          <div className="space-y-3">
+            {matches.map((match) => (
+              <MatchCard key={match.id} match={match} />
+            ))}
+          </div>
+        )}
 
-              <TabsContent value={tab} className="mt-0 space-y-3">
-                {loading ? (
-                  <MatchSkeleton />
-                ) : matches.length === 0 ? (
-                  <EmptyState message={
-                    tab === "upcoming" ? "No upcoming fixtures scheduled." :
-                    tab === "completed" ? "No completed matches yet." :
-                    "No matches found."
-                  } />
-                ) : (
-                  <>
-                    {matches.map((match) => (
-                      <MatchCard key={match.id} match={match} />
-                    ))}
-                  </>
-                )}
-              </TabsContent>
-            </Tabs>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between mt-6 pt-4 border-t border-border/50">
-                <span className="text-sm text-muted-foreground">
-                  Page {page} of {totalPages} ({total} matches)
-                </span>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={page <= 1 || loading}
-                    onClick={() => setPage((p) => p - 1)}
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                    Prev
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={page >= totalPages || loading}
-                    onClick={() => setPage((p) => p + 1)}
-                  >
-                    Next
-                    <ChevronRight className="w-4 h-4" />
-                  </Button>
-                </div>
-              </div>
-            )}
-          </>
+        {/* Pagination */}
+        {!loading && totalPages > 1 && (
+          <div className="flex items-center justify-between mt-6 pt-4 border-t border-border/50">
+            <span className="text-sm text-muted-foreground">Page {page} of {totalPages}</span>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+                <ChevronLeft className="w-4 h-4" /> Prev
+              </Button>
+              <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
+                Next <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
         )}
       </div>
     </div>
