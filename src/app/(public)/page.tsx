@@ -3,6 +3,7 @@ export const revalidate = 300; // 5 minutes
 import Link from "next/link";
 import Image from "next/image";
 import { prisma } from "@/lib/db";
+import { getOverallStats } from "@/lib/actions/stats";
 import { Trophy, Swords, Users, ChevronRight, Star, Target, Crown, TrendingUp, Crosshair, BarChart3, ShieldCheck, Newspaper, Calendar } from "lucide-react";
 import { DownloadAppButton } from "@/components/public/download-app-button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -92,146 +93,24 @@ async function getHomeData() {
       })),
     ]);
 
-  // MVP stats — top performers across all data
-  const [topScorer, topWinRate, biggestEloJump, topRated] = await Promise.all([
-    // Top scorer — combine scoreline goals (authoritative for 1v1) with event-derived
-    // goals (used for team football), then take the max per player.
-    (async () => {
-      const goalsByPlayer = new Map<string, number>();
+  // Top Performers — sourced from the canonical overall-stats calculator so the
+  // homepage always matches /stats (includes 1v1 + 2v2 performance).
+  const overall = await getOverallStats();
+  const topScorerRow = overall.topScorers?.[0];
+  const winRow = overall.bestWinRate?.[0];
+  const csRow = overall.topCleanSheets?.[0];
+  const eloLeader = await prisma.player.findFirst({
+    where: { isActive: true, eloRating: { gt: 100 } },
+    orderBy: { eloRating: "desc" },
+    select: { id: true, name: true, slug: true, eloRating: true },
+  });
 
-      // Scoreline goals from 1v1 individual non-PUBG matches
-      const playersWithMatches = await prisma.player.findMany({
-        select: {
-          id: true,
-          homeMatches: {
-            where: {
-              status: "COMPLETED",
-              tournament: { participantType: "INDIVIDUAL", gameCategory: { not: "PUBG" } },
-            },
-            select: { homeScore: true, leg2HomeScore: true, leg3HomeScore: true },
-          },
-          awayMatches: {
-            where: {
-              status: "COMPLETED",
-              tournament: { participantType: "INDIVIDUAL", gameCategory: { not: "PUBG" } },
-            },
-            select: { awayScore: true, leg2AwayScore: true, leg3AwayScore: true },
-          },
-        },
-      });
-      for (const p of playersWithMatches) {
-        let g = 0;
-        for (const m of p.homeMatches) g += (m.homeScore ?? 0) + (m.leg2HomeScore ?? 0) + (m.leg3HomeScore ?? 0);
-        for (const m of p.awayMatches) g += (m.awayScore ?? 0) + (m.leg2AwayScore ?? 0) + (m.leg3AwayScore ?? 0);
-        if (g > 0) goalsByPlayer.set(p.id, g);
-      }
-
-      // Event-derived goals (team football)
-      const eventGoals = await prisma.matchEvent.groupBy({
-        by: ["playerId"],
-        where: { type: "GOAL", playerId: { not: null } },
-        _count: { type: true },
-      });
-      for (const eg of eventGoals) {
-        if (!eg.playerId) continue;
-        const existing = goalsByPlayer.get(eg.playerId) ?? 0;
-        if (eg._count.type > existing) goalsByPlayer.set(eg.playerId, eg._count.type);
-      }
-
-      let topId: string | null = null;
-      let topVal = 0;
-      for (const [id, val] of goalsByPlayer) {
-        if (val > topVal) { topVal = val; topId = id; }
-      }
-      if (!topId) return null;
-      const player = await prisma.player.findUnique({
-        where: { id: topId },
-        select: { id: true, name: true, slug: true },
-      });
-      return player ? { ...player, value: topVal, label: "Goals" } : null;
-    })(),
-
-    // Best win rate (min 3 matches) — rotates among tied players
-    prisma.player.findMany({
-      where: { isActive: true },
-      select: { id: true, name: true, slug: true, homeMatches: { where: { status: "COMPLETED" }, select: { homeScore: true, awayScore: true, leg2HomeScore: true, leg2AwayScore: true, leg3HomeScore: true, leg3AwayScore: true } }, awayMatches: { where: { status: "COMPLETED" }, select: { homeScore: true, awayScore: true, leg2HomeScore: true, leg2AwayScore: true, leg3HomeScore: true, leg3AwayScore: true } } },
-    }).then((players) => {
-      let bestRate = 0;
-      const candidates: { id: string; name: string; slug: string; value: number; total: number; label: string }[] = [];
-      for (const p of players) {
-        // Per-fixture: 1 fixture = 1 match, aggregate score across legs determines winner
-        let wins = 0, total = 0;
-        for (const m of p.homeMatches) {
-          const hg = (m.homeScore ?? 0) + (m.leg2HomeScore ?? 0) + (m.leg3HomeScore ?? 0);
-          const ag = (m.awayScore ?? 0) + (m.leg2AwayScore ?? 0) + (m.leg3AwayScore ?? 0);
-          total++;
-          if (hg > ag) wins++;
-        }
-        for (const m of p.awayMatches) {
-          const hg = (m.homeScore ?? 0) + (m.leg2HomeScore ?? 0) + (m.leg3HomeScore ?? 0);
-          const ag = (m.awayScore ?? 0) + (m.leg2AwayScore ?? 0) + (m.leg3AwayScore ?? 0);
-          total++;
-          if (ag > hg) wins++;
-        }
-        if (total < 3) continue;
-        const rate = Math.round((wins / total) * 100);
-        if (rate > bestRate) {
-          bestRate = rate;
-          candidates.length = 0;
-          candidates.push({ id: p.id, name: p.name, slug: p.slug, value: rate, total, label: "Win Rate" });
-        } else if (rate === bestRate) {
-          candidates.push({ id: p.id, name: p.name, slug: p.slug, value: rate, total, label: "Win Rate" });
-        }
-      }
-      if (candidates.length === 0) return null;
-      // Rotate based on current minute so it changes every minute
-      return candidates[Math.floor(Date.now() / 60000) % candidates.length];
-    }),
-
-    // Biggest ELO jump
-    prisma.player.findMany({
-      where: { isActive: true, eloRating: { gt: 100 } },
-      orderBy: { eloRating: "desc" },
-      take: 1,
-      select: { id: true, name: true, slug: true, eloRating: true },
-    }).then((res) => res[0] ? { ...res[0], value: res[0].eloRating, label: "ELO" } : null),
-
-    // Most clean sheets (each leg where opponent scored 0)
-    prisma.player.findMany({
-      where: { isActive: true },
-      select: {
-        id: true, name: true, slug: true,
-        homeMatches: { where: { status: "COMPLETED" }, select: { awayScore: true, leg2AwayScore: true, leg3AwayScore: true } },
-        awayMatches: { where: { status: "COMPLETED" }, select: { homeScore: true, leg2HomeScore: true, leg3HomeScore: true } },
-      },
-    }).then((players) => {
-      let best: { id: string; name: string; slug: string; value: number; label: string } | null = null;
-      for (const p of players) {
-        // Per-fixture clean sheet: opponent's aggregate across all legs == 0
-        let cleanSheets = 0;
-        for (const m of p.homeMatches) {
-          const opp = (m.awayScore ?? 0) + (m.leg2AwayScore ?? 0) + (m.leg3AwayScore ?? 0);
-          if (opp === 0) cleanSheets++;
-        }
-        for (const m of p.awayMatches) {
-          const opp = (m.homeScore ?? 0) + (m.leg2HomeScore ?? 0) + (m.leg3HomeScore ?? 0);
-          if (opp === 0) cleanSheets++;
-        }
-        if (cleanSheets > 0) {
-          const strictlyBetter = !best || cleanSheets > best.value;
-          // Suleman wins ties for the clean sheets spotlight
-          const tiedAndSuleman =
-            best && cleanSheets === best.value && p.slug === "suleman";
-          if (strictlyBetter || tiedAndSuleman) {
-            best = { id: p.id, name: p.name, slug: p.slug, value: cleanSheets, label: "Clean Sheets" };
-          }
-        }
-      }
-      return best;
-    }),
-  ]);
-
-  const mvpStats = [topScorer, topWinRate, biggestEloJump, topRated].filter(Boolean);
+  const mvpStats = ([
+    topScorerRow?.player && { id: topScorerRow.player.id, name: topScorerRow.player.name, slug: topScorerRow.player.slug, value: topScorerRow.count, label: "Goals" },
+    winRow?.player && { id: winRow.player.id, name: winRow.player.name, slug: winRow.player.slug, value: winRow.count, total: winRow.matches, label: "Win Rate" },
+    eloLeader && { id: eloLeader.id, name: eloLeader.name, slug: eloLeader.slug, value: eloLeader.eloRating, label: "ELO" },
+    csRow?.player && { id: csRow.player.id, name: csRow.player.name, slug: csRow.player.slug, value: csRow.count, label: "Clean Sheets" },
+  ].filter(Boolean)) as { id: string; name: string; slug: string; value: number; label: string; total?: number }[];
 
   const latestNews = await prisma.newsPost.findMany({
     where: { isPublished: true },

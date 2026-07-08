@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 async function getPlayersWithStats() {
   // Per-fixture model (matches the league standings):
   // 1 fixture = 1 match, multi-leg knockouts aggregate scores across legs to determine the winner.
-  const [players, individualMatches, eventGoalCounts] = await Promise.all([
+  const [players, individualMatches, eventGoalCounts, teamMatches] = await Promise.all([
     prisma.player.findMany({
       where: { isActive: true },
       orderBy: { eloRating: "desc" },
@@ -62,6 +62,17 @@ async function getPlayersWithStats() {
       where: { type: "GOAL", playerId: { not: null }, match: { tournament: { participantType: "TEAM" } } },
       _count: { type: true },
     }),
+    // 2v2/team matches — for per-member matches + wins.
+    prisma.match.findMany({
+      where: { status: "COMPLETED", OR: [{ homeTeamId: { not: null } }, { awayTeamId: { not: null } }] },
+      select: {
+        homeScore: true, awayScore: true,
+        leg2HomeScore: true, leg2AwayScore: true,
+        leg3HomeScore: true, leg3AwayScore: true,
+        homeTeam: { select: { players: { where: { isActive: true }, select: { playerId: true } } } },
+        awayTeam: { select: { players: { where: { isActive: true }, select: { playerId: true } } } },
+      },
+    }),
   ]);
 
   type Acc = { matches: number; wins: number; goals: number };
@@ -80,6 +91,14 @@ async function getPlayersWithStats() {
     home.goals += hg; away.goals += ag;
     if (hg > ag) home.wins++;
     else if (ag > hg) away.wins++;
+  }
+
+  // 2v2/team matches add to each active member's matches + wins (per fixture).
+  for (const m of teamMatches) {
+    const hg = (m.homeScore ?? 0) + (m.leg2HomeScore ?? 0) + (m.leg3HomeScore ?? 0);
+    const ag = (m.awayScore ?? 0) + (m.leg2AwayScore ?? 0) + (m.leg3AwayScore ?? 0);
+    for (const pl of m.homeTeam?.players ?? []) { const s = ensure(pl.playerId); s.matches++; if (hg > ag) s.wins++; }
+    for (const pl of m.awayTeam?.players ?? []) { const s = ensure(pl.playerId); s.matches++; if (ag > hg) s.wins++; }
   }
 
   const teamGoalsMap = new Map(eventGoalCounts.map((g) => [g.playerId!, g._count.type]));
