@@ -35,9 +35,10 @@ export default function RootLayout({
         <meta httpEquiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
         <meta httpEquiv="Pragma" content="no-cache" />
         <meta httpEquiv="Expires" content="0" />
+        {/* Dark-only site: force dark and clear any previously saved light preference. */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('bwl-theme');if(t==='light'||(!t&&window.matchMedia('(prefers-color-scheme:light)').matches)){document.documentElement.classList.add('light')}}catch(e){}})()`,
+            __html: `(function(){try{document.documentElement.classList.remove('light');localStorage.removeItem('bwl-theme');}catch(e){}})()`,
           }}
         />
       </head>

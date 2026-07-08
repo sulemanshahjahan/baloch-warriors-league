@@ -323,6 +323,40 @@ async function getHomeData() {
   return { featuredTournaments, recentResults, upcomingMatches, stats, mvpStats, latestNews, playerOfWeek, seasonChampion };
 }
 
+/** Premium tournament-style section header: accent bar + bold title + optional link. */
+function SectionHeading({
+  title,
+  href,
+  linkLabel,
+  icon,
+}: {
+  title: string;
+  href?: string;
+  linkLabel?: string;
+  icon?: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between mb-5">
+      <div className="flex items-center gap-2.5">
+        <span className="h-6 w-1.5 rounded-full bg-gradient-to-b from-primary to-primary/40" />
+        <h2 className="text-xl sm:text-2xl font-black tracking-tight flex items-center gap-2">
+          {icon}
+          {title}
+        </h2>
+      </div>
+      {href && (
+        <Link
+          href={href}
+          className="group inline-flex items-center gap-1 text-sm font-medium text-primary hover:text-primary/80 transition-colors"
+        >
+          {linkLabel ?? "View all"}
+          <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+        </Link>
+      )}
+    </div>
+  );
+}
+
 export default async function HomePage() {
   const { featuredTournaments, recentResults, upcomingMatches, stats, mvpStats, latestNews, playerOfWeek, seasonChampion } =
     await getHomeData();
@@ -337,8 +371,8 @@ export default async function HomePage() {
           <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-accent/5 rounded-full blur-3xl" />
         </div>
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-28">
-          <div className="flex flex-col lg:flex-row items-center gap-12">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-20">
+          <div className="flex flex-col lg:flex-row items-center gap-10 lg:gap-12">
             {/* Left: Text Content */}
             <div className="flex-1 text-center lg:text-left">
               <div className="flex items-center justify-center lg:justify-start gap-2 mb-6">
@@ -690,15 +724,7 @@ export default async function HomePage() {
         {/* Active / Upcoming Tournaments */}
         {featuredTournaments.length > 0 && (
           <section>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold">Tournaments</h2>
-              <Link
-                href="/tournaments"
-                className="flex items-center gap-1 text-sm text-primary hover:underline"
-              >
-                View all <ChevronRight className="w-4 h-4" />
-              </Link>
-            </div>
+            <SectionHeading title="Tournaments" href="/tournaments" />
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {featuredTournaments.map((t) => (
                 <Link key={t.id} href={`/tournaments/${t.slug}`}>
@@ -749,15 +775,7 @@ export default async function HomePage() {
           {/* Recent Results */}
           {recentResults.length > 0 && (
             <section>
-              <div className="flex items-center justify-between mb-5">
-                <h2 className="text-xl font-bold">Recent Results</h2>
-                <Link
-                  href="/matches"
-                  className="flex items-center gap-1 text-sm text-primary hover:underline"
-                >
-                  All matches <ChevronRight className="w-4 h-4" />
-                </Link>
-              </div>
+              <SectionHeading title="Recent Results" href="/matches" linkLabel="All matches" />
               <div className="space-y-3">
                 {recentResults.map((match) => {
                   const homeName = match.homePlayer?.name ?? match.homeTeam?.shortName ?? match.homeTeam?.name ?? "TBD";
@@ -847,15 +865,7 @@ export default async function HomePage() {
           {/* Upcoming Fixtures */}
           {upcomingMatches.length > 0 && (
             <section>
-              <div className="flex items-center justify-between mb-5">
-                <h2 className="text-xl font-bold">Upcoming</h2>
-                <Link
-                  href="/matches?status=SCHEDULED"
-                  className="flex items-center gap-1 text-sm text-primary hover:underline"
-                >
-                  See all <ChevronRight className="w-4 h-4" />
-                </Link>
-              </div>
+              <SectionHeading title="Upcoming" href="/matches?status=SCHEDULED" linkLabel="See all" />
               <div className="space-y-3">
                 {upcomingMatches.map((match) => {
                   const homeName = match.homePlayer?.name ?? match.homeTeam?.name ?? "TBD";
@@ -934,18 +944,7 @@ export default async function HomePage() {
         {/* Latest News */}
         {latestNews.length > 0 && (
           <section>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold flex items-center gap-2">
-                <Newspaper className="w-5 h-5 text-primary" />
-                Latest News
-              </h2>
-              <Link
-                href="/news"
-                className="flex items-center gap-1 text-sm text-primary hover:underline"
-              >
-                All news <ChevronRight className="w-4 h-4" />
-              </Link>
-            </div>
+            <SectionHeading title="Latest News" href="/news" linkLabel="All news" icon={<Newspaper className="w-5 h-5 text-primary" />} />
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {latestNews.map((post) => (
                 <Link key={post.id} href={`/news/${post.slug}`}>

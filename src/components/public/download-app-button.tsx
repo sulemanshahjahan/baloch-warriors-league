@@ -46,24 +46,25 @@ export function DownloadAppButton({ variant }: { variant: "navbar-desktop" | "na
 
   // hero
   return (
-    <div className="mt-6 flex flex-col sm:flex-row items-center gap-3 p-4 rounded-xl bg-card/50 border border-border">
+    <div className="mt-8 inline-flex w-full sm:w-auto flex-col sm:flex-row sm:items-center gap-3 p-3 sm:pr-4 rounded-2xl bg-gradient-to-r from-primary/12 via-card/60 to-card/40 border border-primary/20 shadow-lg shadow-primary/5 backdrop-blur">
       <div className="flex items-center gap-3">
-        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10">
+        <div className="flex items-center justify-center w-11 h-11 shrink-0 rounded-xl bg-primary/15 border border-primary/25">
           <Download className="w-5 h-5 text-primary" />
         </div>
-        <div className="text-left">
-          <p className="text-sm font-semibold">Get the BWL Android App</p>
-          <p className="text-xs text-muted-foreground">Available on Google Play</p>
+        <div className="text-left min-w-0">
+          <p className="text-sm font-bold">Get the BWL Android App</p>
+          <p className="text-xs text-muted-foreground">Tournaments, matches &amp; stats on the go</p>
         </div>
       </div>
       <a
         href={PLAY_STORE_URL}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/80 transition-colors sm:ml-auto"
+        className="inline-flex items-center justify-center gap-1.5 bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-semibold hover:bg-primary/90 transition-colors sm:ml-2 whitespace-nowrap"
       >
-        Get on Google Play
-        <ChevronRight className="w-4 h-4" />
+        <Download className="w-4 h-4" />
+        Google Play
+        <ChevronRight className="w-4 h-4 -ml-0.5" />
       </a>
     </div>
   );

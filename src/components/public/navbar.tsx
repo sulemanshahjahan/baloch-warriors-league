@@ -6,7 +6,6 @@ import { useState } from "react";
 import { Menu, X, Trophy, Users } from "lucide-react";
 import { DownloadAppButton } from "./download-app-button";
 import { SearchDialog } from "./search-dialog";
-import { ThemeToggle } from "./theme-toggle";
 import { PushNotificationButton } from "./push-notification-button";
 import { PlayerAuthButton } from "./player-auth-button";
 import { cn } from "@/lib/utils";
@@ -52,7 +51,6 @@ export function PublicNavbar() {
           <div className="flex md:hidden items-center gap-0.5">
             <SearchDialog />
             <PushNotificationButton />
-            <ThemeToggle />
             <PlayerAuthButton />
           </div>
 
@@ -70,7 +68,6 @@ export function PublicNavbar() {
             ))}
             <SearchDialog />
             <PushNotificationButton />
-            <ThemeToggle />
             <PlayerAuthButton />
             <DownloadAppButton variant="navbar-desktop" />
           </div>
