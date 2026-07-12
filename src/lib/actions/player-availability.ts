@@ -151,12 +151,22 @@ export async function upsertAvailabilityBlock(raw: unknown): Promise<ActionResul
           where: { periodId: period.id, date: dateOnly(input.date), NOT: input.id ? { id: input.id } : undefined },
         });
       } else {
+        // A specific time block supersedes a coarse "all day" marker on the same
+        // day — remove any all-day blocks rather than treating them as a clash.
+        const allDayIds = sameDay
+          .filter((o) => o.isAllDay || !o.startDateTime || !o.endDateTime)
+          .map((o) => o.id);
+        if (allDayIds.length > 0) {
+          await tx.availabilityBlock.deleteMany({ where: { id: { in: allDayIds } } });
+        }
+        // Only genuine timed blocks can actually clash.
         const nr = { start: times.startDateTime!.getTime(), end: times.endDateTime!.getTime() };
         const clash = sameDay.some((o) => {
+          if (o.isAllDay || !o.startDateTime || !o.endDateTime) return false;
           const r = rowRange(o);
           return nr.start < r.end && nr.end > r.start;
         });
-        if (clash) throw new Error("That window overlaps another block on the same day. Edit or remove it first.");
+        if (clash) throw new Error("That window overlaps another time block on the same day. Edit or remove it first.");
       }
 
       const data = {
