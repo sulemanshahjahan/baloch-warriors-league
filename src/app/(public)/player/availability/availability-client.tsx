@@ -114,7 +114,7 @@ export function AvailabilityClient(props: Props) {
   while (cells.length % 7 !== 0) cells.push(null);
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-6 space-y-5 pb-32">
+    <div className="max-w-3xl mx-auto px-4 py-6 space-y-5 pb-40 md:pb-32">
       {/* Header */}
       <div className="flex items-center justify-between gap-2">
         <div>
@@ -189,7 +189,7 @@ export function AvailabilityClient(props: Props) {
       <Legend />
 
       {/* Submit bar */}
-      <div className="fixed bottom-0 inset-x-0 border-t border-border bg-background/95 backdrop-blur z-30">
+      <div className="fixed above-mobile-tabbar inset-x-0 border-t border-border bg-background/95 backdrop-blur z-30">
         <div className="max-w-3xl mx-auto px-4 py-3 space-y-2">
           {submitMsg && <p className="text-sm text-emerald-400">{submitMsg}</p>}
           {!canEdit ? (

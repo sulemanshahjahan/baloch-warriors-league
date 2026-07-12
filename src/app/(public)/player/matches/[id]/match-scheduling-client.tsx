@@ -73,7 +73,7 @@ export function MatchSchedulingClient({ view }: { view: MatchSchedulingView }) {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-6 space-y-5 pb-28">
+    <div className="max-w-2xl mx-auto px-4 py-6 space-y-5 pb-40 md:pb-28">
       <Link href="/player/schedule" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="w-4 h-4" /> My schedule
       </Link>
@@ -228,7 +228,7 @@ export function MatchSchedulingClient({ view }: { view: MatchSchedulingView }) {
 
       {/* Action bar */}
       {canAct && view.slots.length > 0 && (
-        <div className="fixed bottom-0 inset-x-0 border-t border-border bg-background/95 backdrop-blur z-30">
+        <div className="fixed above-mobile-tabbar inset-x-0 border-t border-border bg-background/95 backdrop-blur z-30">
           <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-2">
             <Button className="flex-1" onClick={() => act(() => confirmSelectedSlot(view.matchId))} disabled={isPending || !view.selectedSlotId}>
               {isPending ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : <CheckCircle2 className="w-4 h-4 mr-1.5" />}

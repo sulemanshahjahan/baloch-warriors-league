@@ -131,6 +131,18 @@ body {
   overscroll-behavior-y: auto;
 }
 
+/* Fixed action bars on player pages (e.g. availability Submit, match Confirm)
+   must sit ABOVE the mobile bottom tab bar (h-14 = 3.5rem + safe area, md:hidden).
+   On desktop the tab bar is gone, so they drop to the very bottom. */
+.above-mobile-tabbar {
+  bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 768px) {
+  .above-mobile-tabbar {
+    bottom: 0;
+  }
+}
+
 /* ─────────────────────────────────────────────────────────────
    BASE STYLES
    ───────────────────────────────────────────────────────────── */
