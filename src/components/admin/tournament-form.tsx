@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,8 +14,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Save, Info } from "lucide-react";
+import { Loader2, Save, Info, Upload, X } from "lucide-react";
 import { createTournament, updateTournament } from "@/lib/actions/tournament";
+import { uploadTournamentImage } from "@/lib/actions/upload";
 import type { Tournament } from "@prisma/client";
 
 interface TournamentFormProps {
@@ -116,6 +117,9 @@ export function TournamentForm({ tournament }: TournamentFormProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState("");
+  const [bannerUrl, setBannerUrl] = useState(tournament?.bannerUrl ?? "");
+  const [isUploading, setIsUploading] = useState(false);
+  const bannerFileRef = useRef<HTMLInputElement>(null);
 
   const [gameCategory, setGameCategory] = useState<GameCategory>(
     (tournament?.gameCategory as GameCategory) ?? "FOOTBALL"
@@ -423,14 +427,63 @@ export function TournamentForm({ tournament }: TournamentFormProps) {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="bannerUrl">Banner Image URL</Label>
+            <Label>Banner / Champions Poster</Label>
+            <input type="hidden" name="bannerUrl" value={bannerUrl} />
+            {bannerUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={bannerUrl}
+                alt="Banner preview"
+                className="w-full max-w-sm rounded-lg border border-border object-cover"
+              />
+            )}
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isUploading}
+                onClick={() => bannerFileRef.current?.click()}
+              >
+                {isUploading ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Upload className="w-4 h-4 mr-1" />}
+                {bannerUrl ? "Replace image" : "Upload image"}
+              </Button>
+              {bannerUrl && (
+                <Button type="button" variant="ghost" size="sm" onClick={() => setBannerUrl("")}>
+                  <X className="w-4 h-4 mr-1" /> Remove
+                </Button>
+              )}
+            </div>
             <Input
-              id="bannerUrl"
-              name="bannerUrl"
-              type="url"
-              placeholder="https://..."
-              defaultValue={tournament?.bannerUrl ?? ""}
+              ref={bannerFileRef}
+              type="file"
+              accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
+              className="hidden"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                setError("");
+                if (file.size > 10 * 1024 * 1024) {
+                  setError("File too large. Max 10MB.");
+                  if (bannerFileRef.current) bannerFileRef.current.value = "";
+                  return;
+                }
+                setIsUploading(true);
+                try {
+                  const fd = new FormData();
+                  fd.append("file", file);
+                  const result = await uploadTournamentImage(fd);
+                  if (result.success && result.url) setBannerUrl(result.url);
+                  else setError(result.error ?? "Upload failed");
+                } finally {
+                  setIsUploading(false);
+                  if (bannerFileRef.current) bannerFileRef.current.value = "";
+                }
+              }}
             />
+            <p className="text-xs text-muted-foreground">
+              JPG/PNG/WebP up to 10MB (≈1200×600). Shown as the poster in the homepage Champions banner when this tournament&apos;s winner is the latest champion.
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="logoUrl">Logo Image URL</Label>

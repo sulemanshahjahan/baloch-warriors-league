@@ -128,13 +128,16 @@ async function getHomeData() {
     include: { player: { select: { id: true, name: true, slug: true } } },
   });
 
-  // Most recent tournament with a TOURNAMENT_WINNER award assigned
-  // (status doesn't matter — having a winner award is the signal)
-  const completedTournament = await prisma.tournament.findFirst({
-    where: {
-      awards: { some: { type: "TOURNAMENT_WINNER" } },
-    },
-    orderBy: [{ endDate: "desc" }, { updatedAt: "desc" }],
+  // Current "Season Champion" = the most recently crowned tournament winner.
+  // (Ordering tournaments by endDate is unreliable — many have a null endDate,
+  //  which sorts first under DESC and would surface an older champion.)
+  const latestWinnerAward = await prisma.award.findFirst({
+    where: { type: "TOURNAMENT_WINNER" },
+    orderBy: { createdAt: "desc" },
+    select: { tournamentId: true },
+  });
+  const completedTournament = !latestWinnerAward ? null : await prisma.tournament.findUnique({
+    where: { id: latestWinnerAward.tournamentId },
     select: {
       id: true,
       name: true,
