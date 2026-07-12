@@ -225,8 +225,10 @@ export async function uploadTournamentImage(formData: FormData): Promise<UploadR
         {
           folder: "bwl/tournaments",
           resource_type: "image",
+          // "limit" preserves the full image + aspect ratio (only downscales to
+          // fit within the box), so posters aren't cropped — shown as uploaded.
           transformation: [
-            { width: 1200, height: 600, crop: "fill" },
+            { width: 1600, height: 1600, crop: "limit" },
             { quality: "auto", fetch_format: "auto" },
           ],
         },
