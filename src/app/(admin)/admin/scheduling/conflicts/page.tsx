@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
 import { formatDateTime, getRoundDisplayName } from "@/lib/utils";
-import { schedulingStatusMeta } from "@/lib/scheduling/labels";
+import { schedulingStatusMeta, formatConflict } from "@/lib/scheduling/labels";
 import { ShieldAlert, CheckCircle2 } from "lucide-react";
 import { RescheduleDecision, ActivationDecision, NoShowResolve, RegenOrTime } from "./conflict-actions";
 
@@ -109,6 +109,16 @@ export default async function ConflictsPage() {
                   </div>
                   <span className={`text-xs px-2 py-0.5 rounded-full ${schedulingStatusMeta(s.schedulingStatus).cls}`}>{schedulingStatusMeta(s.schedulingStatus).label}</span>
                 </div>
+                {(() => {
+                  const c = formatConflict(s.conflictSummary);
+                  return c && c.blockers ? (
+                    <p className="text-xs text-red-300">
+                      Blocking: {c.blockers}
+                      {c.partial ? ` · ${c.partial}` : ""}
+                      {c.subs ? ` · sub fix: ${c.subs}` : ""}
+                    </p>
+                  ) : null;
+                })()}
                 <RegenOrTime matchId={s.match.id} />
               </Card>
             ))}

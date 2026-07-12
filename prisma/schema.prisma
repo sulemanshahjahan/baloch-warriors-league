@@ -1541,6 +1541,8 @@ model MatchSchedule {
   overrideReason       String?
   schedulingConfidence Float?
   rescheduleCount      Int     @default(0)
+  // Engine no-overlap analysis for admin display (blockers, best partial, sub fixes).
+  conflictSummary      Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

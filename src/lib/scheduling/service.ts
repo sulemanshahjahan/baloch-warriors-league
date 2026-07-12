@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { generateProposedSlots } from "./engine";
 import type { EngineSide, SubstituteOption, GenerateResult } from "./types";
 import { blocksToIntervals, type BlockLike } from "./blocks";
@@ -267,6 +267,31 @@ export async function generateAndPersistSlots(matchId: string, actorId?: string)
   const confirmationDeadline = new Date(now + settings.confirmationWindowHours * 3_600_000);
   const status = result.slots.length === 0 ? "NO_COMMON_TIME" : "AWAITING_CONFIRMATION";
 
+  // Build an admin-facing conflict summary (who blocks it, best partial, sub fixes)
+  // whenever the full lineup can't all make it. Cleared to null once it can.
+  let conflictSummary: Prisma.InputJsonValue | typeof Prisma.DbNull = Prisma.DbNull;
+  if (!result.eligibleFullLineup && result.analysis) {
+    const nameMap = new Map<string, string>();
+    for (const s of sides) for (const p of s.players) nameMap.set(p.playerId, p.name);
+    for (const sub of substitutes) nameMap.set(sub.participant.playerId, sub.participant.displayName ?? "Substitute");
+    const a = result.analysis;
+    const allIds = sides.flatMap((s) => s.players).map((p) => p.playerId);
+    const inPartial = new Set(a.bestPartial?.playerIds ?? []);
+    const blockerIds =
+      a.bestPartial && a.bestPartial.count < a.bestPartial.total
+        ? allIds.filter((id) => !inPartial.has(id))
+        : a.blockingPlayerIds;
+    conflictSummary = {
+      reason: a.reason,
+      blockers: blockerIds.map((id) => ({ id, name: nameMap.get(id) ?? "player" })),
+      bestPartial: a.bestPartial ? { count: a.bestPartial.count, total: a.bestPartial.total } : null,
+      substituteFixes: a.substituteSolutions.map((s) => ({
+        subName: nameMap.get(s.substitutePlayerId) ?? "substitute",
+        replacesName: nameMap.get(s.replacesPlayerId) ?? "player",
+      })),
+    };
+  }
+
   const scheduleId = await prisma.$transaction(async (tx) => {
     const schedule = await tx.matchSchedule.upsert({
       where: { matchId },
@@ -338,6 +363,7 @@ export async function generateAndPersistSlots(matchId: string, actorId?: string)
         primaryEnd: primaryE,
         backupStart: backupS,
         backupEnd: backupE,
+        conflictSummary,
       },
     });
 

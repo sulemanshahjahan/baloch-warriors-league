@@ -50,6 +50,27 @@ export function confirmationMeta(status: string | null | undefined): Meta {
   return CONFIRMATION_META[status ?? "PENDING"] ?? { label: status ?? "—", cls: "bg-muted text-muted-foreground" };
 }
 
+export interface ConflictSummary {
+  reason: string;
+  blockers: { id: string; name: string }[];
+  bestPartial: { count: number; total: number } | null;
+  substituteFixes: { subName: string; replacesName: string }[];
+}
+
+/** Turn a stored MatchSchedule.conflictSummary into short display strings. */
+export function formatConflict(
+  raw: unknown
+): { blockers: string; partial: string | null; subs: string | null } | null {
+  if (!raw || typeof raw !== "object") return null;
+  const s = raw as Partial<ConflictSummary>;
+  const blockerNames = (s.blockers ?? []).map((b) => b.name).filter(Boolean);
+  const partial = s.bestPartial ? `best overlap ${s.bestPartial.count}/${s.bestPartial.total}` : null;
+  const subs = (s.substituteFixes ?? []).length
+    ? (s.substituteFixes ?? []).map((f) => `${f.subName} → ${f.replacesName}`).join(", ")
+    : null;
+  return { blockers: blockerNames.join(", "), partial, subs };
+}
+
 export const REJECT_REASONS: { value: string; label: string }[] = [
   { value: "CANNOT_ATTEND", label: "Can't attend this time" },
   { value: "DUTY_CHANGED", label: "Duty / shift changed" },

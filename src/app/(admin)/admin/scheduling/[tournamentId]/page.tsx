@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDateTime, toKarachiInputValue, getRoundDisplayName } from "@/lib/utils";
 import { getEffectiveSettings } from "@/lib/scheduling/settings";
-import { schedulingStatusMeta } from "@/lib/scheduling/labels";
+import { schedulingStatusMeta, formatConflict } from "@/lib/scheduling/labels";
 import { ArrowLeft, Grid3x3, BarChart3, ShieldAlert, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SchedulingControls } from "./scheduling-controls";
@@ -94,6 +94,7 @@ export default async function TournamentSchedulingPage({
       total: confs.length,
       primary: m.schedule?.primaryStart ? formatDateTime(m.schedule.primaryStart) : m.scheduledAt ? formatDateTime(m.scheduledAt) : null,
       assignable: !!(m.homePlayerId || m.homeTeamId) && !!(m.awayPlayerId || m.awayTeamId),
+      conflict: formatConflict(m.schedule?.conflictSummary),
     };
   });
 
@@ -143,6 +144,13 @@ export default async function TournamentSchedulingPage({
                         <TableCell>
                           <div className="font-medium text-sm">{f.home} vs {f.away}</div>
                           <div className="text-xs text-muted-foreground">{f.label}</div>
+                          {f.conflict && f.conflict.blockers && (
+                            <div className="text-[11px] text-red-300 mt-0.5">
+                              Blocking: {f.conflict.blockers}
+                              {f.conflict.partial ? ` · ${f.conflict.partial}` : ""}
+                              {f.conflict.subs ? ` · sub fix: ${f.conflict.subs}` : ""}
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell><span className={`text-xs px-2 py-0.5 rounded-full ${meta.cls}`}>{meta.label}</span></TableCell>
                         <TableCell className="text-center text-sm">{f.total > 0 ? `${f.confirmed}/${f.total}` : "—"}</TableCell>
