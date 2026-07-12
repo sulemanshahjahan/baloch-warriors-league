@@ -5,7 +5,7 @@ import { generateProposedSlots } from "./engine";
 import type { EngineSide, SubstituteOption, GenerateResult } from "./types";
 import { blocksToIntervals, type BlockLike } from "./blocks";
 import { getEffectiveSettings, type EffectiveSettings } from "./settings";
-import { notifySchedulingAdminAlert } from "./notify";
+import { notifySchedulingAdminAlert, notifyMatchScheduled } from "./notify";
 
 const MINUTE = 60_000;
 const DAY = 86_400_000;
@@ -219,13 +219,13 @@ export async function generateAndPersistSlots(matchId: string, actorId?: string)
   const players = sides.flatMap((s) => s.players);
   if (players.length < 2) throw new Error("Both participants must be assigned before generating a schedule.");
 
-  // Completion window: now → now + completionWindowDays, respecting an existing deadline.
+  // Completion window: always search at least the full completion window from
+  // now, extending to the match deadline only when it is further out. A tight
+  // auto-assigned deadline must NOT shrink the availability search below it.
   const now = Date.now();
   const windowStart = new Date(now);
   const defaultEnd = now + settings.completionWindowDays * DAY;
-  const windowEnd = new Date(
-    match.deadline && match.deadline.getTime() > now ? match.deadline.getTime() : defaultEnd
-  );
+  const windowEnd = new Date(Math.max(defaultEnd, match.deadline?.getTime() ?? 0));
 
   const playerIds = players.map((p) => p.playerId);
   const [availByPlayer, busyByPlayer, substitutes] = await Promise.all([
@@ -265,7 +265,10 @@ export async function generateAndPersistSlots(matchId: string, actorId?: string)
   const primary = result.slots.find((s) => s.isPrimary) ?? result.slots[0] ?? null;
   const backup = result.slots.find((s) => s.isBackup) ?? null;
   const confirmationDeadline = new Date(now + settings.confirmationWindowHours * 3_600_000);
-  const status = result.slots.length === 0 ? "NO_COMMON_TIME" : "AWAITING_CONFIRMATION";
+  // AUTOMATIC mode imposes the engine's best slot immediately (no player
+  // confirmation step). Other modes leave it for players to confirm.
+  const isAutomatic = settings.schedulingMode === "AUTOMATIC" && result.slots.length > 0;
+  const status = result.slots.length === 0 ? "NO_COMMON_TIME" : isAutomatic ? "SCHEDULED" : "AWAITING_CONFIRMATION";
 
   // Build an admin-facing conflict summary (who blocks it, best partial, sub fixes)
   // whenever the full lineup can't all make it. Cleared to null once it can.
@@ -364,16 +367,20 @@ export async function generateAndPersistSlots(matchId: string, actorId?: string)
         backupStart: backupS,
         backupEnd: backupE,
         conflictSummary,
+        kickoffAt: isAutomatic ? primaryS : null,
       },
     });
 
-    // Reset participant confirmations to PENDING.
+    // AUTOMATIC → auto-confirmed on the primary slot; otherwise reset to PENDING
+    // for the players to confirm.
+    const confStatus = isAutomatic ? "CONFIRMED" : "PENDING";
+    const confSlot = isAutomatic ? primarySlotId : null;
     for (const s of sides) {
       for (const p of s.players) {
         await tx.matchParticipantConfirmation.upsert({
           where: { matchScheduleId_playerId: { matchScheduleId: schedule.id, playerId: p.playerId } },
-          create: { matchScheduleId: schedule.id, playerId: p.playerId, teamId: s.teamId, status: "PENDING" },
-          update: { status: "PENDING", proposedSlotId: null, responseReason: null, responseNote: null, respondedAt: null, confirmedById: null },
+          create: { matchScheduleId: schedule.id, playerId: p.playerId, teamId: s.teamId, status: confStatus as never, proposedSlotId: confSlot },
+          update: { status: confStatus as never, proposedSlotId: confSlot, responseReason: null, responseNote: null, respondedAt: isAutomatic ? new Date() : null, confirmedById: null },
         });
       }
     }
@@ -395,6 +402,17 @@ export async function generateAndPersistSlots(matchId: string, actorId?: string)
     });
   } catch {
     /* ignore */
+  }
+
+  // AUTOMATIC: lock the match time in immediately so it shows on fixtures.
+  if (isAutomatic && primary) {
+    await prisma.match.update({ where: { id: matchId }, data: { scheduledAt: new Date(primary.kickoff) } });
+    await notifyMatchScheduled({
+      id: matchId,
+      homeName: sides[0]?.label ?? "Home",
+      awayName: sides[1]?.label ?? "Away",
+      kickoff: new Date(primary.kickoff),
+    });
   }
 
   // Escalate to admins when the engine can't find any workable time.
