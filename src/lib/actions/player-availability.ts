@@ -55,9 +55,13 @@ function computeTimes(input: {
     return { startDateTime: null, endDateTime: null, isAllDay: true, isOvernight: false };
   }
   const start = fromKarachiInputValue(`${input.date}T${input.startTime}`);
-  const endDay = input.isOvernight ? addDayStr(input.date) : input.date;
+  // Treat as overnight when flagged OR when the end isn't after the start
+  // (e.g. a 23:00→01:00 window from bulk/copy/template without the flag), so the
+  // end rolls to the next day instead of an invalid end-before-start block.
+  const overnight = !!input.isOvernight || (input.endTime ?? "") <= (input.startTime ?? "");
+  const endDay = overnight ? addDayStr(input.date) : input.date;
   const end = fromKarachiInputValue(`${endDay}T${input.endTime}`);
-  return { startDateTime: start, endDateTime: end, isAllDay: false, isOvernight: !!input.isOvernight };
+  return { startDateTime: start, endDateTime: end, isAllDay: false, isOvernight: overnight };
 }
 
 function rowRange(b: { date: Date; startDateTime: Date | null; endDateTime: Date | null; isAllDay: boolean }): {

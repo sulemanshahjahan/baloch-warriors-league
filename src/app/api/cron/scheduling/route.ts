@@ -6,6 +6,7 @@ import {
   notifySchedulingAdminAlert,
   whatsappConfirmationRequest,
 } from "@/lib/scheduling/notify";
+import { generateAndPersistSlots } from "@/lib/scheduling/service";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,39 @@ export async function GET(req: NextRequest) {
   let remindersSent = 0;
   let whatsappSent = 0;
   let escalated = 0;
+  let autoScheduled = 0;
+
+  // ── 0) Auto-schedule upcoming matches in AUTOMATIC tournaments ──
+  // For tournaments on AUTOMATIC mode, generate + lock the engine's best slot for
+  // any match that has no schedule yet OR previously had no common time (so it
+  // schedules as soon as the blocking players' availability arrives). Never
+  // touches already-scheduled, awaiting-confirmation, or completed matches.
+  const autoTournaments = await prisma.tournamentSchedulingSettings.findMany({
+    where: { enabled: true, schedulingMode: "AUTOMATIC", tournament: { status: { in: ["ACTIVE", "UPCOMING"] } } },
+    select: { tournamentId: true },
+  });
+  if (autoTournaments.length > 0) {
+    const candidates = await prisma.match.findMany({
+      where: { tournamentId: { in: autoTournaments.map((a) => a.tournamentId) }, status: { in: ["SCHEDULED", "POSTPONED"] } },
+      select: { id: true, homePlayerId: true, awayPlayerId: true, homeTeamId: true, awayTeamId: true, schedule: { select: { schedulingStatus: true } } },
+      take: 500,
+    });
+    const toGenerate = candidates
+      .filter(
+        (m) =>
+          ((m.homePlayerId && m.awayPlayerId) || (m.homeTeamId && m.awayTeamId)) &&
+          (!m.schedule || m.schedule.schedulingStatus === "NO_COMMON_TIME")
+      )
+      .slice(0, 100);
+    for (const m of toGenerate) {
+      try {
+        const out = await generateAndPersistSlots(m.id);
+        if (out.status === "SCHEDULED") autoScheduled++;
+      } catch {
+        /* skip this match on error */
+      }
+    }
+  }
 
   // ── 1) Lock availability past its (per-tournament) deadline ──
   // A deadline in month N locks the *next* month's availability (e.g. a July 28
@@ -139,6 +173,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     ok: true,
+    autoScheduled,
     availabilityLocked,
     remindersSent,
     whatsappSent,
