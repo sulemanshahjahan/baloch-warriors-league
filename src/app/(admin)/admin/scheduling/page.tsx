@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { gameLabel, formatLabel } from "@/lib/utils";
-import { CalendarClock, ChevronRight } from "lucide-react";
+import { CalendarClock, ChevronRight, ShieldAlert } from "lucide-react";
 
 export const metadata = { title: "Scheduling" };
 
@@ -35,10 +35,17 @@ export default async function SchedulingOverviewPage() {
     <div className="flex flex-col flex-1">
       <AdminHeader title="Scheduling" description={`${enabledCount} of ${tournaments.length} active tournaments using scheduling`} />
       <main className="flex-1 p-6 space-y-6">
-        <p className="text-sm text-muted-foreground max-w-2xl">
-          Turn on availability-based scheduling per tournament. Once enabled and players have submitted availability,
-          generate proposed match times from the overlap engine and let participants confirm.
-        </p>
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <p className="text-sm text-muted-foreground max-w-2xl">
+            Turn on availability-based scheduling per tournament. Once enabled and players have submitted availability,
+            generate proposed match times from the overlap engine and let participants confirm.
+          </p>
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/admin/scheduling/conflicts">
+              <ShieldAlert className="w-4 h-4" /> Conflict queue
+            </Link>
+          </Button>
+        </div>
 
         {tournaments.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">

@@ -62,7 +62,9 @@ export function aggregateSchedulingStatus(input: {
   selectedSlotId: string | null;
   confirmations: ConfirmationLike[];
 }): AggregateResult {
-  const { hasSlots, selectedSlotId, confirmations } = input;
+  const { hasSlots, selectedSlotId } = input;
+  // A SUBSTITUTE-status row marks a replaced player — they no longer count.
+  const confirmations = input.confirmations.filter((c) => c.status !== "SUBSTITUTE");
   const total = confirmations.length;
   const rejectedCount = confirmations.filter((c) => c.status === "REJECTED").length;
   const confirmedForSelected = confirmations.filter(

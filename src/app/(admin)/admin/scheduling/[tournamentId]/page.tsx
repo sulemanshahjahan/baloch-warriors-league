@@ -10,9 +10,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatDateTime, toKarachiInputValue, getRoundDisplayName } from "@/lib/utils";
 import { getEffectiveSettings } from "@/lib/scheduling/settings";
 import { schedulingStatusMeta } from "@/lib/scheduling/labels";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Grid3x3, BarChart3, ShieldAlert } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { SchedulingControls } from "./scheduling-controls";
 import { FixtureActions } from "./fixture-actions";
+import { SubstitutesPanel } from "./substitutes-panel";
 
 export const metadata = { title: "Tournament Scheduling" };
 
@@ -65,6 +67,19 @@ export default async function TournamentSchedulingPage({
     },
   });
 
+  const isTeamBased = tournament.participantType === "TEAM" || tournament.eFootballMode === "2v2";
+  let subTeams: { id: string; name: string; players: { id: string; name: string }[] }[] = [];
+  let subRegs: { id: string; teamId: string; playerId: string; playerName: string; status: string }[] = [];
+  if (isTeamBased) {
+    const tts = await prisma.tournamentTeam.findMany({
+      where: { tournamentId },
+      select: { team: { select: { id: true, name: true, players: { where: { isActive: true }, select: { player: { select: { id: true, name: true } } } } } } },
+    });
+    subTeams = tts.map((tt) => ({ id: tt.team.id, name: tt.team.name, players: tt.team.players.map((p) => ({ id: p.player.id, name: p.player.name })) }));
+    const regs = await prisma.substituteRegistration.findMany({ where: { tournamentId, status: { not: "REMOVED" } }, include: { player: { select: { name: true } } } });
+    subRegs = regs.map((r) => ({ id: r.id, teamId: r.teamId, playerId: r.playerId, playerName: r.player.name, status: r.status }));
+  }
+
   const fixtures = matches.map((m) => {
     const home = m.homePlayer?.name ?? m.homeTeam?.name ?? "TBD";
     const away = m.awayPlayer?.name ?? m.awayTeam?.name ?? "TBD";
@@ -86,11 +101,20 @@ export default async function TournamentSchedulingPage({
     <div className="flex flex-col flex-1">
       <AdminHeader title={tournament.name} description="Scheduling configuration & fixtures" />
       <main className="flex-1 p-6 space-y-6">
-        <Link href="/admin/scheduling" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="w-4 h-4" /> All tournaments
-        </Link>
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <Link href="/admin/scheduling" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+            <ArrowLeft className="w-4 h-4" /> All tournaments
+          </Link>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" asChild><Link href={`/admin/scheduling/${tournamentId}/matrix`}><Grid3x3 className="w-4 h-4" /> Overlap matrix</Link></Button>
+            <Button variant="outline" size="sm" asChild><Link href={`/admin/scheduling/${tournamentId}/analytics`}><BarChart3 className="w-4 h-4" /> Analytics</Link></Button>
+            <Button variant="outline" size="sm" asChild><Link href="/admin/scheduling/conflicts"><ShieldAlert className="w-4 h-4" /> Conflicts</Link></Button>
+          </div>
+        </div>
 
         <SchedulingControls tournamentId={tournamentId} initial={initial} />
+
+        {isTeamBased && <SubstitutesPanel tournamentId={tournamentId} teams={subTeams} registrations={subRegs} />}
 
         <div>
           <h2 className="text-sm font-semibold mb-2">Fixtures ({fixtures.length})</h2>

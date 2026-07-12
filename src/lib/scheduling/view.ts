@@ -60,10 +60,25 @@ export interface MatchSchedulingView {
   kickoffAt: string | null;
   scheduledAt: string | null;
   captainConfirmationEnabled: boolean;
+  substitutesEnabled: boolean;
   sides: SideView[];
   slots: SlotView[];
   viewer: ViewerContext | null;
   hasSchedule: boolean;
+  // Reschedule
+  rescheduleUsed: number;
+  maxReschedules: number;
+  pendingRescheduleId: string | null;
+  canRequestReschedule: boolean;
+  // Check-in
+  checkInOpen: boolean;
+  checkIns: { playerId: string; status: string }[];
+  myCheckInStatus: string | null;
+  // Substitutes (only populated when the viewer captains a team side)
+  mySideTeamId: string | null;
+  mySideCaptain: boolean;
+  registeredSubs: { playerId: string; name: string }[];
+  mySideLineup: { playerId: string; name: string }[];
 }
 
 /**
@@ -134,12 +149,15 @@ export async function getMatchSchedulingView(
   });
 
   const scheduled = schedule?.schedulingStatus === "SCHEDULED" || !!match.scheduledAt;
+  const kickoff = schedule?.kickoffAt ?? match.scheduledAt ?? null;
 
   let viewer: ViewerContext | null = null;
+  let mySide: (typeof sidesResolved)[number] | null = null;
   if (viewerPlayerId) {
     for (const s of sidesResolved) {
       const me = s.players.find((p) => p.playerId === viewerPlayerId);
       if (me) {
+        mySide = s;
         const c = confByPlayer.get(viewerPlayerId);
         viewer = {
           playerId: viewerPlayerId,
@@ -153,7 +171,45 @@ export async function getMatchSchedulingView(
     }
   }
 
+  // Reschedule / check-in / substitute context.
+  const [approvedReschedules, pendingReschedule, checkInRows] = await Promise.all([
+    prisma.rescheduleRequest.count({ where: { matchId, status: "APPROVED" } }),
+    prisma.rescheduleRequest.findFirst({ where: { matchId, status: { in: ["PENDING", "OPPONENT_REVIEW"] } }, select: { id: true } }),
+    prisma.matchCheckIn.findMany({ where: { matchId }, select: { playerId: true, status: true } }),
+  ]);
+
+  const grace = (settings?.gracePeriodMinutes ?? 10) * 60_000;
+  const nowMs = Date.now();
+  const checkInOpen =
+    scheduled && !!kickoff && nowMs >= kickoff.getTime() - 30 * 60_000 && nowMs <= kickoff.getTime() + grace + 30 * 60_000;
+
+  const maxReschedules = settings?.maxReschedules ?? 1;
+  const canRequestReschedule = !!viewer && scheduled && approvedReschedules < maxReschedules && !pendingReschedule;
+
+  const substitutesEnabled = settings?.substitutesEnabled ?? false;
+  const mySideCaptain = !!viewer?.isCaptain && !!mySide?.teamId;
+  let registeredSubs: { playerId: string; name: string }[] = [];
+  if (mySideCaptain && substitutesEnabled && mySide?.teamId) {
+    const regs = await prisma.substituteRegistration.findMany({
+      where: { tournamentId: match.tournamentId, teamId: mySide.teamId, status: "APPROVED" },
+      select: { playerId: true, player: { select: { name: true } } },
+    });
+    registeredSubs = regs.map((r) => ({ playerId: r.playerId, name: r.player.name }));
+  }
+
   return {
+    substitutesEnabled,
+    rescheduleUsed: approvedReschedules,
+    maxReschedules,
+    pendingRescheduleId: pendingReschedule?.id ?? null,
+    canRequestReschedule,
+    checkInOpen,
+    checkIns: checkInRows.map((c) => ({ playerId: c.playerId, status: c.status })),
+    myCheckInStatus: viewerPlayerId ? checkInRows.find((c) => c.playerId === viewerPlayerId)?.status ?? null : null,
+    mySideTeamId: mySide?.teamId ?? null,
+    mySideCaptain,
+    registeredSubs,
+    mySideLineup: mySide?.players.map((p) => ({ playerId: p.playerId, name: p.name })) ?? [],
     matchId,
     tournamentName: match.tournament.name,
     tournamentSlug: match.tournament.slug,

@@ -13,6 +13,9 @@ import {
   CalendarCheck,
   AlertTriangle,
   X,
+  LogIn,
+  CalendarClock,
+  UserCog,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,6 +25,19 @@ import { formatDateTime } from "@/lib/utils";
 import { schedulingStatusMeta, confirmationMeta, REJECT_REASONS } from "@/lib/scheduling/labels";
 import type { MatchSchedulingView } from "@/lib/scheduling/view";
 import { confirmSelectedSlot, switchSelectedSlot, rejectMatchTime } from "@/lib/actions/match-scheduling";
+import { playerCheckIn } from "@/lib/actions/checkin";
+import { createRescheduleRequest } from "@/lib/actions/reschedule";
+import { requestSubstituteActivation } from "@/lib/actions/substitutes";
+
+const RESCHEDULE_REASONS = [
+  { value: "DUTY_SHIFT_CHANGED", label: "Duty / shift changed" },
+  { value: "WORK_EMERGENCY", label: "Work emergency" },
+  { value: "MEDICAL_FAMILY", label: "Medical / family emergency" },
+  { value: "TECHNICAL", label: "Technical issue" },
+  { value: "TRAVEL", label: "Travel" },
+  { value: "OPPONENT_REQUEST", label: "Opponent request" },
+  { value: "OTHER", label: "Other" },
+];
 
 const selectCls =
   "w-full h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -33,6 +49,13 @@ export function MatchSchedulingClient({ view }: { view: MatchSchedulingView }) {
   const [rejectOpen, setRejectOpen] = useState(false);
   const [reason, setReason] = useState(REJECT_REASONS[0].value);
   const [note, setNote] = useState("");
+  const [rsOpen, setRsOpen] = useState(false);
+  const [rsReason, setRsReason] = useState(RESCHEDULE_REASONS[0].value);
+  const [rsText, setRsText] = useState("");
+  const [rsEmergency, setRsEmergency] = useState(false);
+  const [subOpen, setSubOpen] = useState(false);
+  const [subOrig, setSubOrig] = useState("");
+  const [subNew, setSubNew] = useState("");
 
   const meta = schedulingStatusMeta(view.aggregateStatus);
   const isScheduled = view.aggregateStatus === "SCHEDULED" || !!view.scheduledAt;
@@ -166,6 +189,41 @@ export function MatchSchedulingClient({ view }: { view: MatchSchedulingView }) {
         </div>
       )}
 
+      {/* Match management: check-in, reschedule, substitute */}
+      {view.hasSchedule && (view.checkInOpen || view.canRequestReschedule || view.pendingRescheduleId || (view.mySideCaptain && view.substitutesEnabled)) && (
+        <div className="space-y-2">
+          <h2 className="text-sm font-semibold">Match management</h2>
+          <div className="flex flex-wrap gap-2">
+            {view.checkInOpen && (
+              <Button
+                variant={view.myCheckInStatus === "CHECKED_IN" || view.myCheckInStatus === "LATE" ? "outline" : "default"}
+                size="sm"
+                disabled={isPending || view.myCheckInStatus === "CHECKED_IN"}
+                onClick={() => act(() => playerCheckIn(view.matchId))}
+              >
+                <LogIn className="w-4 h-4 mr-1.5" />
+                {view.myCheckInStatus === "CHECKED_IN" ? "Checked in" : view.myCheckInStatus === "LATE" ? "Checked in (late)" : "Check in"}
+              </Button>
+            )}
+            {view.pendingRescheduleId ? (
+              <span className="text-xs px-2.5 py-1.5 rounded-md bg-purple-500/15 text-purple-300 inline-flex items-center gap-1">
+                <CalendarClock className="w-4 h-4" /> Reschedule requested
+              </span>
+            ) : view.canRequestReschedule ? (
+              <Button variant="outline" size="sm" onClick={() => setRsOpen(true)}>
+                <CalendarClock className="w-4 h-4 mr-1.5" /> Request reschedule
+              </Button>
+            ) : null}
+            {view.mySideCaptain && view.substitutesEnabled && (
+              <Button variant="outline" size="sm" onClick={() => setSubOpen(true)} disabled={view.registeredSubs.length === 0} title={view.registeredSubs.length === 0 ? "No approved substitutes registered" : ""}>
+                <UserCog className="w-4 h-4 mr-1.5" /> Activate substitute
+              </Button>
+            )}
+          </div>
+          <p className="text-[11px] text-muted-foreground">Reschedules used: {view.rescheduleUsed}/{view.maxReschedules}</p>
+        </div>
+      )}
+
       {msg && <p className="text-sm text-red-400">{msg}</p>}
 
       {/* Action bar */}
@@ -214,6 +272,80 @@ export function MatchSchedulingClient({ view }: { view: MatchSchedulingView }) {
               }
             >
               {isPending && <Loader2 className="w-4 h-4 animate-spin mr-1.5" />} Submit rejection
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reschedule dialog */}
+      <Dialog open={rsOpen} onOpenChange={setRsOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Request a reschedule</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">Used {view.rescheduleUsed} of {view.maxReschedules} allowed. An admin reviews and sets the new time.</p>
+            <div>
+              <Label className="text-xs">Reason</Label>
+              <select className={selectCls} value={rsReason} onChange={(e) => setRsReason(e.target.value)}>
+                {RESCHEDULE_REASONS.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <Label className="text-xs">Explanation</Label>
+              <Textarea rows={2} value={rsText} onChange={(e) => setRsText(e.target.value)} placeholder="What changed?" />
+            </div>
+            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              <input type="checkbox" checked={rsEmergency} onChange={(e) => setRsEmergency(e.target.checked)} />
+              Emergency (bypass the cutoff window)
+            </label>
+            <Button
+              className="w-full"
+              disabled={isPending || !rsText.trim()}
+              onClick={() =>
+                act(async () => {
+                  const r = await createRescheduleRequest({ matchId: view.matchId, reasonCategory: rsReason, reasonText: rsText, isEmergency: rsEmergency });
+                  if (r.success) { setRsOpen(false); setRsText(""); }
+                  return r;
+                })
+              }
+            >
+              {isPending && <Loader2 className="w-4 h-4 animate-spin mr-1.5" />} Submit request
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Substitute activation dialog */}
+      <Dialog open={subOpen} onOpenChange={setSubOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Activate a substitute</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs">Player to replace</Label>
+              <select className={selectCls} value={subOrig} onChange={(e) => setSubOrig(e.target.value)}>
+                <option value="">Select…</option>
+                {view.mySideLineup.map((p) => <option key={p.playerId} value={p.playerId}>{p.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <Label className="text-xs">Substitute (approved)</Label>
+              <select className={selectCls} value={subNew} onChange={(e) => setSubNew(e.target.value)}>
+                <option value="">Select…</option>
+                {view.registeredSubs.map((p) => <option key={p.playerId} value={p.playerId}>{p.name}</option>)}
+              </select>
+            </div>
+            <p className="text-[11px] text-muted-foreground">An admin approves the swap unless captain confirmation covers it.</p>
+            <Button
+              className="w-full"
+              disabled={isPending || !subOrig || !subNew || !view.mySideTeamId}
+              onClick={() =>
+                act(async () => {
+                  const r = await requestSubstituteActivation({ matchId: view.matchId, teamId: view.mySideTeamId!, originalPlayerId: subOrig, substitutePlayerId: subNew });
+                  if (r.success) { setSubOpen(false); setSubOrig(""); setSubNew(""); }
+                  return r;
+                })
+              }
+            >
+              {isPending && <Loader2 className="w-4 h-4 animate-spin mr-1.5" />} Request substitute
             </Button>
           </div>
         </DialogContent>
