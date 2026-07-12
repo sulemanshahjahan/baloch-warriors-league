@@ -180,9 +180,12 @@ export async function getOverallStats(gameCategory?: string, seasonId?: string) 
 
   // Per-fixture stats: 1 fixture = 1 match (legs aggregated to determine winner + goals).
   // A "clean sheet" = opponent's aggregate across all legs of the fixture is 0.
-  const pStats = new Map<string, { wins: number; total: number; cleanSheets: number; goalsFor: number; goalsAgainst: number }>();
+  // goalsFor/goalsAgainst are 1v1-scoreline only (reused by the Top Scorers path).
+  // gdFor/gdAgainst are the goal-difference accumulators and include 2v2 duo
+  // scorelines too, so the Goal Diff leaderboard reflects duo results as well.
+  const pStats = new Map<string, { wins: number; total: number; cleanSheets: number; goalsFor: number; goalsAgainst: number; gdFor: number; gdAgainst: number }>();
   const ensureP = (id: string) => {
-    if (!pStats.has(id)) pStats.set(id, { wins: 0, total: 0, cleanSheets: 0, goalsFor: 0, goalsAgainst: 0 });
+    if (!pStats.has(id)) pStats.set(id, { wins: 0, total: 0, cleanSheets: 0, goalsFor: 0, goalsAgainst: 0, gdFor: 0, gdAgainst: 0 });
     return pStats.get(id)!;
   };
   for (const m of allMatches) {
@@ -195,6 +198,8 @@ export async function getOverallStats(gameCategory?: string, seasonId?: string) 
       if (ag === 0) s.cleanSheets++;
       s.goalsFor += hg;
       s.goalsAgainst += ag;
+      s.gdFor += hg;
+      s.gdAgainst += ag;
     }
     if (m.awayPlayerId) {
       const s = ensureP(m.awayPlayerId);
@@ -203,21 +208,28 @@ export async function getOverallStats(gameCategory?: string, seasonId?: string) 
       if (hg === 0) s.cleanSheets++;
       s.goalsFor += ag;
       s.goalsAgainst += hg;
+      s.gdFor += ag;
+      s.gdAgainst += hg;
     }
   }
-  // 2v2 duos add to matches/wins/clean sheets (not goals — kept event-based).
+  // 2v2 duos add to matches/wins/clean sheets AND goal difference (both members
+  // share the team's scoreline). Individual goals stay event-based (top scorers).
   for (const d of duoSides) {
     for (const id of d.homeIds) {
       const s = ensureP(id);
       s.total++;
       if (d.hg > d.ag) s.wins++;
       if (d.ag === 0) s.cleanSheets++;
+      s.gdFor += d.hg;
+      s.gdAgainst += d.ag;
     }
     for (const id of d.awayIds) {
       const s = ensureP(id);
       s.total++;
       if (d.ag > d.hg) s.wins++;
       if (d.hg === 0) s.cleanSheets++;
+      s.gdFor += d.ag;
+      s.gdAgainst += d.hg;
     }
   }
 
@@ -300,7 +312,7 @@ export async function getOverallStats(gameCategory?: string, seasonId?: string) 
           scoreMap.set(playerId, current + ps.wins * 3 + ps.cleanSheets * 3);
         } else {
           // 1v1 eFootball formula — wins and defense matter more
-          scoreMap.set(playerId, current + ps.wins * 5 + ps.cleanSheets * 4 + (ps.goalsFor - ps.goalsAgainst));
+          scoreMap.set(playerId, current + ps.wins * 5 + ps.cleanSheets * 4 + (ps.gdFor - ps.gdAgainst));
         }
       }
 
@@ -320,7 +332,7 @@ export async function getOverallStats(gameCategory?: string, seasonId?: string) 
             motm,
             wins: ps?.wins ?? 0,
             cleanSheets: ps?.cleanSheets ?? 0,
-            goalDiff: ps ? ps.goalsFor - ps.goalsAgainst : 0,
+            goalDiff: ps ? ps.gdFor - ps.gdAgainst : 0,
             matches: matchCounts.get(playerId) ?? 0,
           };
         })
@@ -359,7 +371,7 @@ export async function getOverallStats(gameCategory?: string, seasonId?: string) 
           .sort((a, b) => b.count - a.count)
           .slice(0, 20),
         topGoalDiff: entries
-          .map(([id, s]) => ({ player: playerMap.get(id), count: s.goalsFor - s.goalsAgainst, matches: s.total }))
+          .map(([id, s]) => ({ player: playerMap.get(id), count: s.gdFor - s.gdAgainst, matches: s.total }))
           .filter((s) => s.player)
           .sort((a, b) => b.count - a.count)
           .slice(0, 20),
