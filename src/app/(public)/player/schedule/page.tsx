@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { CalendarDays, Clock, AlertTriangle, CheckCircle2, ChevronRight, CalendarPlus } from "lucide-react";
+import { CalendarDays, Clock, AlertTriangle, CheckCircle2, ChevronRight, CalendarPlus, CalendarClock } from "lucide-react";
 import { getPlayerSession } from "@/lib/player-session";
 import { prisma } from "@/lib/db";
 import { formatDateTime } from "@/lib/utils";
 import { computeMonthStats, validateMinRequirements, type BlockLike } from "@/lib/scheduling/blocks";
 import { getPlayerMonthRequirements } from "@/lib/scheduling/requirements";
+import { schedulingStatusMeta } from "@/lib/scheduling/labels";
 import { MONTH_LABELS } from "../availability/shared";
 
 export const dynamic = "force-dynamic";
@@ -52,6 +53,45 @@ export default async function SchedulePage() {
   const teamIds = (
     await prisma.teamPlayer.findMany({ where: { playerId, isActive: true }, select: { teamId: true } })
   ).map((t) => t.teamId);
+
+  const awaitingRows = await prisma.matchParticipantConfirmation.findMany({
+    where: {
+      playerId,
+      status: { in: ["PENDING", "REJECTED", "TENTATIVE"] },
+      matchSchedule: { schedulingStatus: { notIn: ["SCHEDULED", "COMPLETED", "CANCELLED", "NO_COMMON_TIME"] } },
+    },
+    orderBy: { matchSchedule: { confirmationDeadline: "asc" } },
+    take: 10,
+    include: {
+      matchSchedule: {
+        select: {
+          schedulingStatus: true,
+          primaryStart: true,
+          match: {
+            select: {
+              id: true,
+              homePlayer: { select: { name: true } },
+              awayPlayer: { select: { name: true } },
+              homeTeam: { select: { name: true } },
+              awayTeam: { select: { name: true } },
+              tournament: { select: { name: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+  const awaiting = awaitingRows.map((c) => {
+    const m = c.matchSchedule.match;
+    return {
+      matchId: m.id,
+      home: m.homePlayer?.name ?? m.homeTeam?.name ?? "TBD",
+      away: m.awayPlayer?.name ?? m.awayTeam?.name ?? "TBD",
+      tournament: m.tournament.name,
+      status: c.matchSchedule.schedulingStatus,
+      primary: c.matchSchedule.primaryStart,
+    };
+  });
 
   const upcoming = await prisma.match.findMany({
     where: {
@@ -124,6 +164,30 @@ export default async function SchedulePage() {
             <CheckCircle2 className="w-4 h-4" /> You&apos;re all set for {cur.label}
           </div>
           <p className="text-sm text-muted-foreground mt-1">Availability submitted. You can still edit it until it locks.</p>
+        </div>
+      )}
+
+      {/* Matches awaiting confirmation */}
+      {awaiting.length > 0 && (
+        <div>
+          <h2 className="text-sm font-semibold mb-2 flex items-center gap-1.5"><CalendarClock className="w-4 h-4" /> Awaiting your confirmation</h2>
+          <div className="space-y-1.5">
+            {awaiting.map((a) => {
+              const meta = schedulingStatusMeta(a.status);
+              return (
+                <Link key={a.matchId} href={`/player/matches/${a.matchId}`} className="flex items-center gap-3 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2.5 hover:bg-amber-500/10">
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium truncate">{a.home} vs {a.away}</div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      {a.tournament}{a.primary ? ` · proposed ${formatDateTime(a.primary)}` : ""}
+                    </div>
+                  </div>
+                  <span className={`text-[11px] px-2 py-0.5 rounded-full shrink-0 ${meta.cls}`}>{meta.label}</span>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                </Link>
+              );
+            })}
+          </div>
         </div>
       )}
 

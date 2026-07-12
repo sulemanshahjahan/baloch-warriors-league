@@ -25,6 +25,7 @@ import {
   Search,
   MessageCircle,
   Radio,
+  CalendarClock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -81,6 +82,11 @@ const navItems = [
     label: "Matches",
     href: "/admin/matches",
     icon: Swords,
+  },
+  {
+    label: "Scheduling",
+    href: "/admin/scheduling",
+    icon: CalendarClock,
   },
   {
     label: "Standings",
