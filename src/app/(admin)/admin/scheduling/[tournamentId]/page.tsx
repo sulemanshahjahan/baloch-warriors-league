@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatDateTime, toKarachiInputValue, getRoundDisplayName } from "@/lib/utils";
 import { getEffectiveSettings } from "@/lib/scheduling/settings";
 import { schedulingStatusMeta } from "@/lib/scheduling/labels";
-import { ArrowLeft, Grid3x3, BarChart3, ShieldAlert } from "lucide-react";
+import { ArrowLeft, Grid3x3, BarChart3, ShieldAlert, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SchedulingControls } from "./scheduling-controls";
 import { FixtureActions } from "./fixture-actions";
@@ -105,7 +105,8 @@ export default async function TournamentSchedulingPage({
           <Link href="/admin/scheduling" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
             <ArrowLeft className="w-4 h-4" /> All tournaments
           </Link>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            <Button variant="outline" size="sm" asChild><Link href={`/admin/scheduling/${tournamentId}/availability`}><Users className="w-4 h-4" /> Who submitted</Link></Button>
             <Button variant="outline" size="sm" asChild><Link href={`/admin/scheduling/${tournamentId}/matrix`}><Grid3x3 className="w-4 h-4" /> Overlap matrix</Link></Button>
             <Button variant="outline" size="sm" asChild><Link href={`/admin/scheduling/${tournamentId}/analytics`}><BarChart3 className="w-4 h-4" /> Analytics</Link></Button>
             <Button variant="outline" size="sm" asChild><Link href="/admin/scheduling/conflicts"><ShieldAlert className="w-4 h-4" /> Conflicts</Link></Button>

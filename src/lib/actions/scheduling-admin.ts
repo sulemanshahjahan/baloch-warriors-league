@@ -8,6 +8,7 @@ import { fromKarachiInputValue } from "@/lib/utils";
 import { generateAndPersistSlots } from "@/lib/scheduling/service";
 import { getEffectiveSettings } from "@/lib/scheduling/settings";
 import { notifyMatchScheduled } from "@/lib/scheduling/notify";
+import { notify } from "@/lib/push";
 import { formatKeyFor, getTournamentTypeDefaults } from "@/lib/scheduling/defaults";
 import type { Prisma } from "@prisma/client";
 
@@ -273,6 +274,44 @@ export async function adminForceSchedule(matchId: string, slotId: string, reason
   await notifyScheduled(matchId, slot.startDateTime);
   revalidatePath(`/player/matches/${matchId}`);
   return { success: true, data: undefined, message: "Match scheduled." };
+}
+
+/** Broadcast an availability-submission reminder for a tournament. */
+export async function remindNonSubmitters(tournamentId: string): Promise<ActionResult<{ pending: number }>> {
+  const admin = await requireAdmin("EDITOR");
+  if (!admin) return { success: false, error: "Admin access required." };
+
+  const t = await prisma.tournament.findUnique({ where: { id: tournamentId }, select: { name: true } });
+  if (!t) return { success: false, error: "Tournament not found." };
+
+  const [indiv, teams] = await Promise.all([
+    prisma.tournamentPlayer.findMany({ where: { tournamentId }, select: { playerId: true } }),
+    prisma.tournamentTeam.findMany({ where: { tournamentId }, select: { team: { select: { players: { where: { isActive: true }, select: { playerId: true } } } } } }),
+  ]);
+  const enrolledIds = [...new Set([...indiv.map((i) => i.playerId), ...teams.flatMap((t2) => t2.team.players.map((p) => p.playerId))])];
+
+  const now = new Date();
+  const cm = now.getMonth() + 1;
+  const cy = now.getFullYear();
+  const nm = cm === 12 ? 1 : cm + 1;
+  const ny = cm === 12 ? cy + 1 : cy;
+  const submitted = enrolledIds.length
+    ? await prisma.playerAvailabilityPeriod.findMany({
+        where: { playerId: { in: enrolledIds }, status: "SUBMITTED", OR: [{ month: cm, year: cy }, { month: nm, year: ny }] },
+        select: { playerId: true },
+      })
+    : [];
+  const submittedSet = new Set(submitted.map((s) => s.playerId));
+  const pending = enrolledIds.filter((id) => !submittedSet.has(id)).length;
+
+  await notify({
+    title: "Availability reminder",
+    body: `Please submit your availability for ${t.name}.`,
+    url: "/player/availability",
+    tag: `sched-avail-remind-${tournamentId}`,
+  });
+  await audit(tournamentId, admin.id, "AVAILABILITY_REMINDER_SENT", { pending });
+  return { success: true, data: { pending }, message: `Reminder sent. ${pending} player(s) still to submit.` };
 }
 
 export async function adminSetManualTime(matchId: string, startInput: string, reason: string): Promise<ActionResult> {
