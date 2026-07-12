@@ -7,6 +7,7 @@ import type { ActionResult } from "@/lib/utils";
 import { fromKarachiInputValue } from "@/lib/utils";
 import { generateAndPersistSlots } from "@/lib/scheduling/service";
 import { getEffectiveSettings } from "@/lib/scheduling/settings";
+import { notifyMatchScheduled } from "@/lib/scheduling/notify";
 import { formatKeyFor, getTournamentTypeDefaults } from "@/lib/scheduling/defaults";
 import type { Prisma } from "@prisma/client";
 
@@ -36,6 +37,25 @@ async function audit(tournamentId: string, actorId: string, eventType: string, m
   } catch {
     /* ignore */
   }
+}
+
+async function notifyScheduled(matchId: string, kickoff: Date | null) {
+  const m = await prisma.match.findUnique({
+    where: { id: matchId },
+    select: {
+      homePlayer: { select: { name: true } },
+      awayPlayer: { select: { name: true } },
+      homeTeam: { select: { name: true } },
+      awayTeam: { select: { name: true } },
+    },
+  });
+  if (!m) return;
+  await notifyMatchScheduled({
+    id: matchId,
+    homeName: m.homePlayer?.name ?? m.homeTeam?.name ?? "Home",
+    awayName: m.awayPlayer?.name ?? m.awayTeam?.name ?? "Away",
+    kickoff,
+  });
 }
 
 function revalidateScheduling(tournamentId: string, slug?: string) {
@@ -250,6 +270,7 @@ export async function adminForceSchedule(matchId: string, slotId: string, reason
     await audit(m.tournamentId, admin.id, "ADMIN_FORCE_SCHEDULE", { slotId, reason }, matchId);
     revalidateScheduling(m.tournamentId, m.tournament.slug);
   }
+  await notifyScheduled(matchId, slot.startDateTime);
   revalidatePath(`/player/matches/${matchId}`);
   return { success: true, data: undefined, message: "Match scheduled." };
 }
@@ -286,6 +307,7 @@ export async function adminSetManualTime(matchId: string, startInput: string, re
   });
   await prisma.match.update({ where: { id: matchId }, data: { scheduledAt: start } });
   await audit(match.tournamentId, admin.id, "ADMIN_MANUAL_TIME", { start: start.toISOString(), reason }, matchId);
+  await notifyScheduled(matchId, start);
   revalidateScheduling(match.tournamentId, match.tournament.slug);
   revalidatePath(`/player/matches/${matchId}`);
   return { success: true, data: undefined, message: "Match time set." };

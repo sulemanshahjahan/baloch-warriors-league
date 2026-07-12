@@ -5,6 +5,7 @@ import { generateProposedSlots } from "./engine";
 import type { EngineSide, SubstituteOption, GenerateResult } from "./types";
 import { blocksToIntervals, type BlockLike } from "./blocks";
 import { getEffectiveSettings, type EffectiveSettings } from "./settings";
+import { notifySchedulingAdminAlert } from "./notify";
 
 const MINUTE = 60_000;
 const DAY = 86_400_000;
@@ -368,6 +369,17 @@ export async function generateAndPersistSlots(matchId: string, actorId?: string)
     });
   } catch {
     /* ignore */
+  }
+
+  // Escalate to admins when the engine can't find any workable time.
+  if (status === "NO_COMMON_TIME") {
+    await notifySchedulingAdminAlert({
+      matchId,
+      tournamentId: match.tournamentId,
+      homeName: sides[0]?.label ?? "Home",
+      awayName: sides[1]?.label ?? "Away",
+      reason: "No common time found across participants",
+    });
   }
 
   return {

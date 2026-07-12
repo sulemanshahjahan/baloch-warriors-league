@@ -7,7 +7,8 @@ import type { ActionResult } from "@/lib/utils";
 import type { Prisma } from "@prisma/client";
 import { resolveMatchSides, MATCH_SCHED_INCLUDE, type ResolvedSide } from "@/lib/scheduling/service";
 import { getEffectiveSettings } from "@/lib/scheduling/settings";
-import { aggregateSchedulingStatus } from "@/lib/scheduling/status";
+import { aggregateSchedulingStatus, type AggregateResult } from "@/lib/scheduling/status";
+import { notifyMatchScheduled } from "@/lib/scheduling/notify";
 
 interface Ctx {
   match: { id: string; tournamentId: string; slug: string };
@@ -103,6 +104,17 @@ async function auditPlayer(playerId: string, matchId: string, tournamentId: stri
   }
 }
 
+async function maybeNotifyScheduled(ctx: Ctx, matchId: string, agg: AggregateResult) {
+  if (!agg.allConfirmed) return;
+  const sched = await prisma.matchSchedule.findUnique({ where: { id: ctx.scheduleId }, select: { kickoffAt: true } });
+  await notifyMatchScheduled({
+    id: matchId,
+    homeName: ctx.sides.find((s) => s.sideId === "home")?.label ?? "Home",
+    awayName: ctx.sides.find((s) => s.sideId === "away")?.label ?? "Away",
+    kickoff: sched?.kickoffAt ?? null,
+  });
+}
+
 function revalidate(ctx: Ctx) {
   revalidatePath(`/player/matches/${ctx.match.id}`);
   revalidatePath("/player/schedule");
@@ -130,6 +142,7 @@ export async function confirmSelectedSlot(matchId: string): Promise<ActionResult
   });
 
   await auditPlayer(playerId, matchId, ctx.match.tournamentId, "SLOT_CONFIRMED", { slotId: ctx.selectedSlotId, byCaptain: targets.length > 1 });
+  await maybeNotifyScheduled(ctx, matchId, agg);
   revalidate(ctx);
   return { success: true, data: { status: agg.allConfirmed ? "SCHEDULED" : agg.status } };
 }
@@ -162,6 +175,7 @@ export async function switchSelectedSlot(matchId: string, slotId: string): Promi
   });
 
   await auditPlayer(playerId, matchId, ctx.match.tournamentId, "SLOT_SWITCHED", { slotId });
+  await maybeNotifyScheduled(ctx, matchId, agg);
   revalidate(ctx);
   return { success: true, data: { status: agg.status } };
 }
