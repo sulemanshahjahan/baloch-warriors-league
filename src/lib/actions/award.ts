@@ -125,6 +125,81 @@ export async function propagateTeamWinnerToMembers(
   return toAdd.length;
 }
 
+/**
+ * Auto-create the individual tournament honours from match stats:
+ *   Golden Boot   = most GOAL events
+ *   Top Assists   = most ASSIST events
+ *   Player of the Tournament (TOURNAMENT_MVP) = most Man-of-the-Match awards
+ * Idempotent: skips any honour type that already has an award for the tournament,
+ * so manually-assigned awards are never overwritten. Works for 1v1 and 2v2
+ * (events are attributed to individual players).
+ */
+export async function generateTournamentHonours(
+  tournamentId: string
+): Promise<ActionResult<{ created: { type: string; name: string }[]; skipped: string[] }>> {
+  const session = await auth();
+  if (!session) return { success: false, error: "Unauthorized" };
+  if (!hasRole(session, "ADMIN")) return { success: false, error: "Forbidden: Admin role required" };
+
+  const existing = await prisma.award.findMany({ where: { tournamentId }, select: { type: true } });
+  const existingTypes = new Set(existing.map((a) => a.type));
+
+  const topEvent = async (type: "GOAL" | "ASSIST") => {
+    const rows = await prisma.matchEvent.groupBy({
+      by: ["playerId"],
+      where: { type, match: { tournamentId }, playerId: { not: null } },
+      _count: { _all: true },
+    });
+    if (rows.length === 0) return null;
+    const best = rows.reduce((a, b) => (b._count._all > a._count._all ? b : a));
+    return best.playerId ? { playerId: best.playerId, value: best._count._all } : null;
+  };
+
+  const motmRows = await prisma.match.groupBy({
+    by: ["motmPlayerId"],
+    where: { tournamentId, motmPlayerId: { not: null } },
+    _count: { _all: true },
+  });
+  const mvp = motmRows.length
+    ? (() => {
+        const best = motmRows.reduce((a, b) => (b._count._all > a._count._all ? b : a));
+        return best.motmPlayerId ? { playerId: best.motmPlayerId, value: best._count._all } : null;
+      })()
+    : null;
+
+  const plan = [
+    { type: "GOLDEN_BOOT" as const, pick: await topEvent("GOAL"), desc: (n: number) => `Top scorer — ${n} goal${n === 1 ? "" : "s"}` },
+    { type: "TOP_ASSISTS" as const, pick: await topEvent("ASSIST"), desc: (n: number) => `Most assists — ${n}` },
+    { type: "TOURNAMENT_MVP" as const, pick: mvp, desc: (n: number) => `Player of the Tournament — ${n} MOTM award${n === 1 ? "" : "s"}` },
+  ];
+
+  const created: { type: string; name: string }[] = [];
+  const skipped: string[] = [];
+  for (const item of plan) {
+    if (existingTypes.has(item.type)) { skipped.push(`${item.type} (already assigned)`); continue; }
+    if (!item.pick) { skipped.push(`${item.type} (no stats)`); continue; }
+    const player = await prisma.player.findUnique({ where: { id: item.pick.playerId }, select: { name: true, slug: true } });
+    if (!player) { skipped.push(`${item.type} (player missing)`); continue; }
+    await prisma.award.create({ data: { tournamentId, type: item.type, playerId: item.pick.playerId, description: item.desc(item.pick.value) } });
+    created.push({ type: item.type, name: player.name });
+    revalidatePath(`/players/${player.slug}`);
+  }
+
+  if (created.length > 0) {
+    await logActivity({ action: "ASSIGN_AWARD", entityType: "TOURNAMENT", entityId: tournamentId, details: { generated: created } });
+    const t = await prisma.tournament.findUnique({ where: { id: tournamentId }, select: { slug: true } });
+    revalidatePath("/");
+    revalidatePath(`/admin/tournaments/${tournamentId}`);
+    if (t?.slug) {
+      revalidatePath(`/tournaments/${t.slug}`);
+      revalidatePath(`/tournaments/${t.slug}/stats`);
+      revalidatePath(`/tournaments/${t.slug}/recap`);
+    }
+  }
+
+  return { success: true, data: { created, skipped } };
+}
+
 export async function deleteAward(id: string, tournamentId: string): Promise<ActionResult> {
   const session = await auth();
   if (!session) return { success: false, error: "Unauthorized" };

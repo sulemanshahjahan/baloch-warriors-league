@@ -347,7 +347,7 @@ export default async function HomePage() {
           TOP_ASSISTS: "Top Assists",
           BEST_GOALKEEPER: "Best Goalkeeper",
           FAIR_PLAY: "Fair Play",
-          TOURNAMENT_MVP: "Tournament MVP",
+          TOURNAMENT_MVP: "Player of the Tournament",
         };
         const awardLabel = (a: { type: string; customName: string | null }) => {
           if (a.type === "CUSTOM") return a.customName ?? "Custom";

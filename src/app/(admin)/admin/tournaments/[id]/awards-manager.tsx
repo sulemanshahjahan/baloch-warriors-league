@@ -23,8 +23,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Plus, Trash2, Loader2, Award, Trophy } from "lucide-react";
-import { createAward, deleteAward } from "@/lib/actions/award";
+import { Plus, Trash2, Loader2, Award, Trophy, Sparkles } from "lucide-react";
+import { createAward, deleteAward, generateTournamentHonours } from "@/lib/actions/award";
 import { getInitials } from "@/lib/utils";
 
 const AWARD_TYPES = [
@@ -86,6 +86,25 @@ export function AwardsManager({
   const [recipientId, setRecipientId] = useState("");
   const [customName, setCustomName] = useState("");
   const [description, setDescription] = useState("");
+  const [genMsg, setGenMsg] = useState("");
+
+  function handleGenerate() {
+    setGenMsg("");
+    startTransition(async () => {
+      const result = await generateTournamentHonours(tournamentId);
+      if (!result.success) {
+        setGenMsg(result.error);
+        return;
+      }
+      const { created, skipped } = result.data;
+      setGenMsg(
+        created.length
+          ? `Added: ${created.map((c) => `${c.name} (${c.type.replace("_", " ").toLowerCase()})`).join(", ")}.${skipped.length ? ` Skipped ${skipped.length}.` : ""}`
+          : "Nothing to add — honours already assigned or no stats yet."
+      );
+      router.refresh();
+    });
+  }
 
   function resetForm() {
     setAwardType("");
@@ -225,6 +244,17 @@ export function AwardsManager({
           ))}
         </div>
       )}
+
+      {/* Auto-generate honours from stats */}
+      <div className="space-y-1">
+        <Button variant="secondary" className="w-full" onClick={handleGenerate} disabled={isPending}>
+          {isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Sparkles className="w-4 h-4 mr-2" />}
+          Generate honours from stats
+        </Button>
+        <p className="text-xs text-muted-foreground">
+          {genMsg || "Creates Golden Boot, Top Assists & Player of the Tournament from match stats. Won't overwrite awards you've already set."}
+        </p>
+      </div>
 
       {/* Add Award Dialog */}
       <Dialog
