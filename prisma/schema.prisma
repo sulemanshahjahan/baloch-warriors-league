@@ -157,8 +157,8 @@ model Tournament {
   prizeInfo       String?
   isFeatured      Boolean          @default(false)
   // eFootball-specific
-  eFootballMode   String?          // "1v1" or "2v2" (only for EFOOTBALL)
-  eFootballType   String?          // "AUTHENTIC" or "DREAM" (only for EFOOTBALL)
+  eFootballMode   String? // "1v1" or "2v2" (only for EFOOTBALL)
+  eFootballType   String? // "AUTHENTIC" or "DREAM" (only for EFOOTBALL)
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -171,6 +171,11 @@ model Tournament {
   awards       Award[]
   whatsappLogs WhatsAppLog[]
 
+  // ── Scheduling system ──
+  schedulingSettings      TournamentSchedulingSettings?
+  stageOverrides          StageSchedulingOverride[]
+  substituteRegistrations SubstituteRegistration[]
+
   @@index([gameCategory])
   @@index([status])
   @@map("tournaments")
@@ -181,12 +186,12 @@ model Tournament {
 // ─────────────────────────────────────────────────────────────
 
 model TournamentGroup {
-  id           String   @id @default(cuid())
+  id           String @id @default(cuid())
   tournamentId String
   name         String
-  orderIndex   Int      @default(0)
+  orderIndex   Int    @default(0)
 
-  tournament Tournament        @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  tournament Tournament         @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   teams      TournamentTeam[]
   players    TournamentPlayer[]
   matches    Match[]
@@ -215,15 +220,19 @@ model Team {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  captain      Player?           @relation("TeamCaptain", fields: [captainId], references: [id])
+  captain      Player?            @relation("TeamCaptain", fields: [captainId], references: [id])
   players      TeamPlayer[]
   tournaments  TournamentTeam[]
-  homeMatches  Match[]           @relation("HomeTeam")
-  awayMatches  Match[]           @relation("AwayTeam")
+  homeMatches  Match[]            @relation("HomeTeam")
+  awayMatches  Match[]            @relation("AwayTeam")
   matchEvents  MatchEvent[]
   participants MatchParticipant[]
   awards       Award[]
   standings    Standing[]
+
+  // ── Scheduling system ──
+  matchConfirmations      MatchParticipantConfirmation[]
+  substituteRegistrations SubstituteRegistration[]
 
   @@index([isActive])
   @@map("teams")
@@ -234,52 +243,52 @@ model Team {
 // ─────────────────────────────────────────────────────────────
 
 model Player {
-  id          String    @id @default(cuid())
-  name        String
-  nickname    String?
-  slug        String    @unique
-  photoUrl    String?
-  dateOfBirth DateTime?
-  nationality String?
-  phone       String?   // WhatsApp number with country code e.g. +923001234567
-  email        String?  @unique // login email (player accounts)
-  passwordHash String?  // bcrypt hash for email+password login
-  position    String?
-  skillLevel  Int?      @default(50) // 0-99 rating for seeding
-  eloRating   Int       @default(100)
-  cardRank    Int       @default(70) // FIFA-style card rank, 50-99
+  id                 String    @id @default(cuid())
+  name               String
+  nickname           String?
+  slug               String    @unique
+  photoUrl           String?
+  dateOfBirth        DateTime?
+  nationality        String?
+  phone              String? // WhatsApp number with country code e.g. +923001234567
+  email              String?   @unique // login email (player accounts)
+  passwordHash       String? // bcrypt hash for email+password login
+  position           String?
+  skillLevel         Int?      @default(50) // 0-99 rating for seeding
+  eloRating          Int       @default(100)
+  cardRank           Int       @default(70) // FIFA-style card rank, 50-99
   // ── BWL Legacy / economy (status only — never affects ELO/cardRank/matchmaking) ──
-  coins        Int      @default(0)
-  legacyXp     Int      @default(0)
-  legacyLevel  Int      @default(1)
-  legacyTier   String   @default("Rookie")
-  legacyTokens Int      @default(0)
-  bio              String?   @db.Text
+  coins              Int       @default(0)
+  legacyXp           Int       @default(0)
+  legacyLevel        Int       @default(1)
+  legacyTier         String    @default("Rookie")
+  legacyTokens       Int       @default(0)
+  bio                String?   @db.Text
   // ── Presence (admin "Active Users" panel; approx location from IP headers) ──
-  lastSeenAt   DateTime?
-  lastCountry  String?
-  lastCity     String?
-  lastPath     String?
-  pageViews    Int       @default(0)
-  isActive         Boolean   @default(true)
-  registrationStatus String  @default("APPROVED") // PENDING, APPROVED, REJECTED
-  suspendedUntil   DateTime?
-  suspensionReason String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  lastSeenAt         DateTime?
+  lastCountry        String?
+  lastCity           String?
+  lastPath           String?
+  pageViews          Int       @default(0)
+  isActive           Boolean   @default(true)
+  registrationStatus String    @default("APPROVED") // PENDING, APPROVED, REJECTED
+  suspendedUntil     DateTime?
+  suspensionReason   String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   teams           TeamPlayer[]
   tournaments     TournamentPlayer[]
   matchEvents     MatchEvent[]
   participants    MatchParticipant[]
-  captainOf       Team[]             @relation("TeamCaptain")
+  captainOf       Team[]                   @relation("TeamCaptain")
   awards          Award[]
-  manOfTheMatches Match[]            @relation("MatchMOTM")
-  homeMatches     Match[]            @relation("HomePlayer")
-  awayMatches     Match[]            @relation("AwayPlayer")
+  manOfTheMatches Match[]                  @relation("MatchMOTM")
+  homeMatches     Match[]                  @relation("HomePlayer")
+  awayMatches     Match[]                  @relation("AwayPlayer")
   standings       Standing[]
   eloHistory      EloHistory[]
-  eloAsOpponent   EloHistory[]       @relation("EloOpponent")
+  eloAsOpponent   EloHistory[]             @relation("EloOpponent")
   availabilities  MatchAvailability[]
   playerOfWeeks   PlayerOfWeek[]
   whatsappLogs    WhatsAppLog[]
@@ -297,6 +306,14 @@ model Player {
   raffleEntries   RaffleEntry[]
   visitorSessions VisitorSession[]
 
+  // ── Scheduling system ──
+  availabilityPeriods     PlayerAvailabilityPeriod[]
+  availabilityBlocks      AvailabilityBlock[]
+  availabilityTemplates   AvailabilityTemplate[]
+  matchConfirmations      MatchParticipantConfirmation[]
+  substituteRegistrations SubstituteRegistration[]
+  matchCheckIns           MatchCheckIn[]
+
   @@index([isActive])
   @@map("players")
 }
@@ -310,8 +327,8 @@ model LegacyXpTransaction {
   playerId  String
   xp        Int      @default(0)
   coins     Int      @default(0)
-  source    String   // MATCH_PLAYED, MATCH_WIN, CLEAN_SHEET, MOTM, …
-  sourceId  String?  // e.g. matchId — makes the reward idempotent per event
+  source    String // MATCH_PLAYED, MATCH_WIN, CLEAN_SHEET, MOTM, …
+  sourceId  String? // e.g. matchId — makes the reward idempotent per event
   reason    String
   metadata  Json?
   createdAt DateTime @default(now())
@@ -369,10 +386,10 @@ model PlayerContract {
   id          String    @id @default(cuid())
   playerId    String
   templateKey String
-  period      String    // "2026-06-30" (daily) or "2026-W26" (weekly)
-  type        String    // DAILY, WEEKLY
+  period      String // "2026-06-30" (daily) or "2026-W26" (weekly)
+  type        String // DAILY, WEEKLY
   title       String
-  condition   String    // PLAY_MATCHES, WIN_MATCHES, CLEAN_SHEETS
+  condition   String // PLAY_MATCHES, WIN_MATCHES, CLEAN_SHEETS
   target      Int
   progress    Int       @default(0)
   rewardXp    Int       @default(0)
@@ -427,7 +444,7 @@ model RespectTransaction {
 model PlayerMoment {
   id           String   @id @default(cuid())
   playerId     String
-  type         String   // FIRST_WIN, FIRST_CLEAN_SHEET, REACHED_99, HOT_STREAK_5, TOURNAMENT_WIN …
+  type         String // FIRST_WIN, FIRST_CLEAN_SHEET, REACHED_99, HOT_STREAK_5, TOURNAMENT_WIN …
   title        String
   description  String
   icon         String?
@@ -453,9 +470,9 @@ model PlayerMoment {
 model PlayerInventoryItem {
   id         String   @id @default(cuid())
   playerId   String
-  itemType   String   // PROFILE_FRAME, PROFILE_BANNER, NAME_COLOR, TITLE, CARD_BG
+  itemType   String // PROFILE_FRAME, PROFILE_BANNER, NAME_COLOR, TITLE, CARD_BG
   itemKey    String
-  source     String   // STORE, LEGACY_LEVEL, SEASON, ADMIN
+  source     String // STORE, LEGACY_LEVEL, SEASON, ADMIN
   acquiredAt DateTime @default(now())
 
   player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
@@ -466,13 +483,13 @@ model PlayerInventoryItem {
 }
 
 model PlayerEquippedCosmetics {
-  id             String   @id @default(cuid())
-  playerId       String   @unique
-  profileFrame   String?
-  profileBanner  String?
-  nameColor      String?
-  cardBg         String?
-  updatedAt      DateTime @updatedAt
+  id            String   @id @default(cuid())
+  playerId      String   @unique
+  profileFrame  String?
+  profileBanner String?
+  nameColor     String?
+  cardBg        String?
+  updatedAt     DateTime @updatedAt
 
   player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
 
@@ -484,14 +501,14 @@ model PlayerEquippedCosmetics {
 // ─────────────────────────────────────────────────────────────
 
 model MatchPrediction {
-  id         String    @id @default(cuid())
-  playerId   String
-  matchId    String
-  pick       String    // HOME, AWAY, DRAW
-  settled    Boolean   @default(false)
-  correct    Boolean?
-  createdAt  DateTime  @default(now())
-  settledAt  DateTime?
+  id        String    @id @default(cuid())
+  playerId  String
+  matchId   String
+  pick      String // HOME, AWAY, DRAW
+  settled   Boolean   @default(false)
+  correct   Boolean?
+  createdAt DateTime  @default(now())
+  settledAt DateTime?
 
   player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
   match  Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
@@ -571,14 +588,14 @@ model PlayerAuthCode {
 // ─────────────────────────────────────────────────────────────
 
 model AdminRewardAuditLog {
-  id           String   @id @default(cuid())
-  adminId      String
+  id             String   @id @default(cuid())
+  adminId        String
   targetPlayerId String
-  action       String
-  beforeJson   Json?
-  afterJson    Json?
-  reason       String
-  createdAt    DateTime @default(now())
+  action         String
+  beforeJson     Json?
+  afterJson      Json?
+  reason         String
+  createdAt      DateTime @default(now())
 
   @@index([targetPlayerId])
   @@map("admin_reward_audit_logs")
@@ -593,8 +610,8 @@ model RankChange {
   playerId    String
   oldRank     Int
   newRank     Int
-  reason      String   @db.Text       // Human-readable summary
-  reasonStats Json?                    // Structured stats snapshot used for the calculation
+  reason      String   @db.Text // Human-readable summary
+  reasonStats Json? // Structured stats snapshot used for the calculation
   createdAt   DateTime @default(now())
 
   player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
@@ -638,9 +655,9 @@ model TournamentTeam {
   seedNumber   Int?
   registeredAt DateTime @default(now())
 
-  tournament Tournament        @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-  team       Team              @relation(fields: [teamId], references: [id])
-  group      TournamentGroup?  @relation(fields: [groupId], references: [id])
+  tournament Tournament       @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  team       Team             @relation(fields: [teamId], references: [id])
+  group      TournamentGroup? @relation(fields: [groupId], references: [id])
 
   @@unique([tournamentId, teamId])
   @@index([tournamentId])
@@ -659,9 +676,9 @@ model TournamentPlayer {
   groupId      String?
   registeredAt DateTime @default(now())
 
-  tournament Tournament        @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-  player     Player            @relation(fields: [playerId], references: [id])
-  group      TournamentGroup?  @relation(fields: [groupId], references: [id])
+  tournament Tournament       @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  player     Player           @relation(fields: [playerId], references: [id])
+  group      TournamentGroup? @relation(fields: [groupId], references: [id])
 
   @@unique([tournamentId, playerId])
   @@index([tournamentId])
@@ -689,23 +706,23 @@ model Venue {
 // ─────────────────────────────────────────────────────────────
 
 model Match {
-  id           String      @id @default(cuid())
+  id           String  @id @default(cuid())
   tournamentId String
   groupId      String?
   venueId      String?
 
   // Round info
-  round        String?
-  roundNumber  Int?
-  matchNumber  Int?
+  round       String?
+  roundNumber Int?
+  matchNumber Int?
 
   // Team vs team
-  homeTeamId    String?
-  awayTeamId    String?
+  homeTeamId String?
+  awayTeamId String?
 
   // Player vs player (e.g. eFootball 1v1)
-  homePlayerId  String?
-  awayPlayerId  String?
+  homePlayerId String?
+  awayPlayerId String?
 
   // Leg 1 scores (or single match score)
   homeScore     Int?
@@ -755,33 +772,39 @@ model Match {
   isOverdue     Boolean   @default(false)
 
   // Room ID for online matches (eFootball, PUBG)
-  roomId        String?
-  roomPassword  String?
+  roomId       String?
+  roomPassword String?
 
   // Score self-reporting magic link tokens
-  homeToken     String?   @unique
-  awayToken     String?   @unique
+  homeToken String? @unique
+  awayToken String? @unique
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tournament      Tournament        @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-  group           TournamentGroup?  @relation(fields: [groupId], references: [id])
-  venue           Venue?            @relation(fields: [venueId], references: [id])
-  homeTeam        Team?             @relation("HomeTeam", fields: [homeTeamId], references: [id])
-  awayTeam        Team?             @relation("AwayTeam", fields: [awayTeamId], references: [id])
-  homePlayer      Player?           @relation("HomePlayer", fields: [homePlayerId], references: [id])
-  awayPlayer      Player?           @relation("AwayPlayer", fields: [awayPlayerId], references: [id])
-  motmPlayer      Player?           @relation("MatchMOTM", fields: [motmPlayerId], references: [id])
+  tournament      Tournament          @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  group           TournamentGroup?    @relation(fields: [groupId], references: [id])
+  venue           Venue?              @relation(fields: [venueId], references: [id])
+  homeTeam        Team?               @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeam        Team?               @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  homePlayer      Player?             @relation("HomePlayer", fields: [homePlayerId], references: [id])
+  awayPlayer      Player?             @relation("AwayPlayer", fields: [awayPlayerId], references: [id])
+  motmPlayer      Player?             @relation("MatchMOTM", fields: [motmPlayerId], references: [id])
   events          MatchEvent[]
   participants    MatchParticipant[]
-  nextMatch       Match?            @relation("KnockoutProgression", fields: [nextMatchId], references: [id])
-  previousMatches Match[]           @relation("KnockoutProgression")
+  nextMatch       Match?              @relation("KnockoutProgression", fields: [nextMatchId], references: [id])
+  previousMatches Match[]             @relation("KnockoutProgression")
   eloHistory      EloHistory[]
   scoreReports    ScoreReport[]
   availabilities  MatchAvailability[]
   whatsappLogs    WhatsAppLog[]
   predictions     MatchPrediction[]
+
+  // ── Scheduling system ──
+  schedule              MatchSchedule?
+  rescheduleRequests    RescheduleRequest[]
+  substituteActivations SubstituteActivation[]
+  checkIns              MatchCheckIn[]
 
   @@index([tournamentId])
   @@index([status])
@@ -804,7 +827,7 @@ model EloHistory {
   change               Int
   opponentId           String
   opponentRatingBefore Int
-  result               String   // WIN, LOSS, DRAW
+  result               String // WIN, LOSS, DRAW
   kFactor              Int
   createdAt            DateTime @default(now())
 
@@ -878,11 +901,11 @@ model Standing {
   teamId       String?
   playerId     String?
 
-  played Int   @default(0)
-  won    Int   @default(0)
-  drawn  Int   @default(0)
-  lost   Int   @default(0)
-  points Int   @default(0)
+  played Int @default(0)
+  won    Int @default(0)
+  drawn  Int @default(0)
+  lost   Int @default(0)
+  points Int @default(0)
 
   // Football / eFootball
   goalsFor     Int @default(0)
@@ -895,10 +918,10 @@ model Standing {
 
   updatedAt DateTime @updatedAt
 
-  tournament Tournament        @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-  group      TournamentGroup?  @relation(fields: [groupId], references: [id])
-  team       Team?             @relation(fields: [teamId], references: [id])
-  player     Player?           @relation(fields: [playerId], references: [id])
+  tournament Tournament       @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  group      TournamentGroup? @relation(fields: [groupId], references: [id])
+  team       Team?            @relation(fields: [teamId], references: [id])
+  player     Player?          @relation(fields: [playerId], references: [id])
 
   @@index([tournamentId])
   @@index([tournamentId, playerId])
@@ -1031,26 +1054,26 @@ model Notification {
 // ─────────────────────────────────────────────────────────────
 
 model AppSettings {
-  id        String   @id @default("global")
+  id String @id @default("global")
 
   // Global kill switch
-  testMode  Boolean  @default(false)
+  testMode Boolean @default(false)
 
   // Push notification toggles (Web Push + FCM)
-  pushMatchReminders         Boolean @default(true)
-  pushScoreSubmissions       Boolean @default(true)
-  pushMatchResults           Boolean @default(true)
-  pushTournamentUpdates      Boolean @default(true)
-  pushRoomId                 Boolean @default(true)
-  pushAdminAlerts            Boolean @default(true)
+  pushMatchReminders    Boolean @default(true)
+  pushScoreSubmissions  Boolean @default(true)
+  pushMatchResults      Boolean @default(true)
+  pushTournamentUpdates Boolean @default(true)
+  pushRoomId            Boolean @default(true)
+  pushAdminAlerts       Boolean @default(true)
 
   // WhatsApp notification toggles
-  waMatchReminders           Boolean @default(true)
-  waScoreSubmissions         Boolean @default(true)
-  waMatchResults             Boolean @default(true)
-  waTournamentUpdates        Boolean @default(true)
-  waRoomId                   Boolean @default(true)
-  waAdminAlerts              Boolean @default(true)
+  waMatchReminders    Boolean @default(true)
+  waScoreSubmissions  Boolean @default(true)
+  waMatchResults      Boolean @default(true)
+  waTournamentUpdates Boolean @default(true)
+  waRoomId            Boolean @default(true)
+  waAdminAlerts       Boolean @default(true)
 
   updatedAt DateTime @updatedAt
 
@@ -1065,7 +1088,7 @@ model MatchAvailability {
   id            String    @id @default(cuid())
   matchId       String
   playerId      String
-  side          String    // "home" or "away"
+  side          String // "home" or "away"
   isAvailable   Boolean   @default(true)
   preferredTime DateTime?
   markedAt      DateTime  @default(now())
@@ -1085,7 +1108,7 @@ model MatchAvailability {
 model ScoreReport {
   id            String            @id @default(cuid())
   matchId       String
-  submittedBy   String            // "home" or "away"
+  submittedBy   String // "home" or "away"
   homeScore     Int
   awayScore     Int
   status        ScoreReportStatus @default(PENDING)
@@ -1114,7 +1137,7 @@ model PlayerOfWeek {
   wins          Int
   matchesPlayed Int
   eloGained     Int
-  score         Int      // composite score used to pick
+  score         Int // composite score used to pick
   createdAt     DateTime @default(now())
 
   player Player @relation(fields: [playerId], references: [id])
@@ -1129,23 +1152,23 @@ model PlayerOfWeek {
 // ─────────────────────────────────────────────────────────────
 
 model WhatsAppLog {
-  id           String   @id @default(cuid())
+  id           String  @id @default(cuid())
   matchId      String?
   playerId     String?
   tournamentId String?
 
-  phone        String   // cleaned phone number we sent to
-  templateName String   // e.g. match_reminder, match_schedule, fixture_summary
-  category     String   // REMINDER | SCHEDULE | FIXTURE | OPPONENT_READY | OTHER
-  parameters   Json     // template parameters (for audit)
+  phone        String // cleaned phone number we sent to
+  templateName String // e.g. match_reminder, match_schedule, fixture_summary
+  category     String // REMINDER | SCHEDULE | FIXTURE | OPPONENT_READY | OTHER
+  parameters   Json // template parameters (for audit)
 
-  status       String   // SENT | FAILED | SKIPPED
-  error        String?
+  status String // SENT | FAILED | SKIPPED
+  error  String?
 
   // Idempotency key — if a SENT row with this key exists, skip re-sending
-  dedupKey     String   @unique
+  dedupKey String @unique
 
-  createdAt    DateTime @default(now())
+  createdAt DateTime @default(now())
 
   match      Match?      @relation(fields: [matchId], references: [id], onDelete: SetNull)
   player     Player?     @relation(fields: [playerId], references: [id], onDelete: SetNull)
@@ -1157,4 +1180,550 @@ model WhatsAppLog {
   @@index([category, createdAt])
   @@index([createdAt])
   @@map("whatsapp_logs")
+}
+
+// ═════════════════════════════════════════════════════════════
+// SCHEDULING SYSTEM
+// Monthly availability + match-level confirmation, overlap engine,
+// rescheduling, substitutes, check-in, audit. All additive — existing
+// fixtures keep working with no scheduling record.
+// ═════════════════════════════════════════════════════════════
+
+enum AvailabilityPeriodStatus {
+  DRAFT
+  SUBMITTED
+  LOCKED
+  REOPENED
+}
+
+// Distinct statuses — the engine weights these differently (see scheduling engine).
+enum AvailabilityStatus {
+  CONFIRMED // confidently available
+  LIKELY // expects to be available, not fully confirmed
+  UNAVAILABLE // cannot play
+  SHIFT_UNCONFIRMED // work shift not known yet
+  IF_NEEDED // prefers not to, but can adjust
+  NO_RESPONSE // not submitted
+}
+
+enum DutyType {
+  DAY_SHIFT
+  NIGHT_SHIFT
+  OFF_DUTY
+  ROTATING
+  UNKNOWN
+  CUSTOM
+}
+
+enum AvailabilityPrivacy {
+  PRIVATE // player + admin only
+  TEAM_CAPTAIN // + captain
+  TEAM // + teammates
+  ENGINE_ONLY // used for overlap math, notes hidden
+}
+
+enum AvailabilitySource {
+  MANUAL
+  TEMPLATE
+  COPIED
+  ADMIN
+}
+
+enum SchedulingAvailabilityMode {
+  MONTHLY
+  WEEKLY
+  TOURNAMENT_WIDE
+  ROUND_SPECIFIC
+  ADMIN_MANAGED
+  HYBRID // monthly plan + per-match confirmation (BWL default)
+}
+
+enum SchedulingMode {
+  AUTOMATIC // engine picks highest-scoring slot
+  ADMIN_ASSISTED // engine suggests, admin selects
+  PLAYER_CHOICE // engine generates, players/captains pick
+  MANUAL // admin sets exact time
+  WINDOW // play anytime inside a window
+  OFFICIAL // fixed official time (finals/streams)
+}
+
+enum MinRequirementMode {
+  HARD
+  SOFT
+  DISABLED
+}
+
+// Match scheduling state machine — transitions validated in the service layer.
+enum MatchSchedulingStatus {
+  FIXTURE_CREATED
+  AWAITING_AVAILABILITY
+  AVAILABILITY_INCOMPLETE
+  CALCULATING_OVERLAP
+  NO_COMMON_TIME
+  PROPOSED
+  AWAITING_SELECTION
+  AWAITING_CONFIRMATION
+  PARTIALLY_CONFIRMED
+  FULLY_CONFIRMED
+  SCHEDULED
+  RESCHEDULE_REQUESTED
+  RESCHEDULE_REVIEW
+  RESCHEDULED
+  SUBSTITUTE_REQUESTED
+  SUBSTITUTE_PENDING
+  SUBSTITUTE_APPROVED
+  CHECK_IN_OPEN
+  PLAYER_LATE
+  NO_SHOW_REVIEW
+  WALKOVER_PROPOSED
+  ADMIN_DECISION
+  COMPLETED
+  CANCELLED
+}
+
+enum SlotEligibility {
+  ELIGIBLE
+  PARTIAL // some participants only likely / if-needed
+  REQUIRES_SUBSTITUTE
+  INELIGIBLE
+}
+
+enum ConfirmationStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+  TENTATIVE
+  NO_RESPONSE
+  SUBSTITUTE
+}
+
+enum RescheduleReason {
+  DUTY_SHIFT_CHANGED
+  WORK_EMERGENCY
+  MEDICAL_FAMILY
+  TECHNICAL
+  TRAVEL
+  OPPONENT_REQUEST
+  OTHER
+}
+
+enum RescheduleStatus {
+  PENDING
+  OPPONENT_REVIEW
+  APPROVED
+  REJECTED
+  CANCELLED
+  COUNTERED
+}
+
+enum SubstituteRegStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  REMOVED
+}
+
+enum SubstituteActivationStatus {
+  REQUESTED
+  PENDING
+  ACCEPTED
+  DECLINED
+  APPROVED
+  REJECTED
+}
+
+enum CheckInStatus {
+  NOT_CHECKED_IN
+  CHECKED_IN
+  LATE
+  EXCUSED
+  NO_SHOW
+  SUBSTITUTE_CHECKED_IN
+}
+
+enum CheckInSource {
+  PLAYER
+  CAPTAIN
+  ADMIN
+  AUTO
+}
+
+enum SchedulingActorType {
+  ADMIN
+  PLAYER
+  SYSTEM
+}
+
+enum StageType {
+  GROUP
+  LEAGUE_ROUND
+  ROUND_OF_32
+  ROUND_OF_16
+  QUARTER_FINAL
+  SEMI_FINAL
+  FINAL
+  THIRD_PLACE
+  CUSTOM
+}
+
+// ─── MONTHLY AVAILABILITY PERIOD (one per player per month) ────
+
+model PlayerAvailabilityPeriod {
+  id            String                   @id @default(cuid())
+  playerId      String
+  month         Int // 1-12
+  year          Int
+  timezone      String                   @default("Asia/Karachi")
+  status        AvailabilityPeriodStatus @default(DRAFT)
+  submittedAt   DateTime?
+  lockedAt      DateTime?
+  submittedById String? // admin id when submitted/locked on player's behalf
+  adminNotes    String?                  @db.Text
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+
+  player Player              @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  blocks AvailabilityBlock[]
+
+  @@unique([playerId, month, year])
+  @@index([playerId])
+  @@index([year, month])
+  @@index([status])
+  @@map("player_availability_periods")
+}
+
+// ─── AVAILABILITY BLOCK (a time range on a specific date) ──────
+
+model AvailabilityBlock {
+  id            String              @id @default(cuid())
+  periodId      String
+  playerId      String
+  date          DateTime            @db.Date // calendar day (in period timezone)
+  startDateTime DateTime? // UTC instant; null when all-day
+  endDateTime   DateTime? // UTC instant; may be next day if overnight
+  status        AvailabilityStatus  @default(CONFIRMED)
+  dutyType      DutyType?
+  confidence    Int? // 0-100 optional confidence override
+  isAllDay      Boolean             @default(false)
+  isOvernight   Boolean             @default(false) // end crosses midnight
+  note          String?
+  privacy       AvailabilityPrivacy @default(PRIVATE)
+  source        AvailabilitySource  @default(MANUAL)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  period PlayerAvailabilityPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  player Player                   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@index([playerId, date])
+  @@index([periodId])
+  @@index([date])
+  @@map("availability_blocks")
+}
+
+// ─── REUSABLE AVAILABILITY TEMPLATES ──────────────────────────
+
+model AvailabilityTemplate {
+  id          String   @id @default(cuid())
+  playerId    String
+  name        String
+  description String?
+  // JSON rules: { weekdays: { "1": [{start,end,status,duty}], ... }, allDay?, ... }
+  rules       Json
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@index([playerId])
+  @@map("availability_templates")
+}
+
+// ─── PER-TOURNAMENT SCHEDULING SETTINGS ───────────────────────
+
+model TournamentSchedulingSettings {
+  id           String @id @default(cuid())
+  tournamentId String @unique
+
+  enabled  Boolean @default(false)
+  timezone String  @default("Asia/Karachi")
+
+  availabilityMode SchedulingAvailabilityMode @default(HYBRID)
+  schedulingMode   SchedulingMode             @default(ADMIN_ASSISTED)
+
+  matchDurationMinutes   Int @default(60)
+  preMatchBufferMinutes  Int @default(10)
+  postMatchBufferMinutes Int @default(10)
+
+  confirmationWindowHours Int @default(24)
+  rescheduleCutoffHours   Int @default(6)
+  maxReschedules          Int @default(1)
+  gracePeriodMinutes      Int @default(10)
+
+  // Minimum availability requirements
+  minRequirementMode    MinRequirementMode @default(SOFT)
+  minimumAvailableSlots Int?
+  minimumAvailableDays  Int?
+  minimumSlotDuration   Int? // minutes
+
+  substitutesEnabled          Boolean @default(false)
+  captainConfirmationEnabled  Boolean @default(false)
+  earlyPlayEnabled            Boolean @default(true)
+  autoWalkoverEnabled         Boolean @default(false)
+  opponentAvailabilityVisible Boolean @default(true)
+
+  availabilityOpensAt  DateTime?
+  availabilityDeadline DateTime?
+
+  // Flexible config blobs
+  weights              Json? // availability status → score weight overrides
+  visibilitySettings   Json?
+  notificationSettings Json?
+  reminderSettings     Json?
+  noShowRules          Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  @@map("tournament_scheduling_settings")
+}
+
+// ─── STAGE-SPECIFIC OVERRIDES (group / R16 / QF / SF / final) ──
+
+model StageSchedulingOverride {
+  id               String    @id @default(cuid())
+  tournamentId     String
+  stageType        StageType
+  roundNumber      Int? // optional narrower scope
+  // Partial settings blob merged over the tournament settings for this stage.
+  settingsOverride Json
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, stageType, roundNumber])
+  @@index([tournamentId])
+  @@map("stage_scheduling_overrides")
+}
+
+// ─── MATCH SCHEDULE (one per Match that opts into scheduling) ──
+
+model MatchSchedule {
+  id      String @id @default(cuid())
+  matchId String @unique
+
+  schedulingStatus MatchSchedulingStatus @default(FIXTURE_CREATED)
+  schedulingMode   SchedulingMode        @default(ADMIN_ASSISTED)
+  timezone         String                @default("Asia/Karachi")
+
+  windowStart          DateTime?
+  windowEnd            DateTime?
+  confirmationDeadline DateTime?
+  rescheduleDeadline   DateTime?
+
+  primaryStart DateTime?
+  primaryEnd   DateTime?
+  backupStart  DateTime?
+  backupEnd    DateTime?
+
+  checkInOpensAt DateTime?
+  kickoffAt      DateTime?
+  gracePeriodEnd DateTime?
+  resultDeadline DateTime?
+
+  selectedSlotId       String?
+  autoGenerated        Boolean @default(false)
+  adminOverride        Boolean @default(false)
+  overrideReason       String?
+  schedulingConfidence Float?
+  rescheduleCount      Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  match         Match                          @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  slots         ProposedMatchSlot[]
+  confirmations MatchParticipantConfirmation[]
+
+  @@index([schedulingStatus])
+  @@index([confirmationDeadline])
+  @@index([windowEnd])
+  @@map("match_schedules")
+}
+
+// ─── PROPOSED SLOTS (engine output, ranked) ───────────────────
+
+model ProposedMatchSlot {
+  id                 String          @id @default(cuid())
+  matchScheduleId    String
+  startDateTime      DateTime
+  endDateTime        DateTime
+  score              Float           @default(0)
+  rank               Int             @default(0)
+  eligibility        SlotEligibility @default(ELIGIBLE)
+  requiresSubstitute Boolean         @default(false)
+  isPrimary          Boolean         @default(false)
+  isBackup           Boolean         @default(false)
+  scoringExplanation String?         @db.Text
+  conflictDetails    Json?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  matchSchedule MatchSchedule @relation(fields: [matchScheduleId], references: [id], onDelete: Cascade)
+
+  @@index([matchScheduleId])
+  @@index([matchScheduleId, rank])
+  @@map("proposed_match_slots")
+}
+
+// ─── PARTICIPANT CONFIRMATIONS (per player per match) ─────────
+
+model MatchParticipantConfirmation {
+  id              String             @id @default(cuid())
+  matchScheduleId String
+  playerId        String
+  teamId          String?
+  proposedSlotId  String?
+  status          ConfirmationStatus @default(PENDING)
+  responseReason  String? // maps to reject categories: DUTY_CHANGED, EMERGENCY, ...
+  responseNote    String?
+  respondedAt     DateTime?
+  confirmedById   String? // captain/admin id when confirmed on behalf
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  matchSchedule MatchSchedule @relation(fields: [matchScheduleId], references: [id], onDelete: Cascade)
+  player        Player        @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  team          Team?         @relation(fields: [teamId], references: [id])
+
+  @@unique([matchScheduleId, playerId])
+  @@index([matchScheduleId])
+  @@index([playerId])
+  @@map("match_participant_confirmations")
+}
+
+// ─── RESCHEDULE REQUESTS ──────────────────────────────────────
+
+model RescheduleRequest {
+  id               String           @id @default(cuid())
+  matchId          String
+  requestedById    String // player id
+  requestingTeamId String?
+  reasonCategory   RescheduleReason
+  reasonText       String           @db.Text
+  requestedStart   DateTime?
+  requestedEnd     DateTime?
+  status           RescheduleStatus @default(PENDING)
+  opponentResponse String?
+  adminDecision    String?
+  adminNote        String?
+  decidedById      String?
+  decidedAt        DateTime?
+  isEmergency      Boolean          @default(false)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@index([matchId])
+  @@index([status])
+  @@map("reschedule_requests")
+}
+
+// ─── SUBSTITUTE REGISTRATION (per tournament per team) ────────
+
+model SubstituteRegistration {
+  id              String              @id @default(cuid())
+  tournamentId    String
+  teamId          String
+  playerId        String
+  status          SubstituteRegStatus @default(PENDING)
+  registeredAt    DateTime            @default(now())
+  approvedById    String?
+  eligibilityData Json?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  team       Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  player     Player     @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([tournamentId, teamId, playerId])
+  @@index([tournamentId])
+  @@index([teamId])
+  @@map("substitute_registrations")
+}
+
+// ─── SUBSTITUTE ACTIVATION (per match) ────────────────────────
+
+model SubstituteActivation {
+  id                 String                     @id @default(cuid())
+  matchId            String
+  teamId             String
+  originalPlayerId   String
+  substitutePlayerId String
+  requestedById      String
+  status             SubstituteActivationStatus @default(REQUESTED)
+  approvedById       String?
+  reason             String?
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@index([matchId])
+  @@index([teamId])
+  @@map("substitute_activations")
+}
+
+// ─── MATCH CHECK-IN ───────────────────────────────────────────
+
+model MatchCheckIn {
+  id          String        @id @default(cuid())
+  matchId     String
+  playerId    String
+  status      CheckInStatus @default(NOT_CHECKED_IN)
+  checkedInAt DateTime?
+  source      CheckInSource @default(PLAYER)
+  adminNote   String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  match  Match  @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  player Player @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, playerId])
+  @@index([matchId])
+  @@map("match_check_ins")
+}
+
+// ─── SCHEDULING AUDIT LOG ─────────────────────────────────────
+// Separate from ActivityLog: captures player + system actions too, with
+// before/after snapshots. actorId/matchId/playerId are plain ids (may
+// reference either an AdminUser or a Player) so no FK ambiguity.
+
+model SchedulingAuditEvent {
+  id           String              @id @default(cuid())
+  tournamentId String?
+  matchId      String?
+  playerId     String?
+  actorType    SchedulingActorType @default(SYSTEM)
+  actorId      String?
+  eventType    String
+  previousData Json?
+  newData      Json?
+  reason       String?
+  metadata     Json?
+  createdAt    DateTime            @default(now())
+
+  @@index([tournamentId])
+  @@index([matchId])
+  @@index([playerId])
+  @@index([eventType])
+  @@index([createdAt])
+  @@map("scheduling_audit_events")
 }

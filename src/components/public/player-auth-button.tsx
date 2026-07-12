@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Coins, LogOut } from "lucide-react";
+import { Coins, LogOut, CalendarClock } from "lucide-react";
 import { playerLogout } from "@/lib/actions/player-auth";
 
 interface Me {
@@ -40,6 +40,9 @@ export function PlayerAuthButton() {
 
   return (
     <div className="flex items-center gap-2">
+      <Link href="/player/schedule" className="inline-flex items-center justify-center p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" aria-label="My schedule & availability" title="My schedule">
+        <CalendarClock className="w-4 h-4" />
+      </Link>
       <Link href="/player/account" className="inline-flex items-center gap-1.5 text-sm font-medium px-2.5 py-1.5 rounded-md bg-muted hover:bg-muted/70 transition-colors">
         <span className="text-amber-300 flex items-center gap-1"><Coins className="w-3.5 h-3.5" />{me.coins.toLocaleString()}</span>
         <span className="text-muted-foreground hidden sm:inline">·</span>
