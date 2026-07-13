@@ -261,6 +261,58 @@ export async function uploadTournamentImage(formData: FormData): Promise<UploadR
 }
 
 /**
+ * Upload an Early Exit Wall meme to Cloudinary (full image, never cropped).
+ */
+export async function uploadWallImage(formData: FormData): Promise<UploadResult> {
+  const session = await auth();
+  if (!session) return { success: false, error: "Unauthorized" };
+
+  const file = formData.get("file") as File;
+  if (!file) return { success: false, error: "No file provided" };
+  if (!ALLOWED_TYPES.includes(file.type)) {
+    return { success: false, error: `Invalid file type: ${file.type}. Use JPG, PNG, WebP, or GIF.` };
+  }
+  if (file.size > MAX_FILE_SIZE) return { success: false, error: "File too large. Max 10MB." };
+
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  const apiKey = process.env.CLOUDINARY_API_KEY;
+  const apiSecret = process.env.CLOUDINARY_API_SECRET;
+  if (!cloudName || !apiKey || !apiSecret) return { success: false, error: "Server configuration error." };
+
+  try {
+    const { v2: cloudinary } = await import("cloudinary");
+    cloudinary.config({ cloud_name: cloudName, api_key: apiKey, api_secret: apiSecret, secure: true });
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+
+    const result = await new Promise<UploadResult>((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder: "bwl/wall",
+          resource_type: "image",
+          // "limit" keeps the full meme + aspect ratio (only downscales large images).
+          transformation: [
+            { width: 1600, height: 1600, crop: "limit" },
+            { quality: "auto", fetch_format: "auto" },
+          ],
+        },
+        (error, res) => {
+          if (error) reject(new Error(error.message || "Upload failed"));
+          else if (res) resolve({ success: true, url: res.secure_url });
+          else reject(new Error("No result from Cloudinary"));
+        }
+      );
+      const { Readable } = require("stream");
+      Readable.from(buffer).pipe(uploadStream);
+    });
+    return result;
+  } catch (error: any) {
+    console.error("Wall upload error:", error);
+    return { success: false, error: `Upload failed: ${error.message || "Unknown error"}` };
+  }
+}
+
+/**
  * Delete image from Cloudinary by URL
  */
 export async function deleteImageFromCloudinary(url: string): Promise<{ success: boolean; error?: string }> {

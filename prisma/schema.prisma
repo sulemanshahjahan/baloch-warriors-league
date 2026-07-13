@@ -972,6 +972,22 @@ model NewsPost {
 }
 
 // ─────────────────────────────────────────────────────────────
+// EARLY EXIT WALL (community meme gallery for knocked-out members)
+// ─────────────────────────────────────────────────────────────
+
+model WallPost {
+  id        String   @id @default(cuid())
+  imageUrl  String
+  title     String? // e.g. "Knocked out in the group stage — BWL Champions League II"
+  caption   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdAt])
+  @@map("wall_posts")
+}
+
+// ─────────────────────────────────────────────────────────────
 // VISITOR PRESENCE (admin "Active Users" — every browser, not just members)
 // ─────────────────────────────────────────────────────────────
 

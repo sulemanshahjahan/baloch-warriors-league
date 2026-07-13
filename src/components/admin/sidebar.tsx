@@ -26,6 +26,7 @@ import {
   MessageCircle,
   Radio,
   CalendarClock,
+  Skull,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -102,6 +103,11 @@ const navItems = [
     label: "News",
     href: "/admin/news",
     icon: Newspaper,
+  },
+  {
+    label: "Early Exit Wall",
+    href: "/admin/wall",
+    icon: Skull,
   },
   {
     label: "Venues",

@@ -21,6 +21,7 @@ const navLinks = [
   { href: "/store", label: "Store" },
   { href: "/raffles", label: "Raffles" },
   { href: "/news", label: "News" },
+  { href: "/wall", label: "Wall" },
 ];
 
 export function PublicNavbar() {
