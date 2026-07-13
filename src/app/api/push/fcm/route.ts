@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { auth } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
   try {
@@ -8,10 +9,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing token" }, { status: 400 });
     }
 
+    // Tag the device as admin when a logged-in admin registers it.
+    const session = await auth();
+
     await prisma.fcmToken.upsert({
       where: { token },
-      create: { token },
-      update: {},
+      create: { token, isAdmin: !!session },
+      update: session ? { isAdmin: true } : {},
     });
 
     return NextResponse.json({ success: true });

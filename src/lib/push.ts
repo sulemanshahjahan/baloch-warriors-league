@@ -214,3 +214,77 @@ export async function notify(payload: NotifyPayload): Promise<void> {
 }
 
 export const sendPushToAll = notify;
+
+/**
+ * Admin-only notification. Delivers to devices flagged `isAdmin` (an admin was
+ * logged in when they subscribed) and records the feed row as admin-only so it
+ * never appears in the public in-app feed. Use for escalations that only the
+ * admin needs to act on (scheduling conflicts, disputes, no-shows, etc.).
+ */
+export async function notifyAdmins(payload: NotifyPayload): Promise<void> {
+  console.log("notifyAdmins():", payload.title, "-", payload.body);
+
+  try {
+    const { getSettings } = await import("@/lib/settings");
+    const settings = await getSettings();
+    if (settings.testMode) return;
+    if (settings.pushAdminAlerts === false) return;
+  } catch {
+    // fail open
+  }
+  if (process.env.NOTIFICATIONS_ENABLED === "false") return;
+
+  try {
+    // 1. Save to DB, flagged admin-only (kept out of the public feed).
+    await prisma.notification.create({
+      data: { title: payload.title, body: payload.body, url: payload.url || null, tag: payload.tag || null, isAdmin: true },
+    });
+
+    // 2. Web Push — admin devices only.
+    if (vapidConfigured) {
+      const subs = await prisma.pushSubscription.findMany({ where: { isAdmin: true } });
+      if (subs.length > 0) {
+        const message = JSON.stringify(payload);
+        const expiredIds: string[] = [];
+        await Promise.allSettled(
+          subs.map(async (sub) => {
+            try {
+              await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, message, { TTL: 3600 });
+            } catch (err: unknown) {
+              const code = (err as { statusCode?: number })?.statusCode;
+              if (code === 404 || code === 410) expiredIds.push(sub.id);
+            }
+          })
+        );
+        if (expiredIds.length > 0) await prisma.pushSubscription.deleteMany({ where: { id: { in: expiredIds } } });
+      }
+    }
+
+    // 3. FCM — admin devices only.
+    const tokens = await prisma.fcmToken.findMany({ where: { isAdmin: true } });
+    if (tokens.length > 0) {
+      const messaging = await getFirebaseMessaging();
+      if (messaging) {
+        const expiredTokenIds: string[] = [];
+        await Promise.allSettled(
+          tokens.map(async (t) => {
+            try {
+              await messaging.send({
+                token: t.token,
+                notification: { title: payload.title, body: payload.body },
+                data: { url: payload.url || "/", tag: payload.tag || "" },
+                android: { priority: "high" as const },
+              });
+            } catch (err: unknown) {
+              const code = (err as { code?: string })?.code;
+              if (code === "messaging/registration-token-not-registered" || code === "messaging/invalid-registration-token") expiredTokenIds.push(t.id);
+            }
+          })
+        );
+        if (expiredTokenIds.length > 0) await prisma.fcmToken.deleteMany({ where: { id: { in: expiredTokenIds } } });
+      }
+    }
+  } catch (err) {
+    console.error("notifyAdmins failed:", err);
+  }
+}

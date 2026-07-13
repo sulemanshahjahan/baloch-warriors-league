@@ -13,7 +13,8 @@ export async function GET(req: NextRequest) {
   const limit = parseInt(req.nextUrl.searchParams.get("limit") ?? "10", 10);
 
   const notifications = await prisma.notification.findMany({
-    where: since ? { createdAt: { gt: new Date(since) } } : {},
+    // Admin-only alerts are never surfaced in the public feed.
+    where: { isAdmin: false, ...(since ? { createdAt: { gt: new Date(since) } } : {}) },
     orderBy: { createdAt: "desc" },
     take: Math.min(limit, 50),
     select: {

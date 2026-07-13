@@ -198,11 +198,11 @@ export async function disputeScore(
     },
   });
 
-  // Notify admin via broadcast
+  // Admin-only alert (not broadcast to all users).
   const homeName = match.homePlayer?.name ?? match.homeTeam?.name ?? "Home";
   const awayName = match.awayPlayer?.name ?? match.awayTeam?.name ?? "Away";
-  import("@/lib/push").then(({ sendPushToAll }) =>
-    sendPushToAll({
+  import("@/lib/push").then(({ notifyAdmins }) =>
+    notifyAdmins({
       title: "Score DISPUTED — Admin Action Needed",
       body: `${homeName} vs ${awayName} (${match.tournament.name}) — ${reason || "No reason given"}`,
       url: `/admin/matches/${match.id}`,

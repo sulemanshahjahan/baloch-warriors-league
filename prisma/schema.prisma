@@ -1020,6 +1020,9 @@ model PushSubscription {
   endpoint  String   @unique
   p256dh    String
   auth      String
+  // True when this device belongs to a logged-in admin — admin-only alerts
+  // are sent to these devices instead of broadcasting to everyone.
+  isAdmin   Boolean  @default(false)
   createdAt DateTime @default(now())
 
   @@map("push_subscriptions")
@@ -1028,6 +1031,7 @@ model PushSubscription {
 model FcmToken {
   id        String   @id @default(cuid())
   token     String   @unique
+  isAdmin   Boolean  @default(false)
   createdAt DateTime @default(now())
 
   @@map("fcm_tokens")
@@ -1043,9 +1047,12 @@ model Notification {
   body      String
   url       String?
   tag       String?
+  // Admin-only notifications are kept out of the public in-app feed.
+  isAdmin   Boolean  @default(false)
   createdAt DateTime @default(now())
 
   @@index([createdAt])
+  @@index([isAdmin, createdAt])
   @@map("notifications")
 }
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { auth } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
   try {
@@ -10,11 +11,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid subscription" }, { status: 400 });
     }
 
-    // Upsert — handles re-subscribes with rotated keys
+    // Tag the device as admin when a logged-in admin subscribes, so admin-only
+    // alerts reach it. Never un-tag on a later non-admin re-subscribe.
+    const session = await auth();
+
     await prisma.pushSubscription.upsert({
       where: { endpoint },
-      create: { endpoint, p256dh: keys.p256dh, auth: keys.auth },
-      update: { p256dh: keys.p256dh, auth: keys.auth },
+      create: { endpoint, p256dh: keys.p256dh, auth: keys.auth, isAdmin: !!session },
+      update: { p256dh: keys.p256dh, auth: keys.auth, ...(session ? { isAdmin: true } : {}) },
     });
 
     return NextResponse.json({ success: true });

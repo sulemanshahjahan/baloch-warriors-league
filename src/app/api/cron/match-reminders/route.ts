@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { notify } from "@/lib/push";
+import { notify, notifyAdmins } from "@/lib/push";
 import { sendWithLog } from "@/lib/whatsapp-log";
 import { resolveSideRecipients, teamMembersSelect, ensureMatchTokens } from "@/lib/match-recipients";
 
@@ -123,10 +123,10 @@ export async function GET(req: NextRequest) {
     // Check if match is now overdue
     const isNowOverdue = msUntilDeadline <= 0 && !match.isOverdue;
     if (isNowOverdue) {
-      await notify({
+      await notifyAdmins({
         title: "Match OVERDUE",
         body: `${matchLabel} (${match.tournament.name}) has passed its deadline!`,
-        url: `/matches/${match.id}`,
+        url: `/admin/matches/${match.id}`,
         tag: `overdue-${match.id}`,
       });
       overdueCount++;
@@ -198,8 +198,8 @@ export async function GET(req: NextRequest) {
       });
       forfeitCount++;
     } else if (!homeReady && !awayReady) {
-      // Neither responded — notify admin only (don't auto-forfeit both)
-      await notify({
+      // Neither responded — admin-only alert (don't auto-forfeit both)
+      await notifyAdmins({
         title: "Both Players Unresponsive",
         body: `${homeName} vs ${awayName} — neither player responded. Admin action needed. (${overdueMatch.tournament.name})`,
         url: `/admin/matches/${overdueMatch.id}`,

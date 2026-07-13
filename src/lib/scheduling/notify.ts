@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db";
-import { notify } from "@/lib/push";
+import { notify, notifyAdmins } from "@/lib/push";
 import { sendWithLog } from "@/lib/whatsapp-log";
 import type { WaRecipient } from "@/lib/match-recipients";
 
@@ -57,11 +57,15 @@ export async function notifySchedulingAdminAlert(opts: {
   reason: string;
 }): Promise<void> {
   try {
-    await broadcastOnce({
+    // Admin-only + deduped by tag (idempotent across cron runs).
+    const tag = `sched-admin-${opts.matchId}-${tagSlug(opts.reason)}`;
+    const existing = await prisma.notification.findFirst({ where: { tag }, select: { id: true } });
+    if (existing) return;
+    await notifyAdmins({
       title: "Scheduling needs attention",
       body: `${opts.homeName} vs ${opts.awayName}: ${opts.reason}`,
       url: `/admin/scheduling/${opts.tournamentId}`,
-      tag: `sched-admin-${opts.matchId}-${tagSlug(opts.reason)}`,
+      tag,
     });
   } catch {
     /* ignore */
