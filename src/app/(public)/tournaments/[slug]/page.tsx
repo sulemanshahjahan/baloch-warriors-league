@@ -47,6 +47,7 @@ import {
   formatLabel,
   getInitials,
   getRoundDisplayName,
+  tiebreakExplanation,
 } from "@/lib/utils";
 import { SmartAvatar } from "@/components/public/smart-avatar";
 import { DuoTeamAvatar } from "@/components/public/duo-team-avatar";
@@ -1204,25 +1205,26 @@ function StandingsTable({
           const participantId = isIndividual ? s.playerId : s.teamId;
           const form = participantId ? computeForm(participantId, formMatches, isIndividual) : [];
 
-          // Tiebreaker indicator — show why this row is above the previous with same points
-          let tiebreaker: string | null = null;
-          if (!isPUBG && i > 0) {
-            const prev = standings[i - 1];
-            if (s.points === prev.points && s.goalDiff !== prev.goalDiff) {
-              tiebreaker = "GD";
-            } else if (s.points === prev.points && s.goalDiff === prev.goalDiff && s.goalsFor !== prev.goalsFor) {
-              tiebreaker = "GF";
-            } else if (s.points === prev.points && s.goalDiff === prev.goalDiff && s.goalsFor === prev.goalsFor) {
-              tiebreaker = "=";
-            }
-          }
+          // Tiebreaker indicator — show clearly why this row is above the previous
+          // one when they're level on points.
+          const prev = !isPUBG && i > 0 ? standings[i - 1] : null;
+          const prevName = prev ? (isIndividual ? prev.player?.name : prev.team?.name) ?? "the team above" : "";
+          const tiebreakMsg = prev ? tiebreakExplanation(prev, s, prevName) : null;
+          const tiebreaker =
+            prev && s.points === prev.points
+              ? s.goalDiff !== prev.goalDiff
+                ? "GD"
+                : s.goalsFor !== prev.goalsFor
+                  ? "GF"
+                  : null
+              : null;
 
           return (
             <TableRow key={s.id}>
               <TableCell className="font-medium text-muted-foreground">
                 <div className="flex flex-col items-center">
                   <span>{i + 1}</span>
-                  {tiebreaker && tiebreaker !== "=" && (
+                  {tiebreaker && (
                     <span className="text-[9px] text-muted-foreground/60" title={`Separated by ${tiebreaker === "GD" ? "goal difference" : "goals scored"}`}>{tiebreaker}</span>
                   )}
                 </div>
@@ -1242,6 +1244,9 @@ function StandingsTable({
                   )}
                   <span className="font-medium">{name}</span>
                 </Link>
+                {tiebreakMsg && (
+                  <p className="text-[11px] text-amber-400/80 leading-tight mt-1 ml-9">↑ {tiebreakMsg}</p>
+                )}
               </TableCell>
               <TableCell className="text-center">{s.played}</TableCell>
               {isPUBG ? (

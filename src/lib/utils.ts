@@ -351,3 +351,34 @@ function inferRoundNameFromNumber(roundNum: number, matchNumber: number | null):
 export type ActionResult<T = void> =
   | { success: true; data: T; message?: string }
   | { success: false; error: string };
+
+// ── Standings tiebreak explanation ───────────────────────────────────────────
+// Standings are ranked by: points → goal difference → goals scored → wins.
+// Given two adjacent rows tied on points, explain why `above` is ranked higher.
+export interface StandingLite {
+  points: number;
+  goalDiff: number;
+  goalsFor: number;
+  won: number;
+}
+
+export function tiebreakExplanation(above: StandingLite, below: StandingLite, aboveName: string): string | null {
+  if (above.points !== below.points) return null; // not a points tie — no explanation needed
+  const gd = (n: number) => `${n >= 0 ? "+" : ""}${n}`;
+  const level: string[] = ["points"];
+
+  if (above.goalDiff !== below.goalDiff) {
+    return `Level on points — ${aboveName} ahead on goal difference (${gd(above.goalDiff)} vs ${gd(below.goalDiff)}).`;
+  }
+  level.push("goal difference");
+
+  if (above.goalsFor !== below.goalsFor) {
+    return `Level on ${level.join(" & ")} — ${aboveName} ahead on goals scored (${above.goalsFor} vs ${below.goalsFor}).`;
+  }
+  level.push("goals scored");
+
+  if (above.won !== below.won) {
+    return `Level on ${level.join(" & ")} — ${aboveName} ahead on wins (${above.won} vs ${below.won}).`;
+  }
+  return `Level on all tiebreakers with ${aboveName}.`;
+}

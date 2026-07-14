@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { SmartAvatar } from "@/components/public/smart-avatar";
 import { DuoTeamAvatar } from "@/components/public/duo-team-avatar";
 import { Trophy, ArrowLeft, Crown, Target, ShieldCheck, BarChart3, XCircle } from "lucide-react";
-import { gameLabel } from "@/lib/utils";
+import { gameLabel, tiebreakExplanation } from "@/lib/utils";
 
 interface RecapPageProps {
   params: Promise<{ slug: string }>;
@@ -230,6 +230,9 @@ export default async function RecapPage({ params }: RecapPageProps) {
                   const e = entrantOf(s);
                   if (!e) return null;
                   const qualified = isQualified(e, i);
+                  const above = i > 0 ? group.rows[i - 1] : null;
+                  const aboveE = above ? entrantOf(above) : null;
+                  const tiebreak = above && aboveE ? tiebreakExplanation(above, s, aboveE.name) : null;
                   return (
                     <Link key={s.id} href={e.href} className={`flex items-center justify-between p-3 rounded-lg transition-colors ${qualified ? "bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/10" : "bg-muted/30 hover:bg-muted/50 opacity-70"}`}>
                       <div className="flex items-center gap-3 min-w-0">
@@ -238,6 +241,7 @@ export default async function RecapPage({ params }: RecapPageProps) {
                         <div className="min-w-0">
                           <p className="font-medium text-sm truncate">{e.name}</p>
                           <p className="text-xs text-muted-foreground">W{s.won} D{s.drawn} L{s.lost}</p>
+                          {tiebreak && <p className="text-[11px] text-amber-400/80 leading-tight mt-0.5">↑ {tiebreak}</p>}
                         </div>
                       </div>
                       <div className="flex items-center gap-3 sm:gap-4 text-xs shrink-0">

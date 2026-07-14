@@ -27,6 +27,7 @@ import {
   statusColor,
   statusLabel,
   formatLabel,
+  tiebreakExplanation,
 } from "@/lib/utils";
 import { TeamEnrollment } from "./team-enrollment";
 import { PlayerEnrollment } from "./player-enrollment";
@@ -302,11 +303,18 @@ export default async function TournamentDetailPage({ params }: TournamentDetailP
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {tournament.standings.map((s, i) => (
+                {tournament.standings.map((s, i) => {
+                  const nameOf = (row: typeof s) => (tournament.participantType === "INDIVIDUAL" ? row.player?.name : row.team?.name) ?? "—";
+                  const above = i > 0 ? tournament.standings[i - 1] : null;
+                  const tiebreak = above ? tiebreakExplanation(above, s, nameOf(above)) : null;
+                  return (
                   <TableRow key={s.id}>
-                    <TableCell className="text-muted-foreground text-xs">{i + 1}</TableCell>
+                    <TableCell className="text-muted-foreground text-xs align-top">{i + 1}</TableCell>
                     <TableCell className="font-medium text-sm">
-                      {tournament.participantType === "INDIVIDUAL" ? s.player?.name : s.team?.name}
+                      <div>{nameOf(s)}</div>
+                      {tiebreak && (
+                        <div className="text-[11px] font-normal text-amber-400/80 mt-0.5 leading-tight">↑ {tiebreak}</div>
+                      )}
                     </TableCell>
                     <TableCell className="text-center text-sm">{s.played}</TableCell>
                     <TableCell className="text-center text-sm">{s.won}</TableCell>
@@ -317,7 +325,8 @@ export default async function TournamentDetailPage({ params }: TournamentDetailP
                     <TableCell className="text-center text-sm">{s.goalDiff}</TableCell>
                     <TableCell className="text-center text-sm font-bold">{s.points}</TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           )}
