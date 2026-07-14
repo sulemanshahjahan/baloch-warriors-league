@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, Upload, X, Trash2, Save, Plus, Skull } from "lucide-react";
 import { uploadWallImage } from "@/lib/actions/upload";
 import { createWallPost, updateWallPost, deleteWallPost } from "@/lib/actions/wall";
+import { compressImageToWebp } from "@/lib/image-compress";
 import type { WallPost } from "@prisma/client";
 
 export function WallManager({ posts }: { posts: WallPost[] }) {
@@ -25,14 +26,17 @@ export function WallManager({ posts }: { posts: WallPost[] }) {
 
   async function handleFile(file: File) {
     setError("");
-    if (file.size > 10 * 1024 * 1024) {
-      setError("File too large. Max 10MB.");
+    if (file.size > 25 * 1024 * 1024) {
+      setError("File too large. Max 25MB.");
       return;
     }
     setIsUploading(true);
     try {
+      // Downscale + convert to WebP in the browser so big PNGs don't blow past
+      // the server-action body limit (GIFs pass through untouched).
+      const optimized = await compressImageToWebp(file);
       const fd = new FormData();
-      fd.append("file", file);
+      fd.append("file", optimized);
       const result = await uploadWallImage(fd);
       if (result.success && result.url) setImageUrl(result.url);
       else setError(result.error ?? "Upload failed");
@@ -117,7 +121,7 @@ export function WallManager({ posts }: { posts: WallPost[] }) {
               }}
             />
             <p className="text-xs text-muted-foreground">
-              JPG/PNG/WebP/GIF up to 10MB. Shown full — never cropped.
+              JPG/PNG/WebP/GIF up to 25MB. Photos are auto-converted to WebP; shown full — never cropped.
             </p>
           </div>
 

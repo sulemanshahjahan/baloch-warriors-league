@@ -15,7 +15,9 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     serverActions: {
-      bodySizeLimit: "2mb",
+      // Headroom for image uploads (photos + GIFs). Client-side compression
+      // shrinks most uploads, but GIFs pass through uncompressed.
+      bodySizeLimit: "8mb",
     },
   },
   serverExternalPackages: ["@prisma/client", "bcryptjs", "firebase-admin", "sharp"],
