@@ -50,6 +50,7 @@ import {
   tiebreakExplanation,
 } from "@/lib/utils";
 import { SmartAvatar } from "@/components/public/smart-avatar";
+import { TiebreakInfo } from "@/components/public/tiebreak-info";
 import { DuoTeamAvatar } from "@/components/public/duo-team-avatar";
 
 type FormResult = "W" | "D" | "L";
@@ -1205,48 +1206,30 @@ function StandingsTable({
           const participantId = isIndividual ? s.playerId : s.teamId;
           const form = participantId ? computeForm(participantId, formMatches, isIndividual) : [];
 
-          // Tiebreaker indicator — show clearly why this row is above the previous
-          // one when they're level on points.
+          // Tiebreak explanation (only for the non-obvious cases — see util).
           const prev = !isPUBG && i > 0 ? standings[i - 1] : null;
           const prevName = prev ? (isIndividual ? prev.player?.name : prev.team?.name) ?? "the team above" : "";
           const tiebreakMsg = prev ? tiebreakExplanation(prev, s, prevName) : null;
-          const tiebreaker =
-            prev && s.points === prev.points
-              ? s.goalDiff !== prev.goalDiff
-                ? "GD"
-                : s.goalsFor !== prev.goalsFor
-                  ? "GF"
-                  : null
-              : null;
 
           return (
             <TableRow key={s.id}>
-              <TableCell className="font-medium text-muted-foreground">
-                <div className="flex flex-col items-center">
-                  <span>{i + 1}</span>
-                  {tiebreaker && (
-                    <span className="text-[9px] text-muted-foreground/60" title={`Separated by ${tiebreaker === "GD" ? "goal difference" : "goals scored"}`}>{tiebreaker}</span>
-                  )}
-                </div>
-              </TableCell>
+              <TableCell className="font-medium text-muted-foreground text-center">{i + 1}</TableCell>
               <TableCell>
-                <Link href={href} className="flex items-center gap-2 hover:text-primary transition-colors">
-                  {isIndividual && s.player ? (
-                    <SmartAvatar type="player" id={s.player.id} name={name ?? ""} className="h-7 w-7 shrink-0" fallbackClassName="text-[10px]" />
-                  ) : s.team ? (
-                    <DuoTeamAvatar id={s.team.id} name={name ?? ""} isDuo={s.team.isDuo} members={s.team.players?.map((p) => p.player)} className="h-7 w-7 shrink-0" fallbackClassName="text-[10px]" />
-                  ) : (
-                    <Avatar className="h-7 w-7 shrink-0">
-                      <AvatarFallback className="text-[10px]">
-                        {getInitials(name ?? "")}
-                      </AvatarFallback>
-                    </Avatar>
-                  )}
-                  <span className="font-medium">{name}</span>
-                </Link>
-                {tiebreakMsg && (
-                  <p className="text-[11px] text-amber-400/80 leading-tight mt-1 ml-9">↑ {tiebreakMsg}</p>
-                )}
+                <div className="flex items-center gap-1.5">
+                  <Link href={href} className="flex items-center gap-2 hover:text-primary transition-colors min-w-0">
+                    {isIndividual && s.player ? (
+                      <SmartAvatar type="player" id={s.player.id} name={name ?? ""} className="h-7 w-7 shrink-0" fallbackClassName="text-[10px]" />
+                    ) : s.team ? (
+                      <DuoTeamAvatar id={s.team.id} name={name ?? ""} isDuo={s.team.isDuo} members={s.team.players?.map((p) => p.player)} className="h-7 w-7 shrink-0" fallbackClassName="text-[10px]" />
+                    ) : (
+                      <Avatar className="h-7 w-7 shrink-0">
+                        <AvatarFallback className="text-[10px]">{getInitials(name ?? "")}</AvatarFallback>
+                      </Avatar>
+                    )}
+                    <span className="font-medium truncate">{name}</span>
+                  </Link>
+                  {tiebreakMsg && <TiebreakInfo message={tiebreakMsg} />}
+                </div>
               </TableCell>
               <TableCell className="text-center">{s.played}</TableCell>
               {isPUBG ? (

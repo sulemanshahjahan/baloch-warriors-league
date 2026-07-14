@@ -363,22 +363,16 @@ export interface StandingLite {
 }
 
 export function tiebreakExplanation(above: StandingLite, below: StandingLite, aboveName: string): string | null {
-  if (above.points !== below.points) return null; // not a points tie — no explanation needed
-  const gd = (n: number) => `${n >= 0 ? "+" : ""}${n}`;
-  const level: string[] = ["points"];
+  if (above.points !== below.points) return null; // not a points tie
+  // Goal difference is the obvious, expected tiebreaker — don't clutter the table for it.
+  if (above.goalDiff !== below.goalDiff) return null;
 
-  if (above.goalDiff !== below.goalDiff) {
-    return `Level on points — ${aboveName} ahead on goal difference (${gd(above.goalDiff)} vs ${gd(below.goalDiff)}).`;
-  }
-  level.push("goal difference");
-
+  // Tied on points AND goal difference — the less obvious cases get an explanation.
   if (above.goalsFor !== below.goalsFor) {
-    return `Level on ${level.join(" & ")} — ${aboveName} ahead on goals scored (${above.goalsFor} vs ${below.goalsFor}).`;
+    return `Level on points & goal difference — ${aboveName} ranked higher on goals scored (${above.goalsFor} vs ${below.goalsFor}).`;
   }
-  level.push("goals scored");
-
   if (above.won !== below.won) {
-    return `Level on ${level.join(" & ")} — ${aboveName} ahead on wins (${above.won} vs ${below.won}).`;
+    return `Level on points, goal difference & goals scored — ${aboveName} ranked higher on wins (${above.won} vs ${below.won}).`;
   }
-  return `Level on all tiebreakers with ${aboveName}.`;
+  return null; // fully level — separated only by a stable fallback
 }

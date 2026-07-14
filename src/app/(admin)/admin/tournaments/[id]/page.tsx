@@ -34,6 +34,7 @@ import { PlayerEnrollment } from "./player-enrollment";
 import { AwardsManager } from "./awards-manager";
 import { GroupsManager } from "./groups-manager";
 import { RecomputeStandingsButton } from "./recompute-standings-button";
+import { TiebreakInfo } from "@/components/public/tiebreak-info";
 import { BackfillBracketButton } from "./backfill-bracket-button";
 import { CollapsibleSection } from "@/components/admin/collapsible-section";
 import { DrawWrapper } from "./draw-wrapper";
@@ -311,10 +312,10 @@ export default async function TournamentDetailPage({ params }: TournamentDetailP
                   <TableRow key={s.id}>
                     <TableCell className="text-muted-foreground text-xs align-top">{i + 1}</TableCell>
                     <TableCell className="font-medium text-sm">
-                      <div>{nameOf(s)}</div>
-                      {tiebreak && (
-                        <div className="text-[11px] font-normal text-amber-400/80 mt-0.5 leading-tight">↑ {tiebreak}</div>
-                      )}
+                      <span className="inline-flex items-center gap-1.5">
+                        {nameOf(s)}
+                        {tiebreak && <TiebreakInfo message={tiebreak} />}
+                      </span>
                     </TableCell>
                     <TableCell className="text-center text-sm">{s.played}</TableCell>
                     <TableCell className="text-center text-sm">{s.won}</TableCell>
