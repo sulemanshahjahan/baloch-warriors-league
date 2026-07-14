@@ -101,7 +101,7 @@ async function getHomeData() {
   const csRow = overall.topCleanSheets?.[0];
   const eloLeader = await prisma.player.findFirst({
     where: { isActive: true, eloRating: { gt: 100 } },
-    orderBy: { eloRating: "desc" },
+    orderBy: [{ eloRating: "desc" }, { cardRank: "desc" }, { id: "asc" }],
     select: { id: true, name: true, slug: true, eloRating: true },
   });
 

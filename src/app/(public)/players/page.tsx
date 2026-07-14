@@ -22,7 +22,7 @@ async function getPlayersWithStats() {
   const [players, individualMatches, eventGoalCounts, teamMatches] = await Promise.all([
     prisma.player.findMany({
       where: { isActive: true },
-      orderBy: { eloRating: "desc" },
+      orderBy: [{ eloRating: "desc" }, { cardRank: "desc" }, { id: "asc" }],
       select: {
         id: true,
         name: true,

@@ -150,7 +150,7 @@ export default async function RecapPage({ params }: RecapPageProps) {
   }
   const eloPlayers = await prisma.player.findMany({
     where: { id: { in: [...memberIds] } },
-    orderBy: { eloRating: "desc" },
+    orderBy: [{ eloRating: "desc" }, { cardRank: "desc" }, { id: "asc" }],
     take: 5,
     select: { id: true, name: true, slug: true, eloRating: true },
   });

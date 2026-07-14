@@ -27,7 +27,7 @@ export default async function LegacyPage() {
     prisma.player.findMany({ where: { isActive: true }, orderBy: { legacyXp: "desc" }, take: 15, select: { id: true, name: true, slug: true, legacyLevel: true, legacyTier: true, legacyXp: true } }),
     prisma.player.findMany({ where: { isActive: true }, orderBy: { coins: "desc" }, take: 10, select: { id: true, name: true, slug: true, coins: true } }),
     prisma.award.groupBy({ by: ["playerId"], where: { type: "TOURNAMENT_WINNER", playerId: { not: null } }, _count: { playerId: true }, orderBy: { _count: { playerId: "desc" } }, take: 1 }),
-    prisma.player.findFirst({ where: { isActive: true }, orderBy: { eloRating: "desc" }, select: { id: true, name: true, slug: true, eloRating: true } }),
+    prisma.player.findFirst({ where: { isActive: true }, orderBy: [{ eloRating: "desc" }, { cardRank: "desc" }, { id: "asc" }], select: { id: true, name: true, slug: true, eloRating: true } }),
     prisma.player.findFirst({ where: { isActive: true }, orderBy: { cardRank: "desc" }, select: { id: true, name: true, slug: true, cardRank: true } }),
     prisma.player.findFirst({ where: { isActive: true }, orderBy: { legacyXp: "desc" }, select: { id: true, name: true, slug: true, legacyLevel: true } }),
   ]);

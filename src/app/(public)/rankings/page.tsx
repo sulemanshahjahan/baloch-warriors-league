@@ -21,7 +21,7 @@ export default async function RankingsPage() {
       // Get all players with ELO history (not default 1500 with 0 matches)
       const players = await prisma.player.findMany({
         where: { isActive: true },
-        orderBy: { eloRating: "desc" },
+        orderBy: [{ eloRating: "desc" }, { cardRank: "desc" }, { id: "asc" }],
         select: {
           id: true,
           name: true,
