@@ -350,7 +350,7 @@ export async function getTournamentById(id: string) {
       },
       standings: {
         where: { groupId: null },
-        orderBy: [{ points: "desc" }, { goalDiff: "desc" }],
+        orderBy: [{ points: "desc" }, { goalDiff: "desc" }, { goalsFor: "desc" }, { won: "desc" }, { id: "asc" }],
         include: {
           team: { select: { id: true, name: true, logoUrl: true } },
           player: { select: { id: true, name: true, photoUrl: true } },

@@ -78,7 +78,7 @@ export default async function RecapPage({ params }: RecapPageProps) {
       team: TEAM_INCLUDE,
       group: { select: { id: true, name: true } },
     },
-    orderBy: [{ points: "desc" }, { goalDiff: "desc" }, { goalsFor: "desc" }],
+    orderBy: [{ points: "desc" }, { goalDiff: "desc" }, { goalsFor: "desc" }, { won: "desc" }, { id: "asc" }],
   });
 
   type StandingRow = (typeof standings)[number];

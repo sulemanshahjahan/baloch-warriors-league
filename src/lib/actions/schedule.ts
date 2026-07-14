@@ -448,7 +448,7 @@ export async function generateKnockoutFromGroups(
         orderBy: { orderIndex: "asc" },
         include: {
           standings: {
-            orderBy: [{ points: "desc" }, { goalDiff: "desc" }],
+            orderBy: [{ points: "desc" }, { goalDiff: "desc" }, { goalsFor: "desc" }, { won: "desc" }, { id: "asc" }],
             take: advanceCount,
             include: {
               team: true,

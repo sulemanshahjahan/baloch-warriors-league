@@ -161,7 +161,7 @@ async function getTournamentBySlug(slug: string) {
       id: true,
       name: true,
       standings: {
-        orderBy: [{ points: "desc" }, { goalDiff: "desc" }],
+        orderBy: [{ points: "desc" }, { goalDiff: "desc" }, { goalsFor: "desc" }, { won: "desc" }, { id: "asc" }],
         select: {
           id: true,
           played: true,
@@ -269,7 +269,7 @@ async function getTournamentBySlug(slug: string) {
     // Overall standings
     prisma.standing.findMany({
     where: { tournamentId: tid, groupId: null },
-    orderBy: [{ points: "desc" }, { goalDiff: "desc" }],
+    orderBy: [{ points: "desc" }, { goalDiff: "desc" }, { goalsFor: "desc" }, { won: "desc" }, { id: "asc" }],
     select: {
       id: true,
       played: true,
