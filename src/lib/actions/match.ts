@@ -432,6 +432,66 @@ async function maybeResolveWalkover(matchId: string, tournamentId: string) {
   await advanceKnockoutWinner(matchId, tournamentId);
 }
 
+/**
+ * Admin: undo a walkover. Clears the walkover marker so the match becomes a
+ * normal fixture again. If it had already auto-resolved, it is set back to
+ * SCHEDULED and the player who advanced is pulled out of the next-round slot.
+ */
+export async function undoWalkover(
+  matchId: string
+): Promise<{ success: boolean; error?: string; message?: string }> {
+  const session = await auth();
+  if (!hasRole(session, "ADMIN")) return { success: false, error: "Forbidden: Admin role required" };
+
+  const m = await prisma.match.findUnique({ where: { id: matchId } });
+  if (!m) return { success: false, error: "Match not found" };
+  if (!/walkover/i.test(m.notes ?? "")) return { success: false, error: "This match is not a walkover." };
+
+  // If it already auto-resolved, pull the advanced player out of the next round.
+  if (m.status === "COMPLETED") {
+    const winnerId =
+      (m.homeScore ?? 0) >= (m.awayScore ?? 0)
+        ? (m.homePlayerId ?? m.homeTeamId)
+        : (m.awayPlayerId ?? m.awayTeamId);
+    const curRound = await prisma.match.findMany({
+      where: {
+        tournamentId: m.tournamentId,
+        roundNumber: m.roundNumber ?? 0,
+        status: { not: "CANCELLED" },
+        NOT: { round: { contains: "Group" } },
+      },
+      orderBy: [{ matchNumber: "asc" }, { createdAt: "asc" }],
+      select: { id: true },
+    });
+    const idx = curRound.findIndex((x) => x.id === m.id);
+    if (idx >= 0 && winnerId) {
+      const next = await prisma.match.findFirst({
+        where: { tournamentId: m.tournamentId, roundNumber: (m.roundNumber ?? 0) + 1, matchNumber: Math.floor(idx / 2) + 1 },
+      });
+      if (next && next.status !== "COMPLETED") {
+        await prisma.match.update({
+          where: { id: next.id },
+          data: idx % 2 === 0 ? { homePlayerId: null, homeTeamId: null } : { awayPlayerId: null, awayTeamId: null },
+        });
+      }
+    }
+  }
+
+  await prisma.match.update({
+    where: { id: matchId },
+    data: {
+      notes: null,
+      ...(m.status === "COMPLETED" ? { status: "SCHEDULED" as const, homeScore: null, awayScore: null, completedAt: null } : {}),
+    },
+  });
+
+  revalidatePath(`/admin/matches/${matchId}`);
+  revalidatePath(`/matches/${matchId}`);
+  revalidatePath("/matches");
+  revalidatePath("/");
+  return { success: true, message: "Walkover undone." };
+}
+
 export async function advanceKnockoutWinner(matchId: string, tournamentId: string) {
   // Get the completed match with its round info
   const completedMatch = await prisma.match.findUnique({

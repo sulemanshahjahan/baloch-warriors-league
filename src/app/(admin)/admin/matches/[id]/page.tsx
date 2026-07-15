@@ -8,6 +8,7 @@ import { MatchResultForm } from "./match-result-form";
 import { PUBGResultForm } from "./pubg-result-form";
 import { MatchEventManager } from "./match-event-manager";
 import { DeleteMatchButton } from "./delete-match-button";
+import { WalkoverUndoButton } from "./walkover-undo-button";
 import { RescheduleForm } from "./reschedule-form";
 import { RoomIdForm } from "./room-id-form";
 import { MagicLinksCard } from "./magic-links-card";
@@ -136,6 +137,9 @@ export default async function MatchDetailPage({ params }: MatchDetailPageProps) 
                 <MessageCircle className="w-3.5 h-3.5" />
                 WhatsApp
               </a>
+            )}
+            {match.notes && /walkover/i.test(match.notes) && (
+              <WalkoverUndoButton matchId={match.id} />
             )}
             <DeleteMatchButton
               matchId={match.id}
