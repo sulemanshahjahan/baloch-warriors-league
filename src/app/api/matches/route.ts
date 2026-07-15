@@ -28,6 +28,7 @@ const MATCH_SELECT = {
   awayTeam: { select: { id: true, name: true, shortName: true, isDuo: true, players: { where: { isActive: true }, select: { player: { select: { id: true, name: true, photoUrl: true } } } } } },
   homePlayer: { select: { id: true, name: true } },
   awayPlayer: { select: { id: true, name: true } },
+  notes: true,
 } satisfies Prisma.MatchSelect;
 
 type Row = Prisma.MatchGetPayload<{ select: typeof MATCH_SELECT }>;
@@ -91,7 +92,11 @@ export async function GET(req: NextRequest) {
 
     const total = sorted.length;
     const start = (page - 1) * limit;
-    const matches = sorted.slice(start, start + limit);
+    // Keep arbitrary admin notes private; expose only walkover markers.
+    const matches = sorted.slice(start, start + limit).map((m) => ({
+      ...m,
+      notes: m.notes && /walkover/i.test(m.notes) ? m.notes : null,
+    }));
     const games = [...new Set(facetTournaments.map((t) => t.gameCategory))];
 
     return NextResponse.json(

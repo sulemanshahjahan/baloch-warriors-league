@@ -352,6 +352,21 @@ export type ActionResult<T = void> =
   | { success: true; data: T; message?: string }
   | { success: false; error: string };
 
+// ── Walkover / withdrawal ────────────────────────────────────────────────────
+// A knockout match whose opponent withdrew is flagged in `notes` with the
+// sentinel "WALKOVER:home" or "WALKOVER:away" (naming the side that withdrew).
+// Once it auto-resolves the marker is replaced with plain "Walkover" text.
+/** Which side (if any) withdrew by walkover, parsed from a match's notes. */
+export function getWalkoverSide(notes: string | null | undefined): "home" | "away" | null {
+  if (!notes) return null;
+  const m = notes.match(/WALKOVER:(home|away)/i);
+  return m ? (m[1].toLowerCase() as "home" | "away") : null;
+}
+/** True if a match's notes indicate a walkover (before or after it resolves). */
+export function isWalkoverNote(notes: string | null | undefined): boolean {
+  return !!notes && /walkover/i.test(notes);
+}
+
 // ── Standings tiebreak explanation ───────────────────────────────────────────
 // Standings are ranked by: points → goal difference → goals scored → wins.
 // Given two adjacent rows tied on points, explain why `above` is ranked higher.

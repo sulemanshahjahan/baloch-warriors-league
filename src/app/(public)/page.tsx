@@ -16,6 +16,7 @@ import {
   statusLabel,
   getInitials,
   getRoundDisplayName,
+  getWalkoverSide,
 } from "@/lib/utils";
 import { SmartAvatar } from "@/components/public/smart-avatar";
 import { AvatarFrame } from "@/components/public/profile/avatar-frame";
@@ -86,6 +87,7 @@ async function getHomeData() {
           awayTeam: { select: { id: true, name: true, isDuo: true, players: { where: { isActive: true }, select: { player: { select: { id: true, name: true, photoUrl: true } } } } } },
           homePlayer: { select: { id: true, name: true } },
           awayPlayer: { select: { id: true, name: true } },
+          notes: true,
         },
       }),
       prisma.$transaction([
@@ -813,6 +815,7 @@ export default async function HomePage() {
                   const awayId = match.awayPlayer?.id ?? match.awayTeam?.id;
                   const homeType = match.homePlayer ? "player" : "team";
                   const awayType = match.awayPlayer ? "player" : "team";
+                  const woSide = getWalkoverSide(match.notes);
                   return (
                     <Link key={match.id} href={`/matches/${match.id}`}>
                       <Card className="hover:border-border/80 transition-colors">
@@ -847,7 +850,10 @@ export default async function HomePage() {
                                   <AvatarFallback className="text-xs">{getInitials(homeName)}</AvatarFallback>
                                 </Avatar>
                               )}
-                              <p className="font-semibold text-xs text-center leading-tight line-clamp-2 w-full">{homeName}</p>
+                              <p className={`font-semibold text-xs text-center leading-tight line-clamp-2 w-full ${woSide === "home" ? "line-through text-muted-foreground" : ""}`}>{homeName}</p>
+                              {woSide === "home" && (
+                                <span className="text-[9px] font-bold uppercase tracking-wider text-amber-400 bg-amber-400/10 rounded px-1.5 py-0.5">W/O</span>
+                              )}
                             </div>
                             <span className="text-xs text-muted-foreground px-1 shrink-0">vs</span>
                             <div className="flex flex-col items-center gap-1.5 flex-1 min-w-0">
@@ -862,14 +868,21 @@ export default async function HomePage() {
                                   <AvatarFallback className="text-xs">{getInitials(awayName)}</AvatarFallback>
                                 </Avatar>
                               )}
-                              <p className="font-semibold text-xs text-center leading-tight line-clamp-2 w-full">{awayName}</p>
+                              <p className={`font-semibold text-xs text-center leading-tight line-clamp-2 w-full ${woSide === "away" ? "line-through text-muted-foreground" : ""}`}>{awayName}</p>
+                              {woSide === "away" && (
+                                <span className="text-[9px] font-bold uppercase tracking-wider text-amber-400 bg-amber-400/10 rounded px-1.5 py-0.5">W/O</span>
+                              )}
                             </div>
                           </div>
-                          {match.scheduledAt && (
+                          {woSide ? (
+                            <p className="text-xs text-amber-400 font-medium text-center mt-2">
+                              Walkover — {woSide === "home" ? homeName : awayName} eliminated
+                            </p>
+                          ) : match.scheduledAt ? (
                             <p className="text-xs text-muted-foreground text-center mt-2">
                               {formatDate(match.scheduledAt)}
                             </p>
-                          )}
+                          ) : null}
                         </CardContent>
                       </Card>
                     </Link>

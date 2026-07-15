@@ -34,6 +34,7 @@ import {
   statusLabel,
   getInitials,
   getRoundDisplayName,
+  getWalkoverSide,
 } from "@/lib/utils";
 import { ShareButtons } from "./share-buttons";
 import { PredictionWidget } from "./prediction-widget";
@@ -193,6 +194,8 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
   const awayId = match.awayPlayer?.id ?? match.awayTeam?.id;
   const homeType = match.homePlayer ? "player" : "team";
   const awayType = match.awayPlayer ? "player" : "team";
+  const woSide = getWalkoverSide(match.notes);
+  const woName = woSide === "home" ? homeName : woSide === "away" ? awayName : null;
   const homeSlug = match.homePlayer
     ? `/players/${match.homePlayer.slug}`
     : match.homeTeam
@@ -328,7 +331,10 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
                 </Avatar>
               )}
               <div className="text-center">
-                <p className="font-bold text-lg leading-tight">{homeName}</p>
+                <p className={`font-bold text-lg leading-tight ${woSide === "home" ? "line-through text-muted-foreground" : ""}`}>{homeName}</p>
+                {woSide === "home" && (
+                  <span className="inline-block mt-1 text-[10px] font-bold uppercase tracking-wider text-amber-400 bg-amber-400/10 rounded px-2 py-0.5">Walkover · out</span>
+                )}
                 {match.homeTeam?.shortName && (
                   <p className="text-xs text-muted-foreground">
                     {match.homeTeam.shortName}
@@ -433,7 +439,10 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
                 </Avatar>
               )}
               <div className="text-center">
-                <p className="font-bold text-lg leading-tight">{awayName}</p>
+                <p className={`font-bold text-lg leading-tight ${woSide === "away" ? "line-through text-muted-foreground" : ""}`}>{awayName}</p>
+                {woSide === "away" && (
+                  <span className="inline-block mt-1 text-[10px] font-bold uppercase tracking-wider text-amber-400 bg-amber-400/10 rounded px-2 py-0.5">Walkover · out</span>
+                )}
                 {match.awayTeam?.shortName && (
                   <p className="text-xs text-muted-foreground">
                     {match.awayTeam.shortName}
@@ -445,6 +454,15 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
               </div>
             </div>
           </div>
+
+          {/* Walkover / withdrawal */}
+          {woSide && (
+            <div className="flex items-center justify-center mt-5">
+              <span className="inline-flex items-center gap-2 text-sm px-4 py-2 rounded-lg bg-amber-500/10 border border-amber-500/25 text-amber-400 font-semibold">
+                🚶 Walkover — <span className="font-bold">{woName}</span> eliminated · opponent advances
+              </span>
+            </div>
+          )}
 
           {/* Ready Check + random team assignment (1v1 upcoming matches) */}
           {readyInitial && <MatchReadyCheck initialState={readyInitial} />}

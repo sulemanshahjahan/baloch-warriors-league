@@ -15,6 +15,7 @@ import {
   statusColor,
   statusLabel,
   getRoundDisplayName,
+  getWalkoverSide,
 } from "@/lib/utils";
 import { SmartAvatar } from "@/components/public/smart-avatar";
 import { DuoTeamAvatar } from "@/components/public/duo-team-avatar";
@@ -44,6 +45,7 @@ type Match = {
   awayTeam: { id: string; name: string; shortName: string | null; isDuo?: boolean; players?: { player: { id: string; name: string; photoUrl: string | null } }[] } | null;
   homePlayer: { id: string; name: string } | null;
   awayPlayer: { id: string; name: string } | null;
+  notes: string | null;
 };
 
 const ITEMS_PER_PAGE = 10;
@@ -66,6 +68,7 @@ function MatchCard({ match }: { match: Match }) {
 
   const homeName = match.homePlayer?.name ?? match.homeTeam?.name ?? "TBD";
   const awayName = match.awayPlayer?.name ?? match.awayTeam?.name ?? "TBD";
+  const woSide = getWalkoverSide(match.notes);
 
   return (
     <Link href={`/matches/${match.id}`} className="block">
@@ -100,7 +103,10 @@ function MatchCard({ match }: { match: Match }) {
               ) : match.homeTeam ? (
                 <DuoTeamAvatar id={match.homeTeam.id} name={homeName} isDuo={match.homeTeam.isDuo} members={match.homeTeam.players?.map((p) => p.player)} className="h-12 w-12 shrink-0" memberClassName="h-9 w-9" fallbackClassName="text-xs" />
               ) : null}
-              <p className="font-medium text-xs text-center leading-tight line-clamp-2 w-full">{homeName}</p>
+              <p className={`font-medium text-xs text-center leading-tight line-clamp-2 w-full ${woSide === "home" ? "line-through text-muted-foreground" : ""}`}>{homeName}</p>
+              {woSide === "home" && (
+                <span className="text-[9px] font-bold uppercase tracking-wider text-amber-400 bg-amber-400/10 rounded px-1.5 py-0.5">W/O</span>
+              )}
             </div>
 
             <div className="text-center shrink-0 px-1">
@@ -135,12 +141,19 @@ function MatchCard({ match }: { match: Match }) {
               ) : match.awayTeam ? (
                 <DuoTeamAvatar id={match.awayTeam.id} name={awayName} isDuo={match.awayTeam.isDuo} members={match.awayTeam.players?.map((p) => p.player)} className="h-12 w-12 shrink-0" memberClassName="h-9 w-9" fallbackClassName="text-xs" />
               ) : null}
-              <p className="font-medium text-xs text-center leading-tight line-clamp-2 w-full">{awayName}</p>
+              <p className={`font-medium text-xs text-center leading-tight line-clamp-2 w-full ${woSide === "away" ? "line-through text-muted-foreground" : ""}`}>{awayName}</p>
+              {woSide === "away" && (
+                <span className="text-[9px] font-bold uppercase tracking-wider text-amber-400 bg-amber-400/10 rounded px-1.5 py-0.5">W/O</span>
+              )}
             </div>
           </div>
 
           <div className="flex items-center justify-between mt-4 pt-3 border-t border-border/50">
-            {match.scheduledAt ? (
+            {woSide ? (
+              <span className="text-sm text-amber-400 font-medium">
+                Walkover — {woSide === "home" ? homeName : awayName} eliminated
+              </span>
+            ) : match.scheduledAt ? (
               <div className="flex items-center gap-1 text-sm text-muted-foreground">
                 <Calendar className="w-4 h-4" />
                 {formatDateTime(new Date(match.scheduledAt))}
