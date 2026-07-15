@@ -21,6 +21,14 @@ import { SmartAvatar } from "@/components/public/smart-avatar";
 import { AvatarFrame } from "@/components/public/profile/avatar-frame";
 import { DuoTeamAvatar } from "@/components/public/duo-team-avatar";
 
+// BWL leadership shown on the homepage. Roles are editorial (not stored on the
+// Player model); avatars + names come from the live player records by slug.
+const MANAGER_ROSTER = [
+  { slug: "suleman", role: "Founder" },
+  { slug: "yousuf", role: "Manager" },
+  { slug: "haroon", role: "Manager" },
+] as const;
+
 async function getHomeData() {
   const [featuredTournaments, recentResults, upcomingMatches, stats] =
     await Promise.all([
@@ -202,7 +210,18 @@ async function getHomeData() {
     };
   })();
 
-  return { featuredTournaments, recentResults, upcomingMatches, stats, mvpStats, latestNews, playerOfWeek, seasonChampion };
+  // BWL Managers — resolve the roster slugs to live player records (avatar + name),
+  // preserving the roster's declared order/roles.
+  const managerRecords = await prisma.player.findMany({
+    where: { slug: { in: MANAGER_ROSTER.map((m) => m.slug) } },
+    select: { id: true, name: true, slug: true },
+  });
+  const managers = MANAGER_ROSTER.flatMap((m) => {
+    const p = managerRecords.find((r) => r.slug === m.slug);
+    return p ? [{ ...p, role: m.role }] : [];
+  });
+
+  return { featuredTournaments, recentResults, upcomingMatches, stats, mvpStats, latestNews, playerOfWeek, seasonChampion, managers };
 }
 
 /** Premium tournament-style section header: accent bar + bold title + optional link. */
@@ -240,7 +259,7 @@ function SectionHeading({
 }
 
 export default async function HomePage() {
-  const { featuredTournaments, recentResults, upcomingMatches, stats, mvpStats, latestNews, playerOfWeek, seasonChampion } =
+  const { featuredTournaments, recentResults, upcomingMatches, stats, mvpStats, latestNews, playerOfWeek, seasonChampion, managers } =
     await getHomeData();
 
   return (
@@ -649,6 +668,79 @@ export default async function HomePage() {
                   </Card>
                 </Link>
               ))}
+            </div>
+          </section>
+        )}
+
+        {/* BWL Managers */}
+        {managers.length > 0 && (
+          <section>
+            <SectionHeading title="BWL Managers" icon={<ShieldCheck className="w-5 h-5 text-primary" />} />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {managers.map((m) => {
+                const isFounder = m.role === "Founder";
+                return (
+                  <Link key={m.id} href={`/players/${m.slug}`} className="group">
+                    <Card
+                      className={`relative overflow-hidden h-full transition-all hover:-translate-y-1 ${
+                        isFounder
+                          ? "border-amber-500/40 hover:border-amber-400/70"
+                          : "hover:border-primary/50"
+                      }`}
+                    >
+                      {/* Soft glow */}
+                      <div
+                        className={`absolute inset-x-0 -top-20 h-40 blur-3xl opacity-40 pointer-events-none ${
+                          isFounder ? "bg-amber-500/20" : "bg-primary/15"
+                        }`}
+                      />
+                      <CardContent className="relative p-6 flex flex-col items-center text-center gap-4">
+                        {/* Gradient-ringed avatar */}
+                        <div
+                          className={`rounded-full p-[3px] shrink-0 ${
+                            isFounder
+                              ? "bg-gradient-to-br from-amber-300 via-yellow-500 to-orange-500"
+                              : "bg-gradient-to-br from-primary to-primary/40"
+                          }`}
+                        >
+                          <SmartAvatar
+                            type="player"
+                            id={m.id}
+                            name={m.name}
+                            className="h-24 w-24 sm:h-28 sm:w-28 ring-2 ring-background"
+                            fallbackClassName="text-3xl font-bold"
+                          />
+                        </div>
+                        <div>
+                          <h3
+                            className={`font-black text-lg tracking-tight transition-colors ${
+                              isFounder
+                                ? "group-hover:text-amber-300"
+                                : "group-hover:text-primary"
+                            }`}
+                          >
+                            {m.name}
+                          </h3>
+                          <span
+                            className={`mt-2 inline-flex items-center gap-1.5 text-xs font-bold tracking-widest uppercase px-3 py-1 rounded-full ${
+                              isFounder
+                                ? "bg-amber-500/15 text-amber-400"
+                                : "bg-primary/10 text-primary"
+                            }`}
+                          >
+                            {isFounder ? (
+                              <Crown className="w-3 h-3" />
+                            ) : (
+                              <ShieldCheck className="w-3 h-3" />
+                            )}
+                            {m.role}
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                );
+              })}
             </div>
           </section>
         )}
