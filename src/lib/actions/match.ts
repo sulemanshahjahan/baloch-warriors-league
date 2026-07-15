@@ -371,6 +371,67 @@ export async function updateMatchResult(
 
 // ─── KNOCKOUT BRACKET PROGRESSION ─────────────────────────────
 
+// Walkover / bye support. A match whose notes contain the sentinel
+// "WALKOVER:home" or "WALKOVER:away" has that side withdrawn — whenever the
+// OTHER (surviving) side gets filled, the survivor advances without playing.
+const WALKOVER_RE = /WALKOVER:(home|away)/i;
+
+/** Pure decision: should this walkover-marked match auto-resolve, and how? */
+export function planWalkover(m: {
+  notes: string | null;
+  status: string;
+  homePlayerId: string | null;
+  homeTeamId: string | null;
+  awayPlayerId: string | null;
+  awayTeamId: string | null;
+}):
+  | { resolve: false }
+  | { resolve: true; winnerSide: "home" | "away"; homeScore: number; awayScore: number } {
+  if (m.status === "COMPLETED" || m.status === "CANCELLED" || !m.notes) return { resolve: false };
+  const mm = m.notes.match(WALKOVER_RE);
+  if (!mm) return { resolve: false };
+  const byeSide = mm[1].toLowerCase() as "home" | "away";
+  const liveSide: "home" | "away" = byeSide === "away" ? "home" : "away";
+  const liveFilled =
+    liveSide === "home" ? !!(m.homePlayerId || m.homeTeamId) : !!(m.awayPlayerId || m.awayTeamId);
+  if (!liveFilled) return { resolve: false }; // survivor not placed yet
+  return {
+    resolve: true,
+    winnerSide: liveSide,
+    homeScore: liveSide === "home" ? 1 : 0,
+    awayScore: liveSide === "away" ? 1 : 0,
+  };
+}
+
+/**
+ * If `matchId` is a walkover-marked match whose surviving side is now filled,
+ * complete it (as a walkover, no ELO/stats — recorded directly) and advance the
+ * survivor to the next round. Safe to call on any match; no-ops otherwise.
+ */
+async function maybeResolveWalkover(matchId: string, tournamentId: string) {
+  const m = await prisma.match.findUnique({
+    where: { id: matchId },
+    select: {
+      status: true, notes: true,
+      homePlayerId: true, homeTeamId: true, awayPlayerId: true, awayTeamId: true,
+    },
+  });
+  if (!m) return;
+  const plan = planWalkover(m);
+  if (!plan.resolve) return;
+  await prisma.match.update({
+    where: { id: matchId },
+    data: {
+      status: "COMPLETED",
+      homeScore: plan.homeScore,
+      awayScore: plan.awayScore,
+      completedAt: new Date(),
+      notes: "Walkover — opponent withdrew.",
+    },
+  });
+  await advanceKnockoutWinner(matchId, tournamentId);
+}
+
 export async function advanceKnockoutWinner(matchId: string, tournamentId: string) {
   // Get the completed match with its round info
   const completedMatch = await prisma.match.findUnique({
@@ -498,6 +559,7 @@ export async function advanceKnockoutWinner(matchId: string, tournamentId: strin
     nextRoundMatches.find((m) => m.matchNumber === nextMatchNumber) ??
     nextRoundMatches[pairIdx] ?? null;
 
+  let nextMatchId: string;
   if (existingNextMatch) {
     await prisma.match.update({
       where: { id: existingNextMatch.id },
@@ -505,8 +567,9 @@ export async function advanceKnockoutWinner(matchId: string, tournamentId: strin
         ? (isHomeSlot ? { homePlayerId: winnerId } : { awayPlayerId: winnerId })
         : (isHomeSlot ? { homeTeamId: winnerId } : { awayTeamId: winnerId }),
     });
+    nextMatchId = existingNextMatch.id;
   } else {
-    await prisma.match.create({
+    const createdNext = await prisma.match.create({
       data: {
         tournamentId,
         round: nextRoundName,
@@ -520,7 +583,12 @@ export async function advanceKnockoutWinner(matchId: string, tournamentId: strin
           : (isHomeSlot ? { homeTeamId: winnerId } : { awayTeamId: winnerId })),
       },
     });
+    nextMatchId = createdNext.id;
   }
+
+  // Walkover/bye: if the opponent in the next match has withdrawn, pass the
+  // just-advanced player straight through to the following round.
+  await maybeResolveWalkover(nextMatchId, tournamentId);
 
   // Auto-send WhatsApp when the next match has both sides assigned.
   // Works for 1v1 (players) and 2v2 duos (both members of each side).
