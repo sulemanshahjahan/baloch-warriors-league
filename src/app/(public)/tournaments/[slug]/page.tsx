@@ -219,6 +219,7 @@ async function getTournamentBySlug(slug: string) {
       awayTeam: { select: { id: true, name: true, shortName: true, isDuo: true, players: { where: { isActive: true }, select: { player: { select: { id: true, name: true, photoUrl: true } } } } } },
       homePlayer: { select: { id: true, name: true } },
       awayPlayer: { select: { id: true, name: true } },
+      notes: true,
       completedAt: true,
       motmPlayerId: true,
       motmPlayer: { select: { id: true, name: true, slug: true } },
@@ -333,7 +334,13 @@ async function getTournamentBySlug(slug: string) {
       awards: awards.length,
     },
     groups,
-    matches: matches.map((m) => ({ ...m, participants: [], notes: null })),
+    // Keep arbitrary admin notes private, but expose walkover markers so the
+    // bracket can show a withdrawal (e.g. "Suleman eliminated · opponent advances").
+    matches: matches.map((m) => ({
+      ...m,
+      participants: [],
+      notes: m.notes && /walkover/i.test(m.notes) ? m.notes : null,
+    })),
     awards,
     teams,
     latestMOTM,

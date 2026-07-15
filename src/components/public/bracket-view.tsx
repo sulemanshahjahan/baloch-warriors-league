@@ -29,6 +29,7 @@ interface BracketMatch {
   awayTeam: { id: string; name: string; shortName: string | null } | null;
   homePlayer: { id: string; name: string } | null;
   awayPlayer: { id: string; name: string } | null;
+  notes?: string | null;
 }
 
 interface BracketViewProps {
@@ -87,6 +88,7 @@ function Row({
   scores,
   won,
   lost,
+  walkover,
 }: {
   fullName: string;
   entityId: string | null;
@@ -94,11 +96,12 @@ function Row({
   scores: Array<number | null | undefined>;
   won: boolean;
   lost: boolean;
+  walkover?: boolean;
 }) {
   return (
     <div
-      className={`flex items-center gap-2 px-3 py-1.5 ${won ? "bg-primary/5" : ""}`}
-      title={fullName}
+      className={`flex items-center gap-2 px-3 py-1.5 ${won ? "bg-primary/5" : ""} ${walkover ? "opacity-70" : ""}`}
+      title={walkover ? `${fullName} — walkover (withdrew)` : fullName}
     >
       {entityId ? (
         <SmartAvatar
@@ -115,26 +118,32 @@ function Row({
       )}
       <span
         className={`flex-1 min-w-0 text-xs truncate ${
-          won ? "font-bold text-primary" : lost ? "text-muted-foreground" : "font-medium"
-        }`}
+          won ? "font-bold text-primary" : lost || walkover ? "text-muted-foreground" : "font-medium"
+        } ${walkover ? "line-through" : ""}`}
       >
         {fullName}
       </span>
-      <div className="flex items-center gap-1.5 shrink-0">
-        {scores.map((s, i) => {
-          if (s === undefined) return null;
-          return (
-            <span
-              key={i}
-              className={`w-5 text-center text-xs tabular-nums ${
-                won ? "font-bold text-primary" : lost ? "text-muted-foreground" : "font-semibold"
-              }`}
-            >
-              {s == null ? "-" : s}
-            </span>
-          );
-        })}
-      </div>
+      {walkover ? (
+        <span className="shrink-0 text-[8px] font-bold uppercase tracking-wider text-amber-400 bg-amber-400/10 rounded px-1.5 py-0.5">
+          W/O
+        </span>
+      ) : (
+        <div className="flex items-center gap-1.5 shrink-0">
+          {scores.map((s, i) => {
+            if (s === undefined) return null;
+            return (
+              <span
+                key={i}
+                className={`w-5 text-center text-xs tabular-nums ${
+                  won ? "font-bold text-primary" : lost ? "text-muted-foreground" : "font-semibold"
+                }`}
+              >
+                {s == null ? "-" : s}
+              </span>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -161,6 +170,14 @@ function MatchCard({
   const homeId = match.homePlayerId ?? match.homeTeamId;
   const awayId = match.awayPlayerId ?? match.awayTeamId;
 
+  // Walkover / withdrawal. Before it resolves, notes carry a "WALKOVER:home|away"
+  // marker naming the side that withdrew; after it resolves the marker is gone
+  // but the note still says "Walkover".
+  const woMatch = match.notes?.match(/WALKOVER:(home|away)/i);
+  const woSide = woMatch ? (woMatch[1].toLowerCase() as "home" | "away") : null;
+  const isWalkover = woSide != null || /walkover/i.test(match.notes ?? "");
+  const withdrawnName = woSide === "home" ? homeName : woSide === "away" ? awayName : null;
+
   const showL2 = has2Legs;
   const showL3 = match.leg3HomeScore != null;
 
@@ -180,6 +197,7 @@ function MatchCard({
           scores={[legs.l1H, showL2 ? legs.l2H : undefined, showL3 ? legs.l3H : undefined]}
           won={isCompleted && homeWon}
           lost={isCompleted && awayWon}
+          walkover={!isCompleted && woSide === "home"}
         />
 
         <Row
@@ -189,10 +207,17 @@ function MatchCard({
           scores={[legs.l1A, showL2 ? legs.l2A : undefined, showL3 ? legs.l3A : undefined]}
           won={isCompleted && awayWon}
           lost={isCompleted && homeWon}
+          walkover={!isCompleted && woSide === "away"}
         />
 
         <div className="px-3 pb-2 pt-1 text-[10px] text-muted-foreground">
-          {isCompleted && has2Legs ? (
+          {isWalkover && !isCompleted ? (
+            <span className="text-amber-400 font-medium">
+              Walkover{withdrawnName ? ` — ${withdrawnName} eliminated` : ""} · opponent advances
+            </span>
+          ) : isCompleted && isWalkover ? (
+            <span className="text-amber-400 font-medium">Walkover</span>
+          ) : isCompleted && has2Legs ? (
             <span>
               Aggregate: <span className="font-semibold text-foreground">{aggHome} - {aggAway}</span>
               {match.leg3HomePens != null && (
