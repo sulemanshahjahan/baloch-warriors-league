@@ -377,7 +377,7 @@ export async function updateMatchResult(
 const WALKOVER_RE = /WALKOVER:(home|away)/i;
 
 /** Pure decision: should this walkover-marked match auto-resolve, and how? */
-export function planWalkover(m: {
+function planWalkover(m: {
   notes: string | null;
   status: string;
   homePlayerId: string | null;

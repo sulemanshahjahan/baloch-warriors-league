@@ -434,7 +434,7 @@ export async function generateSchedule(options: GenerateScheduleOptions) {
 // Standard recursive bracket seed order: slotToSeed[slot] = seed rank (1-based).
 // e.g. size 8 → [1,8,4,5,2,7,3,6]; adjacent pairs are the opening-round matches
 // and the first half of the slots is the top half of the draw.
-export function bracketSeedOrder(size: number): number[] {
+function bracketSeedOrder(size: number): number[] {
   let seeds = [1];
   while (seeds.length < size) {
     const len = seeds.length * 2 + 1;
@@ -449,7 +449,7 @@ export function bracketSeedOrder(size: number): number[] {
 }
 
 type SeedQ = { id: string; name: string };
-export type SeededMatch = {
+type SeededMatch = {
   home: SeedQ | null;
   away: SeedQ | null;
   roundName: string;
@@ -467,7 +467,7 @@ export type SeededMatch = {
  * kept apart (mathematically impossible to separate 3+ same-group teams across
  * only 2 halves) — but the top two are always separated to opposite halves.
  */
-export function seedKnockoutFirstRound(
+function seedKnockoutFirstRound(
   advancingByGroup: { groupName: string; participants: { id: string; name: string; position: number }[] }[],
   firstRoundName: string,
 ): SeededMatch[] {
