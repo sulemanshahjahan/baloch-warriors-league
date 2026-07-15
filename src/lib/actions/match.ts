@@ -218,6 +218,12 @@ export async function executeMatchCompletion(
   revalidatePath(`/admin/tournaments/${match.tournamentId}`);
   revalidatePath("/admin/matches");
   revalidatePath(`/matches/${matchId}`);
+  // Public leaderboards read ELO / per-fixture stats — refresh their ISR HTML too
+  // so they update immediately instead of waiting out the 300s revalidate window.
+  revalidatePath("/rankings");
+  revalidatePath("/stats");
+  revalidatePath("/players");
+  revalidatePath("/");
   await invalidateCache(`standings:${match.tournamentId}`);
   await invalidateCache(`tstats:${match.tournamentId}`);
   await invalidateCache("leaderboard:");
@@ -1461,6 +1467,12 @@ export async function updatePUBGMatchResult(matchId: string, formData: FormData)
   revalidatePath(`/admin/tournaments/${match.tournamentId}`);
   revalidatePath("/admin/matches");
   revalidatePath(`/tournaments/${match.tournament.slug}`);
+  // Public leaderboards read ELO / per-fixture stats — refresh their ISR HTML too
+  // so they update immediately instead of waiting out the 300s revalidate window.
+  revalidatePath("/rankings");
+  revalidatePath("/stats");
+  revalidatePath("/players");
+  revalidatePath("/");
   await invalidateCache(`standings:${match.tournamentId}`);
   await invalidateCache(`tstats:${match.tournamentId}`);
   await invalidateCache("leaderboard:");

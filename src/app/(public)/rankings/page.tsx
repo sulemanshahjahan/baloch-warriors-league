@@ -38,19 +38,66 @@ export default async function RankingsPage() {
 
       const ranked = players.filter((p) => p.eloHistory.length > 0);
 
+      // W/L/D shown here must match the rest of the site (/stats, /players), which
+      // count PER FIXTURE (legs aggregated to one result), NOT per ELO leg. The ELO
+      // *rating* stays per-leg (correct for ELO); only the displayed record is
+      // per-fixture. Filters below are identical to getOverallStats so the numbers
+      // line up exactly with the Stats page.
       const matchCountsMap: Record<string, { wins: number; losses: number; draws: number }> = {};
       if (ranked.length > 0) {
-        const histories = await prisma.eloHistory.groupBy({
-          by: ["playerId", "result"],
-          where: { playerId: { in: ranked.map((p) => p.id) } },
-          _count: { result: true },
-        });
-        for (const h of histories) {
-          const existing = matchCountsMap[h.playerId] ?? { wins: 0, losses: 0, draws: 0 };
-          if (h.result === "WIN") existing.wins = h._count.result;
-          else if (h.result === "LOSS") existing.losses = h._count.result;
-          else if (h.result === "DRAW") existing.draws = h._count.result;
-          matchCountsMap[h.playerId] = existing;
+        const rankedIds = new Set(ranked.map((p) => p.id));
+        const rec = (id: string) => {
+          if (!matchCountsMap[id]) matchCountsMap[id] = { wins: 0, losses: 0, draws: 0 };
+          return matchCountsMap[id];
+        };
+        const [singles, duos] = await Promise.all([
+          // 1v1 fixtures — same filter as getOverallStats `allMatches`.
+          prisma.match.findMany({
+            where: { status: "COMPLETED", homePlayerId: { not: null } },
+            select: {
+              homePlayerId: true, awayPlayerId: true,
+              homeScore: true, awayScore: true,
+              leg2HomeScore: true, leg2AwayScore: true,
+              leg3HomeScore: true, leg3AwayScore: true,
+            },
+          }),
+          // 2v2 duo fixtures — same filter as getOverallStats `duoMatchesRaw`.
+          prisma.match.findMany({
+            where: { status: "COMPLETED", homeTeam: { isDuo: true } },
+            select: {
+              homeScore: true, awayScore: true,
+              leg2HomeScore: true, leg2AwayScore: true,
+              leg3HomeScore: true, leg3AwayScore: true,
+              homeTeam: { select: { players: { where: { isActive: true }, select: { playerId: true } } } },
+              awayTeam: { select: { players: { where: { isActive: true }, select: { playerId: true } } } },
+            },
+          }),
+        ]);
+        for (const m of singles) {
+          const hg = (m.homeScore ?? 0) + (m.leg2HomeScore ?? 0) + (m.leg3HomeScore ?? 0);
+          const ag = (m.awayScore ?? 0) + (m.leg2AwayScore ?? 0) + (m.leg3AwayScore ?? 0);
+          if (m.homePlayerId && rankedIds.has(m.homePlayerId)) {
+            const s = rec(m.homePlayerId);
+            if (hg > ag) s.wins++; else if (ag > hg) s.losses++; else s.draws++;
+          }
+          if (m.awayPlayerId && rankedIds.has(m.awayPlayerId)) {
+            const s = rec(m.awayPlayerId);
+            if (ag > hg) s.wins++; else if (hg > ag) s.losses++; else s.draws++;
+          }
+        }
+        for (const m of duos) {
+          const hg = (m.homeScore ?? 0) + (m.leg2HomeScore ?? 0) + (m.leg3HomeScore ?? 0);
+          const ag = (m.awayScore ?? 0) + (m.leg2AwayScore ?? 0) + (m.leg3AwayScore ?? 0);
+          for (const pl of m.homeTeam?.players ?? []) {
+            if (!rankedIds.has(pl.playerId)) continue;
+            const s = rec(pl.playerId);
+            if (hg > ag) s.wins++; else if (ag > hg) s.losses++; else s.draws++;
+          }
+          for (const pl of m.awayTeam?.players ?? []) {
+            if (!rankedIds.has(pl.playerId)) continue;
+            const s = rec(pl.playerId);
+            if (ag > hg) s.wins++; else if (hg > ag) s.losses++; else s.draws++;
+          }
         }
       }
 
