@@ -430,6 +430,136 @@ export async function generateSchedule(options: GenerateScheduleOptions) {
   return { success: true, count: createdMatches };
 }
 
+// ─── KNOCKOUT SEEDING (group → bracket) ───────────────────────
+// Standard recursive bracket seed order: slotToSeed[slot] = seed rank (1-based).
+// e.g. size 8 → [1,8,4,5,2,7,3,6]; adjacent pairs are the opening-round matches
+// and the first half of the slots is the top half of the draw.
+export function bracketSeedOrder(size: number): number[] {
+  let seeds = [1];
+  while (seeds.length < size) {
+    const len = seeds.length * 2 + 1;
+    const next: number[] = [];
+    for (const s of seeds) {
+      next.push(s);
+      next.push(len - s);
+    }
+    seeds = next;
+  }
+  return seeds;
+}
+
+type SeedQ = { id: string; name: string };
+export type SeededMatch = {
+  home: SeedQ | null;
+  away: SeedQ | null;
+  roundName: string;
+  roundNumber: number;
+};
+
+/**
+ * Seed the first knockout round from group qualifiers so that:
+ *  - every group's 1st- and 2nd-placed players land in OPPOSITE halves of the
+ *    bracket (so they can only ever meet in the final), and
+ *  - no opening-round match pairs two players from the same group.
+ * Group winners take the strongest seeds and are spread across the draw.
+ *
+ * NOTE: when more than 2 advance per group, the 3rd/4th places cannot all be
+ * kept apart (mathematically impossible to separate 3+ same-group teams across
+ * only 2 halves) — but the top two are always separated to opposite halves.
+ */
+export function seedKnockoutFirstRound(
+  advancingByGroup: { groupName: string; participants: { id: string; name: string; position: number }[] }[],
+  firstRoundName: string,
+): SeededMatch[] {
+  const total = advancingByGroup.reduce((s, g) => s + g.participants.length, 0);
+  const size = Math.max(2, Math.pow(2, Math.ceil(Math.log2(Math.max(total, 2)))));
+  const half = size / 2;
+
+  const slotToSeed = bracketSeedOrder(size);
+  const seedToSlot = new Map<number, number>();
+  slotToSeed.forEach((seed, slot) => seedToSlot.set(seed, slot));
+  const seedHalf = (seed: number): "T" | "B" => (seedToSlot.get(seed)! < half ? "T" : "B");
+
+  const used = new Set<number>();
+  const totalHalf = { T: 0, B: 0 };
+  const seedToQ = new Map<number, SeedQ>();
+  const seedGroup = new Map<number, number>();
+  const groupHalf = advancingByGroup.map(() => ({ T: 0, B: 0 }));
+  const winnerSeed: (number | undefined)[] = advancingByGroup.map(() => undefined);
+
+  const bestUnused = (h?: "T" | "B"): number | null => {
+    for (let s = 1; s <= size; s++) if (!used.has(s) && (!h || seedHalf(s) === h)) return s;
+    return null;
+  };
+  const place = (gi: number, q: SeedQ, preferred?: "T" | "B"): number => {
+    const seed = (preferred ? bestUnused(preferred) : null) ?? bestUnused();
+    if (seed == null) throw new Error("knockout seeding overflow");
+    used.add(seed);
+    seedToQ.set(seed, q);
+    seedGroup.set(seed, gi);
+    const h = seedHalf(seed);
+    totalHalf[h]++;
+    groupHalf[gi][h]++;
+    return seed;
+  };
+
+  // 1) Winners take the best available seeds (standard seeding spreads them).
+  advancingByGroup.forEach((g, gi) => {
+    const w = g.participants.find((p) => p.position === 1);
+    if (w) winnerSeed[gi] = place(gi, { id: w.id, name: w.name });
+  });
+  // 2) Runners-up go to the OPPOSITE half of their own group's winner.
+  advancingByGroup.forEach((g, gi) => {
+    const r = g.participants.find((p) => p.position === 2);
+    if (!r) return;
+    const ws = winnerSeed[gi];
+    const opp: "T" | "B" = ws != null && seedHalf(ws) === "T" ? "B" : "T";
+    place(gi, { id: r.id, name: r.name }, opp);
+  });
+  // 3) Remaining places (3rd, 4th, …): spread each group evenly across halves.
+  const maxPos = Math.max(0, ...advancingByGroup.flatMap((g) => g.participants.map((p) => p.position)));
+  for (let pos = 3; pos <= maxPos; pos++) {
+    advancingByGroup.forEach((g, gi) => {
+      const q = g.participants.find((p) => p.position === pos);
+      if (!q) return;
+      const gc = groupHalf[gi];
+      const preferred: "T" | "B" =
+        gc.T < gc.B ? "T" : gc.B < gc.T ? "B" : totalHalf.T <= totalHalf.B ? "T" : "B";
+      place(gi, { id: q.id, name: q.name }, preferred);
+    });
+  }
+
+  // Build opening-round matches from adjacent slot pairs (top half first).
+  type M = { home: SeedQ | null; away: SeedQ | null; hg: number | null; ag: number | null };
+  const matches: M[] = [];
+  for (let slot = 0; slot < size; slot += 2) {
+    const sa = slotToSeed[slot];
+    const sb = slotToSeed[slot + 1];
+    const qa = seedToQ.get(sa) ?? null;
+    const qb = seedToQ.get(sb) ?? null;
+    matches.push({ home: qa, away: qb, hg: qa ? seedGroup.get(sa)! : null, ag: qb ? seedGroup.get(sb)! : null });
+  }
+  // Safety net: repair any same-group opening match by swapping an away player
+  // with another match in the SAME half (keeps the halves, so top-2 stay apart).
+  const sameHalf = (i: number, k: number) =>
+    Math.floor(i / Math.max(1, matches.length / 2)) === Math.floor(k / Math.max(1, matches.length / 2));
+  for (let i = 0; i < matches.length; i++) {
+    const m = matches[i];
+    if (m.hg == null || m.ag == null || m.hg !== m.ag) continue;
+    for (let k = 0; k < matches.length; k++) {
+      if (k === i || !sameHalf(i, k)) continue;
+      const n = matches[k];
+      if (n.ag == null) continue;
+      if (m.hg !== n.ag && (n.hg == null || n.hg !== m.ag)) {
+        [m.away, n.away] = [n.away, m.away];
+        [m.ag, n.ag] = [n.ag, m.ag];
+        break;
+      }
+    }
+  }
+  return matches.map((m) => ({ home: m.home, away: m.away, roundName: firstRoundName, roundNumber: 1 }));
+}
+
 // ─── CREATE KNOCKOUT BRACKET FROM GROUP STANDINGS ─────────────
 
 export async function generateKnockoutFromGroups(
@@ -526,67 +656,11 @@ export async function generateKnockoutFromGroups(
   
   const firstRoundName = roundNames[roundCount] || `Round of ${bracketSize}`;
   
-  // Build bracket with proper cross-group seeding
-  // Standard format: Group A 1st vs Group B 2nd, Group B 1st vs Group A 2nd, etc.
-  const bracket: { 
-    home: { id: string; name: string } | null; 
-    away: { id: string; name: string } | null;
-    roundName: string;
-    roundNumber: number;
-  }[] = [];
+  // Build the bracket with proper group-separated seeding: each group's top two
+  // qualifiers land in opposite halves (only meet in the final) and no opening
+  // match is an intra-group rematch. See seedKnockoutFirstRound above.
+  const bracket = seedKnockoutFirstRound(advancingByGroup, firstRoundName);
 
-  const groupCount = advancingByGroup.length;
-  
-  // For 2 groups with 2 advancing each (4 teams) - Semi-finals
-  // Match 1: Group A 1st vs Group B 2nd
-  // Match 2: Group B 1st vs Group A 2nd
-  
-  // For 4 groups with 2 advancing each (8 teams) - Quarter-finals
-  // Match 1: Group A 1st vs Group B 2nd
-  // Match 2: Group C 1st vs Group D 2nd
-  // Match 3: Group B 1st vs Group A 2nd
-  // Match 4: Group D 1st vs Group C 2nd
-  
-  // Create proper cross-group pairings for RO16 (4 groups, 4 per group = 16 players)
-  // Pairing: Group X position N vs Group Y position (advanceCount + 1 - N)
-  // A1 vs D4, A2 vs D3, A3 vs D2, A4 vs D1
-  // B1 vs C4, B2 vs C3, B3 vs C2, B4 vs C1
-  // This ensures top seeds face bottom seeds from opposite groups
-
-  // Pair adjacent groups: A↔B, C↔D, E↔F, etc.
-  const pairedGroups: [number, number][] = [];
-  for (let i = 0; i < groupCount - 1; i += 2) {
-    pairedGroups.push([i, i + 1]);
-  }
-
-  for (const [gIdxA, gIdxB] of pairedGroups) {
-    const groupA = advancingByGroup[gIdxA];
-    const groupB = advancingByGroup[gIdxB];
-    if (!groupA || !groupB) continue;
-
-    for (let pos = 1; pos <= advanceCount; pos++) {
-      const playerA = groupA.participants.find(p => p.position === pos);
-      const playerB = groupB.participants.find(p => p.position === (advanceCount + 1 - pos));
-
-      if (playerA && playerB) {
-        bracket.push({
-          home: { id: playerA.id, name: playerA.name },
-          away: { id: playerB.id, name: playerB.name },
-          roundName: firstRoundName,
-          roundNumber: 1,
-        });
-      } else if (playerA) {
-        bracket.push({
-          home: { id: playerA.id, name: playerA.name },
-          away: null,
-          roundName: firstRoundName,
-          roundNumber: 1,
-        });
-      }
-    }
-  }
-
-  // Handle odd numbers or missing pairings by filling remaining slots
   let createdMatches = 0;
 
   for (const match of bracket) {
