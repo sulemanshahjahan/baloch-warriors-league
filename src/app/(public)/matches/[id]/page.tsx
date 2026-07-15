@@ -37,7 +37,9 @@ import {
 } from "@/lib/utils";
 import { ShareButtons } from "./share-buttons";
 import { PredictionWidget } from "./prediction-widget";
+import { MatchReadyCheck } from "./ready-check";
 import { getPlayerSession } from "@/lib/player-session";
+import { getReadyState } from "@/lib/match-ready";
 import { MatchCountdown } from "@/components/public/match-countdown";
 
 interface MatchPageProps {
@@ -165,8 +167,9 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
   const isLive = match.status === "LIVE";
   const isUpcoming = match.status === "SCHEDULED" || match.status === "POSTPONED";
 
-  // Predictions (only for upcoming matches)
+  // Predictions + ready check (only for upcoming matches)
   let prediction: { loggedIn: boolean; myPick: "HOME" | "AWAY" | "DRAW" | null; counts: { HOME: number; DRAW: number; AWAY: number } } | null = null;
+  let readyInitial: Awaited<ReturnType<typeof getReadyState>> = null;
   if (isUpcoming) {
     const psession = await getPlayerSession();
     const [counts, myPred] = await Promise.all([
@@ -176,6 +179,11 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
     const c = { HOME: 0, DRAW: 0, AWAY: 0 };
     for (const g of counts) c[g.pick as "HOME" | "DRAW" | "AWAY"] = g._count.pick;
     prediction = { loggedIn: !!psession, myPick: (myPred?.pick as "HOME" | "AWAY" | "DRAW" | null) ?? null, counts: c };
+
+    // Ready Check is a 1v1 concept — only when both sides are individual players.
+    if (match.homePlayer && match.awayPlayer) {
+      readyInitial = await getReadyState(match.id, psession?.playerId ?? null);
+    }
   }
   const showScore = isCompleted || isLive;
 
@@ -437,6 +445,9 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
               </div>
             </div>
           </div>
+
+          {/* Ready Check + random team assignment (1v1 upcoming matches) */}
+          {readyInitial && <MatchReadyCheck initialState={readyInitial} />}
 
           {/* Derby badge */}
           {match.isDerby && (

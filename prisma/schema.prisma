@@ -799,6 +799,7 @@ model Match {
   availabilities  MatchAvailability[]
   whatsappLogs    WhatsAppLog[]
   predictions     MatchPrediction[]
+  readyState      MatchReadyState?
 
   // ── Scheduling system ──
   schedule              MatchSchedule?
@@ -812,6 +813,45 @@ model Match {
   @@index([homePlayerId])
   @@index([awayPlayerId])
   @@map("matches")
+}
+
+// ─────────────────────────────────────────────────────────────
+// MATCH READY CHECK (pre-match "ready up" + random team assignment)
+// One row per match. Server is the single source of truth for the
+// ready flags, the assigned team and the lock window. See
+// src/lib/match-ready.ts and src/lib/randomTeams.ts.
+// ─────────────────────────────────────────────────────────────
+
+model MatchReadyState {
+  id        String @id @default(cuid())
+  matchId   String @unique
+  homeReady Boolean @default(false)
+  awayReady Boolean @default(false)
+
+  // Assigned team (denormalized from the static randomTeams pool so the
+  // display survives changes to that list). assignedTeamId references
+  // randomTeams.ts ids (e.g. "eng-manutd"), NOT the Team table.
+  assignedTeamId String?
+  teamRegion     String?
+  teamLeague     String?
+  teamName       String?
+
+  // Lock window — all expiry math is done from these server timestamps.
+  // assignedAt == null means "no team assigned in the current ready cycle";
+  // an assignment only happens on the transition into both-ready.
+  assignedAt  DateTime?
+  lockedUntil DateTime?
+
+  // Last assigned team id, so a re-roll never repeats the immediately
+  // previous team.
+  previousTeamId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@map("match_ready_states")
 }
 
 // ─────────────────────────────────────────────────────────────
