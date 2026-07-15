@@ -683,8 +683,11 @@ export async function advanceKnockoutWinner(matchId: string, tournamentId: strin
     default: nextRoundName = `Round ${nextRound}`;
   }
 
-  // Look for existing next-round match. Prefer matchNumber match; fall back to
-  // position-in-sorted-order if matchNumber is null/mismatched on legacy rows.
+  // Find the next-round match strictly by its matchNumber. (A positional
+  // fallback here is unsafe: if a later match in this round completes first —
+  // e.g. QF3 before QF1 — its next-round match is created first, and a
+  // positional match would then route QF1's winner INTO QF3's semi-final slot,
+  // overwriting the player already there.)
   const nextRoundMatches = await prisma.match.findMany({
     where: {
       tournamentId,
@@ -696,8 +699,7 @@ export async function advanceKnockoutWinner(matchId: string, tournamentId: strin
   });
 
   const existingNextMatch =
-    nextRoundMatches.find((m) => m.matchNumber === nextMatchNumber) ??
-    nextRoundMatches[pairIdx] ?? null;
+    nextRoundMatches.find((m) => m.matchNumber === nextMatchNumber) ?? null;
 
   let nextMatchId: string;
   if (existingNextMatch) {
