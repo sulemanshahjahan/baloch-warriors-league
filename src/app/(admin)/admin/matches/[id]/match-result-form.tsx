@@ -350,6 +350,11 @@ export function MatchResultForm({
             <SelectItem value="CANCELLED">Cancelled</SelectItem>
           </SelectContent>
         </Select>
+        {status === "SCHEDULED" && currentStatus !== "SCHEDULED" && (
+          <p className="text-xs text-amber-400">
+            Saving will reset this match to Scheduled — the score, goals and result will be cleared.
+          </p>
+        )}
       </div>
 
       {players.length > 0 && (

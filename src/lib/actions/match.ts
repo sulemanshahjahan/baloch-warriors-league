@@ -44,7 +44,7 @@ const resultSchema = z.object({
   homeScorePens: z.coerce.number().int().min(0).optional().or(z.literal("")),
   awayScorePens: z.coerce.number().int().min(0).optional().or(z.literal("")),
   motmPlayerId: z.string().optional(),
-  status: z.enum(["COMPLETED", "LIVE"]),
+  status: z.enum(["SCHEDULED", "LIVE", "COMPLETED", "POSTPONED", "CANCELLED"]),
 });
 
 const matchEventSchema = z.object({
@@ -232,6 +232,51 @@ export async function executeMatchCompletion(
   return { success: true };
 }
 
+/**
+ * If a completed knockout match had advanced a winner into the next round,
+ * remove that player from the next-round slot (used when a result is reset).
+ * No-op for group/league matches or when the slot no longer holds this winner.
+ */
+async function removeWinnerFromNextRound(m: {
+  id: string;
+  tournamentId: string;
+  roundNumber: number | null;
+  homeScore: number | null;
+  awayScore: number | null;
+  homePlayerId: string | null;
+  homeTeamId: string | null;
+  awayPlayerId: string | null;
+  awayTeamId: string | null;
+}) {
+  if (m.homeScore == null || m.awayScore == null || m.roundNumber == null) return;
+  const winnerId =
+    m.homeScore >= m.awayScore ? (m.homePlayerId ?? m.homeTeamId) : (m.awayPlayerId ?? m.awayTeamId);
+  if (!winnerId) return;
+  const curRound = await prisma.match.findMany({
+    where: {
+      tournamentId: m.tournamentId,
+      roundNumber: m.roundNumber,
+      status: { not: "CANCELLED" },
+      NOT: { round: { contains: "Group" } },
+    },
+    orderBy: [{ matchNumber: "asc" }, { createdAt: "asc" }],
+    select: { id: true },
+  });
+  const idx = curRound.findIndex((x) => x.id === m.id);
+  if (idx < 0) return;
+  const next = await prisma.match.findFirst({
+    where: { tournamentId: m.tournamentId, roundNumber: m.roundNumber + 1, matchNumber: Math.floor(idx / 2) + 1 },
+  });
+  if (!next || next.status === "COMPLETED") return;
+  const isHome = idx % 2 === 0;
+  const slotId = isHome ? (next.homePlayerId ?? next.homeTeamId) : (next.awayPlayerId ?? next.awayTeamId);
+  if (slotId !== winnerId) return; // slot was changed manually — leave it
+  await prisma.match.update({
+    where: { id: next.id },
+    data: isHome ? { homePlayerId: null, homeTeamId: null } : { awayPlayerId: null, awayTeamId: null },
+  });
+}
+
 export async function updateMatchResult(
   matchId: string,
   formData: FormData
@@ -274,6 +319,41 @@ export async function updateMatchResult(
   const leg3AwayScore = raw.leg3AwayScore ? Number(raw.leg3AwayScore) : null;
   const leg3HomePens = raw.leg3HomePens ? Number(raw.leg3HomePens) : null;
   const leg3AwayPens = raw.leg3AwayPens ? Number(raw.leg3AwayPens) : null;
+
+  // Reset to SCHEDULED — wipe the result so an accidental completion/score can be
+  // undone. Clears scores + events (goals), reverts a knockout advancement, and
+  // recomputes standings so the match no longer counts.
+  if (data.status === "SCHEDULED") {
+    if (currentMatch.status === "COMPLETED") {
+      await removeWinnerFromNextRound(currentMatch);
+    }
+    await prisma.matchEvent.deleteMany({ where: { matchId } });
+    await prisma.match.update({
+      where: { id: matchId },
+      data: {
+        status: "SCHEDULED",
+        homeScore: null, awayScore: null, homeScorePens: null, awayScorePens: null,
+        leg2HomeScore: null, leg2AwayScore: null,
+        leg3HomeScore: null, leg3AwayScore: null, leg3HomePens: null, leg3AwayPens: null,
+        motmPlayerId: null, completedAt: null, startedAt: null,
+        homeClub, awayClub, homeFormation, awayFormation, isDerby, rivalNote, highlights,
+      },
+    });
+    await recomputeStandings(currentMatch.tournamentId);
+    await logActivity({
+      action: "UPDATE",
+      entityType: "MATCH",
+      entityId: matchId,
+      details: { status: "SCHEDULED", reset: true, tournamentId: currentMatch.tournamentId },
+    });
+    revalidatePath(`/admin/matches/${matchId}`);
+    revalidatePath(`/admin/tournaments/${currentMatch.tournamentId}`);
+    revalidatePath("/admin/matches");
+    revalidatePath(`/matches/${matchId}`);
+    revalidatePath("/matches");
+    revalidatePath("/");
+    return { success: true, data: undefined };
+  }
 
   // If status is COMPLETED, use the shared cascade
   if (data.status === "COMPLETED") {
