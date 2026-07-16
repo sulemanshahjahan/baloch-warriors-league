@@ -21,33 +21,72 @@ interface RecomputeResult {
  * - Sends ONE summary push notification if any ranks changed
  * - Creates a draft NewsPost summarising the changes (admin must publish)
  */
-export async function recomputeCardRanks(): Promise<RecomputeResult> {
-  await requireRole("ADMIN");
+type Change = {
+  playerId: string;
+  name: string;
+  slug: string;
+  oldRank: number;
+  newRank: number;
+  delta: number;
+  reason: string;
+};
 
+type PendingRow = {
+  p: { id: string; name: string; slug: string; cardRank: number };
+  stats: Awaited<ReturnType<typeof buildStatsSnapshot>>;
+  breakdown: ReturnType<typeof computeCardRank>;
+};
+
+/** Read-only: work out which players' ranks would change. Writes nothing. */
+async function computePendingChanges(): Promise<{ rows: PendingRow[]; totalProcessed: number }> {
   const players = await prisma.player.findMany({
     where: { isActive: true },
     select: { id: true, name: true, slug: true, cardRank: true },
     orderBy: { name: "asc" },
   });
 
-  type Change = {
-    playerId: string;
-    name: string;
-    slug: string;
-    oldRank: number;
-    newRank: number;
-    delta: number;
-    reason: string;
-  };
-
-  const changes: Change[] = [];
-
+  const rows: PendingRow[] = [];
   for (const p of players) {
     const stats = await buildStatsSnapshot(p.id);
     const breakdown = computeCardRank(stats);
-
     if (breakdown.finalRank === p.cardRank) continue;
+    rows.push({ p, stats, breakdown });
+  }
+  return { rows, totalProcessed: players.length };
+}
 
+const toChange = (r: PendingRow): Change => ({
+  playerId: r.p.id,
+  name: r.p.name,
+  slug: r.p.slug,
+  oldRank: r.p.cardRank,
+  newRank: r.breakdown.finalRank,
+  delta: r.breakdown.finalRank - r.p.cardRank,
+  reason: r.breakdown.reason,
+});
+
+/**
+ * DRY RUN — returns exactly what a recompute would change, without touching
+ * anything: no rank-change rows, no player updates, no push, no draft news.
+ */
+export async function previewCardRanks(): Promise<{
+  success: boolean;
+  changes: Change[];
+  totalProcessed: number;
+  error?: string;
+}> {
+  await requireRole("ADMIN");
+  const { rows, totalProcessed } = await computePendingChanges();
+  return { success: true, changes: rows.map(toChange), totalProcessed };
+}
+
+export async function recomputeCardRanks(): Promise<RecomputeResult> {
+  await requireRole("ADMIN");
+
+  const { rows, totalProcessed } = await computePendingChanges();
+  const changes: Change[] = [];
+
+  for (const { p, stats, breakdown } of rows) {
     await prisma.$transaction([
       prisma.rankChange.create({
         data: {
@@ -73,15 +112,7 @@ export async function recomputeCardRanks(): Promise<RecomputeResult> {
       }),
     ]);
 
-    changes.push({
-      playerId: p.id,
-      name: p.name,
-      slug: p.slug,
-      oldRank: p.cardRank,
-      newRank: breakdown.finalRank,
-      delta: breakdown.finalRank - p.cardRank,
-      reason: breakdown.reason,
-    });
+    changes.push(toChange({ p, stats, breakdown }));
   }
 
   let draftNewsId: string | undefined;
@@ -154,7 +185,7 @@ export async function recomputeCardRanks(): Promise<RecomputeResult> {
   return {
     success: true,
     changed: changes.length,
-    totalProcessed: players.length,
+    totalProcessed,
     draftNewsId,
   };
 }
