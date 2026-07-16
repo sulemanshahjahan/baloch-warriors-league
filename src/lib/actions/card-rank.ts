@@ -68,6 +68,9 @@ const toChange = (r: PendingRow): Change => ({
 /**
  * DRY RUN — returns exactly what a recompute would change, without touching
  * anything: no rank-change rows, no player updates, no push, no draft news.
+ *
+ * Shares computePendingChanges() with recomputeCardRanks() so the preview can
+ * never drift from what actually gets applied.
  */
 export async function previewCardRanks(): Promise<{
   success: boolean;
