@@ -47,17 +47,35 @@ export function MatchReadyCheck({ initialState }: { initialState: ReadyState }) 
 
   const refetch = useCallback(async () => {
     try {
-      const res = await fetch(`/api/matches/${matchId}/ready-state`, { cache: "no-store" });
+      // Unique URL per request so no proxy / webview HTTP cache can ever serve a
+      // stale team (some environments ignore `no-store`). The server is the only
+      // source of truth for the assigned team.
+      const res = await fetch(`/api/matches/${matchId}/ready-state?_=${Date.now()}`, {
+        cache: "no-store",
+      });
       if (res.ok) apply(await res.json());
     } catch {
       /* transient — the next poll will retry */
     }
   }, [matchId, apply]);
 
-  // Poll for the opponent's changes while the page is open.
+  // Keep the display in sync with the server: sync once on mount (in case the
+  // initial HTML was cached), poll while open, and re-sync the moment the tab
+  // regains focus (background tabs throttle setInterval, so a returning viewer
+  // could otherwise sit on a stale/previous team).
   useEffect(() => {
+    refetch();
     const id = setInterval(refetch, POLL_INTERVAL_MS);
-    return () => clearInterval(id);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") refetch();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", refetch);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", refetch);
+    };
   }, [refetch]);
 
   // 1s ticker for the countdown; when the lock elapses, pull fresh state once
