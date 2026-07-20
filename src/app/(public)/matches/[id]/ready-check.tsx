@@ -13,6 +13,7 @@ interface ReadyState {
   serverTime: string;
   lockDurationMs: number;
   viewerSide: "home" | "away" | null;
+  loggedIn: boolean;
   home: { name: string; ready: boolean };
   away: { name: string; ready: boolean };
   assignedTeam: RandomTeam | null;
@@ -116,12 +117,16 @@ export function MatchReadyCheck({ initialState }: { initialState: ReadyState }) 
     [matchId, apply],
   );
 
-  if (!state.enabled) return null;
-
   const bothReady = state.home.ready && state.away.ready;
   const remainingMs = state.lockedUntil
     ? new Date(state.lockedUntil).getTime() - (Date.now() + offsetRef.current)
     : 0;
+  // Only an active pre-match lock shows a countdown / locks the buttons.
+  const activeLock = state.enabled && state.locked;
+
+  // Once the ready window closes (match live/completed) we keep showing the
+  // drawn team, read-only. Render nothing only if no team was ever drawn.
+  if (!state.enabled && !state.assignedTeam) return null;
 
   function renderSide(side: "home" | "away") {
     const data = state[side];
@@ -194,33 +199,37 @@ export function MatchReadyCheck({ initialState }: { initialState: ReadyState }) 
 
   return (
     <div className="mt-8">
-      {/* Two ready buttons, aligned under the two players. */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="flex justify-center">{renderSide("home")}</div>
-        <div className="flex justify-center">{renderSide("away")}</div>
-      </div>
+      {state.enabled && (
+        <>
+          {/* Two ready buttons, aligned under the two players. */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex justify-center">{renderSide("home")}</div>
+            <div className="flex justify-center">{renderSide("away")}</div>
+          </div>
 
-      {error && (
-        <p className="mt-3 text-center text-xs text-destructive">{error}</p>
+          {error && (
+            <p className="mt-3 text-center text-xs text-destructive">{error}</p>
+          )}
+
+          {!state.loggedIn && (
+            <p className="mt-3 text-center text-xs text-muted-foreground">
+              Playing this match?{" "}
+              <Link href="/player/login" className="text-primary hover:underline font-medium">
+                Sign in
+              </Link>{" "}
+              to ready up.
+            </p>
+          )}
+        </>
       )}
 
-      {state.viewerSide === null && (
-        <p className="mt-3 text-center text-xs text-muted-foreground">
-          Playing this match?{" "}
-          <Link href="/player/login" className="text-primary hover:underline font-medium">
-            Sign in
-          </Link>{" "}
-          to ready up.
-        </p>
-      )}
-
-      {/* Assigned team card */}
+      {/* Assigned team card — stays visible after the match too */}
       {state.assignedTeam && (
-        <div className="mx-auto mt-6 max-w-sm">
+        <div className={cn("mx-auto max-w-sm", state.enabled ? "mt-6" : "mt-2")}>
           <div
             className={cn(
               "relative overflow-hidden rounded-2xl border p-6 text-center shadow-lg transition-colors",
-              state.locked
+              activeLock
                 ? "border-primary/40 bg-gradient-to-b from-primary/12 to-primary/5"
                 : state.stale
                   ? "border-border bg-card/40 opacity-70"
@@ -271,16 +280,19 @@ export function MatchReadyCheck({ initialState }: { initialState: ReadyState }) 
               {state.assignedTeam.team}
             </p>
 
-            {state.locked && (
+            {activeLock && (
               <div className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-background/60 px-3 py-1 text-sm font-semibold text-primary">
                 <Lock className="h-3.5 w-3.5" />
                 Locked for <span className="tabular-nums">{fmt(remainingMs)}</span>
               </div>
             )}
-            {!state.locked && !state.stale && (
+            {state.enabled && !state.locked && !state.stale && (
               <p className="mt-4 text-xs text-emerald-400">
                 Lock expired — either player may unready to re-roll.
               </p>
+            )}
+            {!state.enabled && (
+              <p className="mt-4 text-xs text-muted-foreground">Match played</p>
             )}
           </div>
         </div>

@@ -57,6 +57,9 @@ export function PredictionWidget({ matchId, homeName, awayName, loggedIn, myPick
           </button>
         ))}
       </div>
+      <p className="text-[11px] text-muted-foreground mt-2 text-center">
+        {total > 0 ? `${total} ${total === 1 ? "vote" : "votes"}` : "No votes yet — be the first"}
+      </p>
       {isPending && <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Saving…</p>}
       {msg && <p className="text-xs mt-2 text-emerald-400">{msg}</p>}
       {!loggedIn && (

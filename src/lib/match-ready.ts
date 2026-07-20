@@ -33,6 +33,8 @@ export interface ReadyStateDTO {
   lockDurationMs: number;
   /** Side the viewer is allowed to toggle. null = spectator / not signed in. */
   viewerSide: Side | null;
+  /** Whether the viewer is a signed-in player (hides the "sign in" prompt). */
+  loggedIn: boolean;
   home: { name: string; ready: boolean };
   away: { name: string; ready: boolean };
   assignedTeam: RandomTeam | null;
@@ -95,6 +97,7 @@ function serialize(
   match: MatchRow,
   row: ReadyRow | null,
   viewerSide: Side | null,
+  loggedIn: boolean,
   now: Date,
 ): ReadyStateDTO {
   const enabled = isEnabled(match);
@@ -111,6 +114,7 @@ function serialize(
     serverTime: now.toISOString(),
     lockDurationMs: LOCK_DURATION_MS,
     viewerSide: enabled ? viewerSide : null,
+    loggedIn,
     home: { name: match.homePlayer?.name ?? "Home", ready: row?.homeReady ?? false },
     away: { name: match.awayPlayer?.name ?? "Away", ready: row?.awayReady ?? false },
     assignedTeam,
@@ -148,7 +152,7 @@ export async function getReadyState(
   if (!match) return null;
   const row = await loadRow(matchId);
   const viewerSide = sideForPlayer(match, viewerPlayerId);
-  return serialize(match, row, viewerSide, new Date());
+  return serialize(match, row, viewerSide, viewerPlayerId != null, new Date());
 }
 
 /**
@@ -211,7 +215,7 @@ export async function readyUp(
   });
 
   const row = await loadRow(matchId);
-  return { ok: true, state: serialize(match, row, side, new Date()) };
+  return { ok: true, state: serialize(match, row, side, viewerPlayerId != null, new Date()) };
 }
 
 /**
@@ -254,5 +258,5 @@ export async function unready(
   }
 
   const row = await loadRow(matchId);
-  return { ok: true, state: serialize(match, row, side, new Date()) };
+  return { ok: true, state: serialize(match, row, side, viewerPlayerId != null, new Date()) };
 }

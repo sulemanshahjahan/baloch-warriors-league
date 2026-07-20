@@ -185,6 +185,10 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
     if (match.homePlayer && match.awayPlayer) {
       readyInitial = await getReadyState(match.id, psession?.playerId ?? null);
     }
+  } else if (match.homePlayer && match.awayPlayer) {
+    // Match is live/completed: keep the drawn-team box visible (read-only). No
+    // session needed here — nothing is actionable — so the page stays cacheable.
+    readyInitial = await getReadyState(match.id, null);
   }
   const showScore = isCompleted || isLive;
 
