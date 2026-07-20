@@ -257,14 +257,13 @@ export function MatchReadyCheck({ initialState }: { initialState: ReadyState }) 
               />
             </div>
 
-            {/* Real club name */}
+            {/* eFootball in-game name — the primary label to pick in-game */}
             <p className="mt-3 text-2xl font-black leading-tight tracking-tight">
-              {state.assignedTeam.team}
+              {state.assignedTeam.efootball}
             </p>
-            {/* In-game (eFootball) name */}
+            {/* Real club name, underneath */}
             <p className="mt-1.5 text-xs text-muted-foreground">
-              In eFootball, pick{" "}
-              <span className="font-bold text-foreground">{state.assignedTeam.efootball}</span>
+              {state.assignedTeam.team}
             </p>
 
             {state.locked && (
