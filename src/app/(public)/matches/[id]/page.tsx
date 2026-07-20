@@ -554,6 +554,7 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
                 myPick={prediction.myPick}
                 counts={prediction.counts}
                 closed={prediction.closed}
+                bothReady={bothReady}
               />
             </div>
           )}
