@@ -216,37 +216,65 @@ export function MatchReadyCheck({ initialState }: { initialState: ReadyState }) 
 
       {/* Assigned team card */}
       {state.assignedTeam && (
-        <div className="mx-auto mt-6 max-w-md">
+        <div className="mx-auto mt-6 max-w-sm">
           <div
             className={cn(
-              "rounded-xl border p-5 text-center transition-colors",
+              "relative overflow-hidden rounded-2xl border p-6 text-center shadow-lg transition-colors",
               state.locked
-                ? "border-primary/40 bg-primary/10"
+                ? "border-primary/40 bg-gradient-to-b from-primary/12 to-primary/5"
                 : state.stale
                   ? "border-border bg-card/40 opacity-70"
-                  : "border-emerald-500/30 bg-emerald-500/10",
+                  : "border-emerald-500/30 bg-gradient-to-b from-emerald-500/12 to-emerald-500/5",
             )}
           >
-            <p className="flex items-center justify-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <p className="flex items-center justify-center gap-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
               <Shuffle className="h-3.5 w-3.5" />
-              {state.stale ? "Previous Team" : "Random Team"}
+              {state.stale ? "Previous Team" : "Your Team"}
             </p>
-            <p className="mt-2 text-xs text-muted-foreground">
-              {state.assignedTeam.region} <span className="mx-1 opacity-50">→</span>
-              {state.assignedTeam.league}
-            </p>
-            <p className="mt-1 text-2xl font-black tracking-tight">
+
+            {/* League badge */}
+            <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-border/50 bg-background/50 px-3 py-1">
+              {state.assignedTeam.leagueLogo && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={encodeURI(state.assignedTeam.leagueLogo)}
+                  alt=""
+                  className="h-4 w-4 object-contain"
+                />
+              )}
+              <span className="text-[11px] font-medium text-muted-foreground">
+                {state.assignedTeam.league}
+              </span>
+            </div>
+
+            {/* Team crest */}
+            <div className="mt-4 flex justify-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={encodeURI(state.assignedTeam.teamLogo)}
+                alt={state.assignedTeam.team}
+                className="h-24 w-24 object-contain drop-shadow-[0_6px_14px_rgba(0,0,0,0.45)]"
+              />
+            </div>
+
+            {/* Real club name */}
+            <p className="mt-3 text-2xl font-black leading-tight tracking-tight">
               {state.assignedTeam.team}
+            </p>
+            {/* In-game (eFootball) name */}
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              In eFootball, pick{" "}
+              <span className="font-bold text-foreground">{state.assignedTeam.efootball}</span>
             </p>
 
             {state.locked && (
-              <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-background/60 px-3 py-1 text-sm font-semibold text-primary">
+              <div className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-background/60 px-3 py-1 text-sm font-semibold text-primary">
                 <Lock className="h-3.5 w-3.5" />
                 Locked for <span className="tabular-nums">{fmt(remainingMs)}</span>
               </div>
             )}
             {!state.locked && !state.stale && (
-              <p className="mt-3 text-xs text-emerald-400">
+              <p className="mt-4 text-xs text-emerald-400">
                 Lock expired — either player may unready to re-roll.
               </p>
             )}
