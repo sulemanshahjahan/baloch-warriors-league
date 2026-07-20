@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { submitPrediction } from "@/lib/actions/player-economy";
-import { Loader2, Sparkles } from "lucide-react";
+import { Loader2, Sparkles, Lock } from "lucide-react";
 
 interface Props {
   matchId: string;
@@ -13,9 +13,11 @@ interface Props {
   loggedIn: boolean;
   myPick: "HOME" | "AWAY" | "DRAW" | null;
   counts: { HOME: number; DRAW: number; AWAY: number };
+  /** Predictions locked — both players are ready, or the match has started/ended. */
+  closed: boolean;
 }
 
-export function PredictionWidget({ matchId, homeName, awayName, loggedIn, myPick, counts }: Props) {
+export function PredictionWidget({ matchId, homeName, awayName, loggedIn, myPick, counts, closed }: Props) {
   const router = useRouter();
   const [isPending, start] = useTransition();
   const [pick, setPick] = useState<Props["myPick"]>(myPick);
@@ -23,9 +25,10 @@ export function PredictionWidget({ matchId, homeName, awayName, loggedIn, myPick
 
   const total = counts.HOME + counts.DRAW + counts.AWAY;
   const pct = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0);
+  const canPick = loggedIn && !closed;
 
   function choose(p: "HOME" | "AWAY" | "DRAW") {
-    if (!loggedIn) return;
+    if (!canPick) return;
     setMsg("");
     start(async () => {
       const r = await submitPrediction(matchId, p);
@@ -42,14 +45,16 @@ export function PredictionWidget({ matchId, homeName, awayName, loggedIn, myPick
 
   return (
     <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 mt-4">
-      <p className="text-sm font-bold flex items-center gap-1.5 mb-3"><Sparkles className="w-4 h-4 text-primary" /> Predict the result</p>
+      <p className="text-sm font-bold flex items-center gap-1.5 mb-3">
+        <Sparkles className="w-4 h-4 text-primary" /> {closed ? "Predictions" : "Predict the result"}
+      </p>
       <div className="grid grid-cols-3 gap-2">
         {options.map((o) => (
           <button
             key={o.key}
             onClick={() => choose(o.key)}
-            disabled={!loggedIn || isPending}
-            className={`rounded-lg border p-2 text-center transition-colors ${pick === o.key ? "border-primary bg-primary/15" : "border-border hover:bg-muted/50"} ${!loggedIn ? "opacity-70 cursor-default" : ""}`}
+            disabled={!canPick || isPending}
+            className={`rounded-lg border p-2 text-center transition-colors ${pick === o.key ? "border-primary bg-primary/15" : "border-border hover:bg-muted/50"} ${!canPick ? "opacity-80 cursor-default hover:bg-transparent" : ""}`}
           >
             <span className="block text-xs font-semibold truncate">{o.label}</span>
             <span className="block text-[11px] text-muted-foreground mt-0.5">{pct(o.c)}%</span>
@@ -62,11 +67,15 @@ export function PredictionWidget({ matchId, homeName, awayName, loggedIn, myPick
       </p>
       {isPending && <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Saving…</p>}
       {msg && <p className="text-xs mt-2 text-emerald-400">{msg}</p>}
-      {!loggedIn && (
+      {closed ? (
+        <p className="text-xs text-muted-foreground mt-2 flex items-center justify-center gap-1">
+          <Lock className="w-3 h-3" /> Predictions are closed.
+        </p>
+      ) : !loggedIn ? (
         <p className="text-xs text-muted-foreground mt-2">
           <Link href="/player/login" className="text-primary hover:underline font-medium">Sign in</Link> to predict and earn coins.
         </p>
-      )}
+      ) : null}
     </div>
   );
 }

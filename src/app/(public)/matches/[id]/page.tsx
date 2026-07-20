@@ -168,27 +168,40 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
   const isLive = match.status === "LIVE";
   const isUpcoming = match.status === "SCHEDULED" || match.status === "POSTPONED";
 
-  // Predictions + ready check (only for upcoming matches)
-  let prediction: { loggedIn: boolean; myPick: "HOME" | "AWAY" | "DRAW" | null; counts: { HOME: number; DRAW: number; AWAY: number } } | null = null;
+  // Ready check + predictions.
+  let prediction:
+    | { loggedIn: boolean; myPick: "HOME" | "AWAY" | "DRAW" | null; counts: { HOME: number; DRAW: number; AWAY: number }; closed: boolean }
+    | null = null;
   let readyInitial: Awaited<ReturnType<typeof getReadyState>> = null;
-  if (isUpcoming) {
-    const psession = await getPlayerSession();
-    const [counts, myPred] = await Promise.all([
-      prisma.matchPrediction.groupBy({ by: ["pick"], where: { matchId: match.id }, _count: { pick: true } }),
-      psession ? prisma.matchPrediction.findUnique({ where: { playerId_matchId: { playerId: psession.playerId, matchId: match.id } }, select: { pick: true } }) : Promise.resolve(null),
-    ]);
-    const c = { HOME: 0, DRAW: 0, AWAY: 0 };
-    for (const g of counts) c[g.pick as "HOME" | "DRAW" | "AWAY"] = g._count.pick;
-    prediction = { loggedIn: !!psession, myPick: (myPred?.pick as "HOME" | "AWAY" | "DRAW" | null) ?? null, counts: c };
 
-    // Ready Check is a 1v1 concept — only when both sides are individual players.
-    if (match.homePlayer && match.awayPlayer) {
-      readyInitial = await getReadyState(match.id, psession?.playerId ?? null);
-    }
-  } else if (match.homePlayer && match.awayPlayer) {
-    // Match is live/completed: keep the drawn-team box visible (read-only). No
-    // session needed here — nothing is actionable — so the page stays cacheable.
-    readyInitial = await getReadyState(match.id, null);
+  // Session is only needed while a match is still open (ready buttons + the
+  // viewer's own pick). Finished matches skip it so the page stays cacheable.
+  const psession = isUpcoming ? await getPlayerSession() : null;
+
+  // Ready Check is a 1v1 concept — shown (read-only after the match) for any
+  // match with two individual players.
+  if (match.homePlayer && match.awayPlayer) {
+    readyInitial = await getReadyState(match.id, psession?.playerId ?? null);
+  }
+  const bothReady = !!(readyInitial && readyInitial.home.ready && readyInitial.away.ready);
+
+  // Predictions: shown while upcoming, or on any match that already has votes
+  // (so past matches keep their prediction results). Locked once both players
+  // are ready, or the match is no longer upcoming.
+  const predGroups = await prisma.matchPrediction.groupBy({ by: ["pick"], where: { matchId: match.id }, _count: { pick: true } });
+  const predCounts = { HOME: 0, DRAW: 0, AWAY: 0 };
+  for (const g of predGroups) predCounts[g.pick as "HOME" | "DRAW" | "AWAY"] = g._count.pick;
+  const totalPreds = predCounts.HOME + predCounts.DRAW + predCounts.AWAY;
+  if (isUpcoming || totalPreds > 0) {
+    const myPred = isUpcoming && psession
+      ? await prisma.matchPrediction.findUnique({ where: { playerId_matchId: { playerId: psession.playerId, matchId: match.id } }, select: { pick: true } })
+      : null;
+    prediction = {
+      loggedIn: !!psession,
+      myPick: (myPred?.pick as "HOME" | "AWAY" | "DRAW" | null) ?? null,
+      counts: predCounts,
+      closed: !isUpcoming || bothReady,
+    };
   }
   const showScore = isCompleted || isLive;
 
@@ -529,8 +542,9 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
             </div>
           )}
 
-          {/* Predict the result (upcoming matches) */}
-          {isUpcoming && prediction && (
+          {/* Predict the result — shown while open, and kept (read-only) on any
+              match that already has votes. Locks when both players are ready. */}
+          {prediction && (
             <div className="max-w-md mx-auto">
               <PredictionWidget
                 matchId={match.id}
@@ -539,6 +553,7 @@ export default async function MatchDetailPage({ params }: MatchPageProps) {
                 loggedIn={prediction.loggedIn}
                 myPick={prediction.myPick}
                 counts={prediction.counts}
+                closed={prediction.closed}
               />
             </div>
           )}

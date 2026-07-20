@@ -75,9 +75,17 @@ export async function submitPrediction(matchId: string, pick: "HOME" | "AWAY" | 
   if ("error" in m) return { success: false, error: m.error };
   if (!["HOME", "AWAY", "DRAW"].includes(pick)) return { success: false, error: "Invalid pick" };
 
-  const match = await prisma.match.findUnique({ where: { id: matchId }, select: { status: true } });
+  const match = await prisma.match.findUnique({
+    where: { id: matchId },
+    select: { status: true, readyState: { select: { homeReady: true, awayReady: true } } },
+  });
   if (!match) return { success: false, error: "Match not found" };
-  if (match.status === "COMPLETED" || match.status === "CANCELLED") return { success: false, error: "Predictions are closed for this match." };
+  if (match.status !== "SCHEDULED" && match.status !== "POSTPONED") {
+    return { success: false, error: "Predictions are closed for this match." };
+  }
+  if (match.readyState?.homeReady && match.readyState?.awayReady) {
+    return { success: false, error: "Predictions are closed — both players are ready." };
+  }
 
   await prisma.matchPrediction.upsert({
     where: { playerId_matchId: { playerId: m.id, matchId } },
