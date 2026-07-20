@@ -17,9 +17,11 @@ interface Props {
   closed: boolean;
   /** Locked specifically because both players readied up (shows a green note). */
   bothReady: boolean;
+  /** The match has been played — shows a "match finished" note. */
+  finished: boolean;
 }
 
-export function PredictionWidget({ matchId, homeName, awayName, loggedIn, myPick, counts, closed, bothReady }: Props) {
+export function PredictionWidget({ matchId, homeName, awayName, loggedIn, myPick, counts, closed, bothReady, finished }: Props) {
   const router = useRouter();
   const [isPending, start] = useTransition();
   const [pick, setPick] = useState<Props["myPick"]>(myPick);
@@ -70,7 +72,11 @@ export function PredictionWidget({ matchId, homeName, awayName, loggedIn, myPick
       {isPending && <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> Saving…</p>}
       {msg && <p className="text-xs mt-2 text-emerald-400">{msg}</p>}
       {closed ? (
-        bothReady ? (
+        finished ? (
+          <p className="text-xs font-semibold text-amber-400 mt-2 flex items-center justify-center gap-1.5">
+            <Lock className="w-3 h-3" /> Predictions closed — match finished!
+          </p>
+        ) : bothReady ? (
           <p className="text-xs font-semibold text-emerald-400 mt-2 flex items-center justify-center gap-1.5">
             <CheckCircle2 className="w-3.5 h-3.5" /> Predictions closed — both players are ready!
           </p>
