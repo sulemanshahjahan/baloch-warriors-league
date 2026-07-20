@@ -232,14 +232,19 @@ export function MatchReadyCheck({ initialState }: { initialState: ReadyState }) 
               {state.stale ? "Previous Team" : "Your Team"}
             </p>
 
+            {/* Region */}
+            <p className="mt-2 text-sm font-bold text-foreground">
+              {state.assignedTeam.region}
+            </p>
+
             {/* League badge */}
-            <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-border/50 bg-background/50 px-3 py-1">
+            <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-border/50 bg-background/50 px-3 py-1">
               {state.assignedTeam.leagueLogo && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={encodeURI(state.assignedTeam.leagueLogo)}
                   alt=""
-                  className="h-6 w-6 object-contain"
+                  className="h-9 w-9 object-contain"
                 />
               )}
               <span className="text-[11px] font-medium text-muted-foreground">
