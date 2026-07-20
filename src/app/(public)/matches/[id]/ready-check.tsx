@@ -239,7 +239,7 @@ export function MatchReadyCheck({ initialState }: { initialState: ReadyState }) 
                 <img
                   src={encodeURI(state.assignedTeam.leagueLogo)}
                   alt=""
-                  className="h-4 w-4 object-contain"
+                  className="h-6 w-6 object-contain"
                 />
               )}
               <span className="text-[11px] font-medium text-muted-foreground">
