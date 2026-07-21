@@ -216,16 +216,45 @@ model TournamentStage {
   name         String
   orderIndex   Int       @default(0)
   kind         StageKind
+  // Per-stage rules (qualification / draw / pairings). Shape depends on kind.
+  config       Json?
   createdAt    DateTime  @default(now())
 
-  tournament Tournament        @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-  groups     TournamentGroup[]
-  matches    Match[]
-  standings  Standing[]
+  tournament   Tournament         @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  groups       TournamentGroup[]
+  matches      Match[]
+  standings    Standing[]
+  participants StageParticipant[]
 
   @@unique([tournamentId, orderIndex])
   @@index([tournamentId])
   @@map("tournament_stages")
+}
+
+// A participant's membership in a specific stage (and its group within that
+// stage). This is what lets Stage 2 be re-drawn without touching Stage 1's
+// TournamentPlayer.groupId. Legacy single-stage tournaments are backfilled to
+// mirror their existing group assignment.
+model StageParticipant {
+  id           String  @id @default(cuid())
+  tournamentId String
+  stageId      String
+  groupId      String?
+  playerId     String?
+  teamId       String?
+  seed         Int? // seeding order within the stage (Stage 2 snake seeding)
+
+  stage  TournamentStage  @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  group  TournamentGroup? @relation(fields: [groupId], references: [id])
+  player Player?          @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  team   Team?            @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([stageId, playerId])
+  @@unique([stageId, teamId])
+  @@index([stageId])
+  @@index([groupId])
+  @@index([tournamentId])
+  @@map("stage_participants")
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -239,12 +268,13 @@ model TournamentGroup {
   name         String
   orderIndex   Int     @default(0)
 
-  tournament Tournament         @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-  stage      TournamentStage?   @relation(fields: [stageId], references: [id])
-  teams      TournamentTeam[]
-  players    TournamentPlayer[]
-  matches    Match[]
-  standings  Standing[]
+  tournament   Tournament         @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  stage        TournamentStage?   @relation(fields: [stageId], references: [id])
+  teams        TournamentTeam[]
+  players      TournamentPlayer[]
+  matches      Match[]
+  standings    Standing[]
+  stageMembers StageParticipant[]
 
   @@unique([tournamentId, name])
   @@index([stageId])
@@ -283,6 +313,7 @@ model Team {
   // ── Scheduling system ──
   matchConfirmations      MatchParticipantConfirmation[]
   substituteRegistrations SubstituteRegistration[]
+  stageParticipations     StageParticipant[]
 
   @@index([isActive])
   @@map("teams")
@@ -363,6 +394,7 @@ model Player {
   matchConfirmations      MatchParticipantConfirmation[]
   substituteRegistrations SubstituteRegistration[]
   matchCheckIns           MatchCheckIn[]
+  stageParticipations     StageParticipant[]
 
   @@index([isActive])
   @@map("players")

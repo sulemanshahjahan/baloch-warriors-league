@@ -39,6 +39,7 @@ import { CollapsibleSection } from "@/components/admin/collapsible-section";
 import { DrawWrapper } from "./draw-wrapper";
 import { DuoGroupDrawWrapper } from "./duo-group-draw-wrapper";
 import { PaginatedMatchesTable } from "./matches-table";
+import { StageProgressionPanel } from "./stage-progression-panel";
 
 interface TournamentDetailPageProps {
   params: Promise<{ id: string }>;
@@ -54,6 +55,12 @@ export default async function TournamentDetailPage({ params }: TournamentDetailP
   ]);
 
   if (!tournament) notFound();
+
+  const stages = await prisma.tournamentStage.findMany({
+    where: { tournamentId: id },
+    orderBy: { orderIndex: "asc" },
+    select: { id: true, name: true, kind: true, orderIndex: true },
+  });
 
   // 2v2 eFootball: competitors are duos (backed by isDuo teams), not single players.
   const is2v2 = tournament.gameCategory === "EFOOTBALL" && tournament.eFootballMode === "2v2";
@@ -166,6 +173,11 @@ export default async function TournamentDetailPage({ params }: TournamentDetailP
               />
             </CollapsibleSection>
           </div>
+        )}
+
+        {/* Multi-stage (BWL Cup) — individual tournaments only */}
+        {tournament.participantType === "INDIVIDUAL" && (
+          <StageProgressionPanel tournamentId={id} stages={stages} />
         )}
 
         {/* Groups — only for GROUP_KNOCKOUT, collapsed when set up */}

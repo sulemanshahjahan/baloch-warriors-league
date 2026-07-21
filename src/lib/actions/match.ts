@@ -17,7 +17,7 @@ import {
   type TiebreakKey,
   type PointsRules,
 } from "@/lib/standings/ranking";
-import { getOrCreateDefaultStageId } from "@/lib/stages";
+import { getOrCreateDefaultStageId, getStageMembership } from "@/lib/stages";
 
 // Role hierarchy levels
 const ROLE_LEVELS: Record<string, number> = {
@@ -588,13 +588,17 @@ export async function advanceKnockoutWinner(matchId: string, tournamentId: strin
   // Get the completed match with its round info
   const completedMatch = await prisma.match.findUnique({
     where: { id: matchId },
-    include: { tournament: true },
+    include: { tournament: true, stage: { select: { kind: true } } },
   });
 
   if (!completedMatch || completedMatch.homeScore == null || completedMatch.awayScore == null) return;
-  
+
   // Only process knockout matches — skip LEAGUE format entirely
   if (completedMatch.tournament.format === "LEAGUE") return;
+
+  // Playoff-stage matches are qualifying deciders, NOT a bracket to a champion —
+  // never auto-advance them. Their winners are pulled into Stage 2's draw.
+  if (completedMatch.stage?.kind === "PLAYOFF") return;
 
   const roundName = completedMatch.round || "";
   const isKnockoutMatch = completedMatch.roundNumber && completedMatch.roundNumber > 0 &&
@@ -1100,6 +1104,19 @@ export async function recomputeStandings(tournamentId: string, opts?: { stageId?
   }
 
   for (const stageId of scopes) {
+    // Playoff / knockout stages of a multi-stage tournament have no league
+    // table — clear any rows and skip. (Legacy single-stage knockout keeps its
+    // historical behavior: orderIndex 0 is never skipped.)
+    if (stageId) {
+      const stage = await prisma.tournamentStage.findUnique({
+        where: { id: stageId },
+        select: { kind: true, orderIndex: true },
+      });
+      if (stage && stage.orderIndex > 0 && (stage.kind === "PLAYOFF" || stage.kind === "KNOCKOUT")) {
+        await prisma.standing.deleteMany({ where: { tournamentId, stageId } });
+        continue;
+      }
+    }
     if (tournament.participantType === "INDIVIDUAL") {
       await recomputeIndividualStandings(tournamentId, config, stageId);
     } else {
@@ -1150,11 +1167,11 @@ async function recomputeTeamStandings(tournamentId: string, config: StandingsCon
     },
   });
 
-  // Get all enrolled teams with their group assignments
-  const enrolled = await prisma.tournamentTeam.findMany({
-    where: { tournamentId },
-    select: { teamId: true, groupId: true },
-  });
+  // Stage-scoped membership (StageParticipant, or legacy TournamentTeam.groupId)
+  const enrolled = (await getStageMembership(tournamentId, stageId, false)).map((m) => ({
+    teamId: m.id,
+    groupId: m.groupId,
+  }));
 
   // Initialize stats for overall and per-group
   const overallStats: Record<string, PlayerStats> = {};
@@ -1375,11 +1392,11 @@ async function recomputeIndividualStandings(tournamentId: string, config: Standi
     },
   });
 
-  // Get all enrolled individual players with their group assignments
-  const enrolled = await prisma.tournamentPlayer.findMany({
-    where: { tournamentId },
-    select: { playerId: true, groupId: true },
-  });
+  // Stage-scoped membership (StageParticipant, or legacy TournamentPlayer.groupId)
+  const enrolled = (await getStageMembership(tournamentId, stageId, true)).map((m) => ({
+    playerId: m.id,
+    groupId: m.groupId,
+  }));
 
   // Build a map of player -> groupId
   const playerGroups = new Map<string, string | null>();

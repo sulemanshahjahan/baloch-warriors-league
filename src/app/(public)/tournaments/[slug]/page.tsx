@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UrlTabs } from "@/components/public/url-tabs";
+import { TournamentStages } from "@/components/public/tournament-stages";
 import {
   Table,
   TableBody,
@@ -368,6 +369,9 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
 
   if (!tournament) notFound();
 
+  // Multi-stage tournaments (BWL Cup) have stages beyond the single implicit one.
+  const isMultiStage = (await prisma.tournamentStage.count({ where: { tournamentId: tournament.id, orderIndex: { gt: 0 } } })) > 0;
+
   // Sort matches properly: Knockout first (Final -> Semi -> etc.), then Group rounds
   const sortedMatches = [...tournament.matches].sort((a, b) => {
     const aIsKnockout = a.round && !/Group\s+[A-Z]/i.test(a.round);
@@ -598,8 +602,11 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
 
           {/* Standings */}
           <TabsContent value="standings" className="mt-0 space-y-6">
+            {/* Multi-stage (BWL Cup): stages rendered in order, replacing the flat view */}
+            {isMultiStage && <TournamentStages tournamentId={tournament.id} />}
+
             {/* Group Standings */}
-            {tournament.groups.length > 0 && (
+            {!isMultiStage && tournament.groups.length > 0 && (
               <>
                 {tournament.groups.map((group) => (
                   <Card key={group.id}>
@@ -650,7 +657,8 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
               </>
             )}
 
-            {/* Overall League Table */}
+            {/* Overall League Table (hidden for multi-stage — stages shown above) */}
+            {!isMultiStage && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
@@ -673,6 +681,7 @@ export default async function TournamentPage({ params }: TournamentPageProps) {
                 )}
               </CardContent>
             </Card>
+            )}
           </TabsContent>
 
           {/* Matches */}
