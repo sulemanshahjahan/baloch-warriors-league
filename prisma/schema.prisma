@@ -37,6 +37,16 @@ enum ParticipantType {
   INDIVIDUAL
 }
 
+// A tournament's structural phase. Phase 1 wraps every existing tournament in a
+// single implicit stage; multi-stage tournaments (group → playoff → group →
+// knockout) come in later phases.
+enum StageKind {
+  LEAGUE // one flat round-robin table
+  GROUP // multiple groups, round-robin within each
+  PLAYOFF // mini-knockout whose OUTPUT is qualifiers
+  KNOCKOUT // elimination bracket to a champion
+}
+
 enum TournamentStatus {
   DRAFT
   UPCOMING
@@ -177,6 +187,7 @@ model Tournament {
   teams        TournamentTeam[]
   players      TournamentPlayer[]
   groups       TournamentGroup[]
+  stages       TournamentStage[]
   matches      Match[]
   standings    Standing[]
   awards       Award[]
@@ -193,22 +204,50 @@ model Tournament {
 }
 
 // ─────────────────────────────────────────────────────────────
+// TOURNAMENT STAGE (Phase 1)
+// A structural phase of a tournament. stageId is nullable across groups/
+// matches/standings so the migration is additive and rollback is clean; the
+// app treats a null stageId as "the single implicit stage".
+// ─────────────────────────────────────────────────────────────
+
+model TournamentStage {
+  id           String    @id @default(cuid())
+  tournamentId String
+  name         String
+  orderIndex   Int       @default(0)
+  kind         StageKind
+  createdAt    DateTime  @default(now())
+
+  tournament Tournament        @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  groups     TournamentGroup[]
+  matches    Match[]
+  standings  Standing[]
+
+  @@unique([tournamentId, orderIndex])
+  @@index([tournamentId])
+  @@map("tournament_stages")
+}
+
+// ─────────────────────────────────────────────────────────────
 // TOURNAMENT GROUP
 // ─────────────────────────────────────────────────────────────
 
 model TournamentGroup {
-  id           String @id @default(cuid())
+  id           String  @id @default(cuid())
   tournamentId String
+  stageId      String?
   name         String
-  orderIndex   Int    @default(0)
+  orderIndex   Int     @default(0)
 
   tournament Tournament         @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  stage      TournamentStage?   @relation(fields: [stageId], references: [id])
   teams      TournamentTeam[]
   players    TournamentPlayer[]
   matches    Match[]
   standings  Standing[]
 
   @@unique([tournamentId, name])
+  @@index([stageId])
   @@map("tournament_groups")
 }
 
@@ -719,6 +758,7 @@ model Venue {
 model Match {
   id           String  @id @default(cuid())
   tournamentId String
+  stageId      String?
   groupId      String?
   venueId      String?
 
@@ -794,6 +834,7 @@ model Match {
   updatedAt DateTime @updatedAt
 
   tournament      Tournament          @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  stage           TournamentStage?    @relation(fields: [stageId], references: [id])
   group           TournamentGroup?    @relation(fields: [groupId], references: [id])
   venue           Venue?              @relation(fields: [venueId], references: [id])
   homeTeam        Team?               @relation("HomeTeam", fields: [homeTeamId], references: [id])
@@ -819,6 +860,7 @@ model Match {
   checkIns              MatchCheckIn[]
 
   @@index([tournamentId])
+  @@index([stageId])
   @@index([status])
   @@index([status, deadline])
   @@index([homePlayerId])
@@ -948,6 +990,7 @@ model MatchEvent {
 model Standing {
   id           String  @id @default(cuid())
   tournamentId String
+  stageId      String?
   groupId      String?
   teamId       String?
   playerId     String?
@@ -975,11 +1018,13 @@ model Standing {
   updatedAt DateTime @updatedAt
 
   tournament Tournament       @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  stage      TournamentStage? @relation(fields: [stageId], references: [id])
   group      TournamentGroup? @relation(fields: [groupId], references: [id])
   team       Team?            @relation(fields: [teamId], references: [id])
   player     Player?          @relation(fields: [playerId], references: [id])
 
   @@index([tournamentId])
+  @@index([tournamentId, stageId])
   @@index([tournamentId, playerId])
   @@index([tournamentId, teamId])
   @@map("standings")

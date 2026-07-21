@@ -17,6 +17,7 @@ import {
   type TiebreakKey,
   type PointsRules,
 } from "@/lib/standings/ranking";
+import { getOrCreateDefaultStageId } from "@/lib/stages";
 
 // Role hierarchy levels
 const ROLE_LEVELS: Record<string, number> = {
@@ -83,9 +84,12 @@ export async function createMatch(formData: FormData) {
 
   const data = parsed.data;
 
+  const stageId = await getOrCreateDefaultStageId(data.tournamentId);
+
   const match = await prisma.match.create({
     data: {
       tournamentId: data.tournamentId,
+      stageId,
       homeTeamId: data.homeTeamId || null,
       awayTeamId: data.awayTeamId || null,
       homePlayerId: data.homePlayerId || null,
@@ -178,8 +182,8 @@ export async function executeMatchCompletion(
     }
   }
 
-  // Recompute standings, advance knockout, update ELO
-  await recomputeStandings(match.tournamentId);
+  // Recompute standings (only the match's stage), advance knockout, update ELO
+  await recomputeStandings(match.tournamentId, { stageId: match.stageId ?? undefined });
   await advanceKnockoutWinner(matchId, match.tournamentId);
   const { updateEloAfterMatch } = await import("@/lib/elo");
   await updateEloAfterMatch(matchId);
@@ -347,7 +351,7 @@ export async function updateMatchResult(
         homeClub, awayClub, homeFormation, awayFormation, isDerby, rivalNote, highlights,
       },
     });
-    await recomputeStandings(currentMatch.tournamentId);
+    await recomputeStandings(currentMatch.tournamentId, { stageId: currentMatch.stageId ?? undefined });
     await logActivity({
       action: "UPDATE",
       entityType: "MATCH",
@@ -722,6 +726,7 @@ export async function advanceKnockoutWinner(matchId: string, tournamentId: strin
     const createdNext = await prisma.match.create({
       data: {
         tournamentId,
+        stageId: completedMatch.stageId,
         round: nextRoundName,
         roundNumber: nextRound,
         matchNumber: nextMatchNumber,
@@ -925,7 +930,7 @@ export async function deleteMatch(matchId: string) {
   // Get match to find tournament for standings recompute
   const match = await prisma.match.findUnique({
     where: { id: matchId },
-    select: { tournamentId: true, status: true },
+    select: { tournamentId: true, stageId: true, status: true },
   });
 
   if (!match) return { success: false, error: "Match not found" };
@@ -939,7 +944,7 @@ export async function deleteMatch(matchId: string) {
 
   // Recompute standings if match was completed
   if (match.status === "COMPLETED") {
-    await recomputeStandings(match.tournamentId);
+    await recomputeStandings(match.tournamentId, { stageId: match.stageId ?? undefined });
   }
 
   await logActivity({
@@ -1010,29 +1015,16 @@ export async function recomputeTournamentStandings(tournamentId: string) {
     return { success: false, error: "Forbidden" };
   }
 
-  // Get tournament info
+  // Get tournament name for the audit log.
   const tournament = await prisma.tournament.findUnique({
     where: { id: tournamentId },
-    select: {
-      participantType: true,
-      name: true,
-      gameCategory: true,
-      pointsWin: true,
-      pointsDraw: true,
-      pointsLoss: true,
-      tiebreakers: true,
-    },
+    select: { name: true },
   });
 
   if (!tournament) return { success: false, error: "Tournament not found" };
 
-  const config = resolveStandingsConfig(tournament);
-
-  if (tournament.participantType === "INDIVIDUAL") {
-    await recomputeIndividualStandings(tournamentId, config);
-  } else {
-    await recomputeTeamStandings(tournamentId, config);
-  }
+  // Manual recompute rebuilds every stage of the tournament.
+  await recomputeStandings(tournamentId);
 
   await logActivity({
     action: "UPDATE",
@@ -1068,7 +1060,15 @@ function resolveStandingsConfig(t: {
   };
 }
 
-export async function recomputeStandings(tournamentId: string) {
+/**
+ * Recompute standings, scoped by stage.
+ *  - opts.stageId set → recompute only that stage.
+ *  - opts.stageId omitted → recompute every stage of the tournament (preserves
+ *    the historical "recompute everything" semantics). A tournament with no
+ *    stage rows yet (pre-backfill) falls back to a single null-scoped pass that
+ *    behaves exactly like the old tournament-wide recompute.
+ */
+export async function recomputeStandings(tournamentId: string, opts?: { stageId?: string }) {
   // Get tournament info
   const tournament = await prisma.tournament.findUnique({
     where: { id: tournamentId },
@@ -1086,10 +1086,25 @@ export async function recomputeStandings(tournamentId: string) {
 
   const config = resolveStandingsConfig(tournament);
 
-  if (tournament.participantType === "INDIVIDUAL") {
-    await recomputeIndividualStandings(tournamentId, config);
+  // Determine which stage scope(s) to rebuild.
+  let scopes: (string | null)[];
+  if (opts?.stageId) {
+    scopes = [opts.stageId];
   } else {
-    await recomputeTeamStandings(tournamentId, config);
+    const stages = await prisma.tournamentStage.findMany({
+      where: { tournamentId },
+      select: { id: true },
+      orderBy: { orderIndex: "asc" },
+    });
+    scopes = stages.length ? stages.map((s) => s.id) : [null];
+  }
+
+  for (const stageId of scopes) {
+    if (tournament.participantType === "INDIVIDUAL") {
+      await recomputeIndividualStandings(tournamentId, config, stageId);
+    } else {
+      await recomputeTeamStandings(tournamentId, config, stageId);
+    }
   }
 }
 
@@ -1100,7 +1115,7 @@ function toStatRows(map: Record<string, PlayerStats>): StatRow[] {
     .map(([id, s]) => ({ id, ...s, goalDiff: s.goalsFor - s.goalsAgainst }));
 }
 
-async function recomputeTeamStandings(tournamentId: string, config: StandingsConfig) {
+async function recomputeTeamStandings(tournamentId: string, config: StandingsConfig, stageId: string | null) {
   const rules = config.points;
   const isPUBG = config.gameCategory === "PUBG";
   // Head-to-head match pools (scoped to each table).
@@ -1111,6 +1126,7 @@ async function recomputeTeamStandings(tournamentId: string, config: StandingsCon
   const matches = await prisma.match.findMany({
     where: {
       tournamentId,
+      ...(stageId ? { stageId } : {}),
       status: "COMPLETED",
       ...(isPUBG ? {} : { homeTeamId: { not: null }, awayTeamId: { not: null } }),
       OR: [
@@ -1202,12 +1218,14 @@ async function recomputeTeamStandings(tournamentId: string, config: StandingsCon
   // Resolve team names for tiebreak notes.
   const nameOf = await buildNameResolver("team", Object.keys(overallStats));
 
-  // Delete existing standings for this tournament, then recreate (ranked).
-  await prisma.standing.deleteMany({ where: { tournamentId } });
+  // Delete existing standings for this stage (whole tournament when unscoped),
+  // then recreate (ranked).
+  await prisma.standing.deleteMany({ where: { tournamentId, ...(stageId ? { stageId } : {}) } });
 
   // Overall table (no groupId)
   await persistRankedTable(toStatRows(overallStats), overallMatches, config, nameOf, {
     tournamentId,
+    stageId,
     kind: "team",
   });
 
@@ -1215,6 +1233,7 @@ async function recomputeTeamStandings(tournamentId: string, config: StandingsCon
   for (const [groupId, teams] of Object.entries(groupStats)) {
     await persistRankedTable(toStatRows(teams), groupMatchPool[groupId] ?? [], config, nameOf, {
       tournamentId,
+      stageId,
       groupId,
       kind: "team",
     });
@@ -1227,7 +1246,7 @@ async function persistRankedTable(
   matches: MiniMatch[],
   config: StandingsConfig,
   nameOf: (id: string) => string,
-  base: { tournamentId: string; groupId?: string; kind: "team" | "player" }
+  base: { tournamentId: string; stageId: string | null; groupId?: string; kind: "team" | "player" }
 ) {
   const ranked = rankTable(rows, {
     tiebreakers: config.tiebreakers,
@@ -1240,6 +1259,7 @@ async function persistRankedTable(
     await prisma.standing.create({
       data: {
         tournamentId: base.tournamentId,
+        ...(base.stageId ? { stageId: base.stageId } : {}),
         ...(base.groupId ? { groupId: base.groupId } : {}),
         ...(base.kind === "team" ? { teamId: id } : { playerId: id }),
         ...stats,
@@ -1318,7 +1338,7 @@ function addMatchToStats(
   }
 }
 
-async function recomputeIndividualStandings(tournamentId: string, config: StandingsConfig) {
+async function recomputeIndividualStandings(tournamentId: string, config: StandingsConfig, stageId: string | null) {
   const rules = config.points;
   const isPUBG = config.gameCategory === "PUBG";
   // Head-to-head match pools (scoped to each table).
@@ -1330,6 +1350,7 @@ async function recomputeIndividualStandings(tournamentId: string, config: Standi
   const matches = await prisma.match.findMany({
     where: {
       tournamentId,
+      ...(stageId ? { stageId } : {}),
       status: "COMPLETED",
       ...(isPUBG ? {} : { homePlayerId: { not: null }, awayPlayerId: { not: null } }),
       // Exclude knockout: only include matches that have a groupId OR are from round-robin (no groupId but part of league)
@@ -1436,12 +1457,14 @@ async function recomputeIndividualStandings(tournamentId: string, config: Standi
   // Resolve player names for tiebreak notes.
   const nameOf = await buildNameResolver("player", Object.keys(overallStats));
 
-  // Delete existing standings for this tournament, then recreate (ranked).
-  await prisma.standing.deleteMany({ where: { tournamentId } });
+  // Delete existing standings for this stage (whole tournament when unscoped),
+  // then recreate (ranked).
+  await prisma.standing.deleteMany({ where: { tournamentId, ...(stageId ? { stageId } : {}) } });
 
   // Overall table (no groupId)
   await persistRankedTable(toStatRows(overallStats), overallMatches, config, nameOf, {
     tournamentId,
+    stageId,
     kind: "player",
   });
 
@@ -1449,6 +1472,7 @@ async function recomputeIndividualStandings(tournamentId: string, config: Standi
   for (const [groupId, players] of Object.entries(groupStats)) {
     await persistRankedTable(toStatRows(players), groupMatchPool[groupId] ?? [], config, nameOf, {
       tournamentId,
+      stageId,
       groupId,
       kind: "player",
     });
@@ -1772,7 +1796,7 @@ export async function updatePUBGMatchResult(matchId: string, formData: FormData)
   });
 
   // Recompute standings (outside transaction — uses own queries)
-  await recomputeStandings(match.tournamentId);
+  await recomputeStandings(match.tournamentId, { stageId: match.stageId ?? undefined });
 
   await logActivity({
     action: "UPDATE",

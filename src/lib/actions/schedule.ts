@@ -7,6 +7,7 @@ import { MatchStatus } from "@prisma/client";
 import { randomUUID } from "crypto";
 import { atKarachiHour, fromKarachiInputValue } from "@/lib/utils";
 import { recomputeStandings } from "@/lib/actions/match";
+import { getOrCreateDefaultStageId } from "@/lib/stages";
 
 // Role hierarchy levels
 const ROLE_LEVELS: Record<string, number> = {
@@ -103,7 +104,8 @@ export async function generateSchedule(options: GenerateScheduleOptions) {
   if (!tournament) return { success: false, error: "Tournament not found" };
 
   const isIndividual = tournament.participantType === "INDIVIDUAL";
-  
+  const stageId = await getOrCreateDefaultStageId(tournamentId);
+
   // Get participants
   let participants: { id: string; name: string; skillLevel?: number | null }[] = isIndividual
     ? tournament.players.map((p) => ({
@@ -324,6 +326,9 @@ export async function generateSchedule(options: GenerateScheduleOptions) {
     }
   }
 
+  // Stamp all newly-created fixtures with the tournament's (single) stage.
+  await prisma.match.updateMany({ where: { tournamentId, stageId: null }, data: { stageId } });
+
   // ── Auto-assign dates (1-2 matches per player per day) ──
   if (tournament.startDate && createdMatches > 0) {
     const maxPerDay = options.maxMatchesPerDay ?? 2;
@@ -426,7 +431,7 @@ export async function generateSchedule(options: GenerateScheduleOptions) {
 
   // Seed standings (all teams/players at 0) so group + league tables show
   // immediately, before any match is played.
-  await recomputeStandings(tournamentId);
+  await recomputeStandings(tournamentId, { stageId });
 
   const sched = await prisma.tournament.findUnique({ where: { id: tournamentId }, select: { slug: true } });
   revalidatePath(`/admin/tournaments/${tournamentId}`);
@@ -669,6 +674,9 @@ export async function generateKnockoutFromGroups(
   // match is an intra-group rematch. See seedKnockoutFirstRound above.
   const bracket = seedKnockoutFirstRound(advancingByGroup, firstRoundName);
 
+  // Phase 1: knockout shares the tournament's single stage.
+  const koStageId = await getOrCreateDefaultStageId(tournamentId);
+
   let createdMatches = 0;
 
   for (const match of bracket) {
@@ -678,6 +686,7 @@ export async function generateKnockoutFromGroups(
       await prisma.match.create({
         data: {
           tournamentId,
+          stageId: koStageId,
           round: match.roundName,
           roundNumber: match.roundNumber,
           matchNumber: createdMatches + 1,
@@ -692,6 +701,7 @@ export async function generateKnockoutFromGroups(
       await prisma.match.create({
         data: {
           tournamentId,
+          stageId: koStageId,
           round: match.roundName,
           roundNumber: match.roundNumber,
           matchNumber: createdMatches + 1,
@@ -799,10 +809,12 @@ export async function createGroup(tournamentId: string, name: string) {
   if (!hasRole(session, "EDITOR")) return { success: false, error: "Forbidden: Insufficient permissions" };
 
   const count = await prisma.tournamentGroup.count({ where: { tournamentId } });
-  
+  const stageId = await getOrCreateDefaultStageId(tournamentId);
+
   const group = await prisma.tournamentGroup.create({
     data: {
       tournamentId,
+      stageId,
       name: name || `Group ${String.fromCharCode(65 + count)}`,
       orderIndex: count,
     },
@@ -841,7 +853,7 @@ export async function assignTeamToGroup(tournamentTeamId: string, groupId: strin
     select: { tournamentId: true, tournament: { select: { slug: true } } },
   });
 
-  await recomputeStandings(updated.tournamentId);
+  await recomputeStandings(updated.tournamentId, { stageId: await getOrCreateDefaultStageId(updated.tournamentId) });
   revalidatePath(`/admin/tournaments/${updated.tournamentId}`);
   if (updated.tournament?.slug) revalidatePath(`/tournaments/${updated.tournament.slug}`);
   return { success: true };
@@ -863,7 +875,7 @@ export async function assignPlayerToGroup(tournamentPlayerId: string, groupId: s
   });
 
   if (tournamentPlayer) {
-    await recomputeStandings(tournamentPlayer.tournamentId);
+    await recomputeStandings(tournamentPlayer.tournamentId, { stageId: await getOrCreateDefaultStageId(tournamentPlayer.tournamentId) });
     revalidatePath(`/admin/tournaments/${tournamentPlayer.tournamentId}`);
     if (tournamentPlayer.tournament?.slug) revalidatePath(`/tournaments/${tournamentPlayer.tournament.slug}`);
   }
@@ -889,7 +901,7 @@ export async function bulkAssignPlayersToGroups(
   }
 
   if (tournamentId) {
-    await recomputeStandings(tournamentId);
+    await recomputeStandings(tournamentId, { stageId: await getOrCreateDefaultStageId(tournamentId) });
     revalidatePath(`/admin/tournaments/${tournamentId}`);
     const t = await prisma.tournament.findUnique({ where: { id: tournamentId }, select: { slug: true } });
     if (t?.slug) revalidatePath(`/tournaments/${t.slug}`);
@@ -929,7 +941,7 @@ export async function bulkAssignTeamsToGroups(
   }
 
   if (tournamentId) {
-    await recomputeStandings(tournamentId);
+    await recomputeStandings(tournamentId, { stageId: await getOrCreateDefaultStageId(tournamentId) });
     revalidatePath(`/admin/tournaments/${tournamentId}`);
     const t = await prisma.tournament.findUnique({ where: { id: tournamentId }, select: { slug: true } });
     if (t?.slug) revalidatePath(`/tournaments/${t.slug}`);
@@ -1134,12 +1146,14 @@ export async function createPUBGMatches(options: PUBGMatchOptions) {
 
   // Create PUBG matches - all participants in each match
   const createdMatches = [];
-  
+  const pubgStageId = await getOrCreateDefaultStageId(tournamentId);
+
   for (let i = 1; i <= matchCount; i++) {
     // Create the match
     const match = await prisma.match.create({
       data: {
         tournamentId,
+        stageId: pubgStageId,
         round: `Match ${i}`,
         roundNumber: i,
         matchNumber: i,
@@ -1208,12 +1222,13 @@ export async function addLatePlayerToGroup(
 
   const group = await prisma.tournamentGroup.findUnique({
     where: { id: groupId },
-    select: { id: true, name: true, tournamentId: true },
+    select: { id: true, name: true, tournamentId: true, stageId: true },
   });
   if (!group || group.tournamentId !== tournamentId) {
     return { success: false, error: "Group not found in this tournament" };
   }
 
+  const lateStageId = group.stageId ?? (await getOrCreateDefaultStageId(tournamentId));
   const isIndividual = tournament.participantType === "INDIVIDUAL";
 
   if (isIndividual) {
@@ -1284,6 +1299,7 @@ export async function addLatePlayerToGroup(
       await prisma.match.create({
         data: {
           tournamentId,
+          stageId: lateStageId,
           groupId,
           round: `${group.name} - Late`,
           roundNumber: 99, // high number so they sort at end
@@ -1368,6 +1384,7 @@ export async function addLatePlayerToGroup(
       await prisma.match.create({
         data: {
           tournamentId,
+          stageId: lateStageId,
           groupId,
           round: `${group.name} - Late`,
           roundNumber: 99,
