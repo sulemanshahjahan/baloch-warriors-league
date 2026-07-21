@@ -368,26 +368,7 @@ export function isWalkoverNote(notes: string | null | undefined): boolean {
 }
 
 // ── Standings tiebreak explanation ───────────────────────────────────────────
-// Standings are ranked by: points → goal difference → goals scored → wins.
-// Given two adjacent rows tied on points, explain why `above` is ranked higher.
-export interface StandingLite {
-  points: number;
-  goalDiff: number;
-  goalsFor: number;
-  won: number;
-}
-
-export function tiebreakExplanation(above: StandingLite, below: StandingLite, aboveName: string): string | null {
-  if (above.points !== below.points) return null; // not a points tie
-  // Goal difference is the obvious, expected tiebreaker — don't clutter the table for it.
-  if (above.goalDiff !== below.goalDiff) return null;
-
-  // Tied on points AND goal difference — the less obvious cases get an explanation.
-  if (above.goalsFor !== below.goalsFor) {
-    return `Level on points & goal difference — ${aboveName} ranked higher on goals scored (${above.goalsFor} vs ${below.goalsFor}).`;
-  }
-  if (above.won !== below.won) {
-    return `Level on points, goal difference & goals scored — ${aboveName} ranked higher on wins (${above.won} vs ${below.won}).`;
-  }
-  return null; // fully level — separated only by a stable fallback
-}
+// Ranking (and its explanation) is computed once in recomputeStandings and
+// persisted as Standing.tiebreakNote. Read that field directly — there is no
+// client-side re-derivation here, so the note can never drift from the actual
+// order. See src/lib/standings/ranking.ts.

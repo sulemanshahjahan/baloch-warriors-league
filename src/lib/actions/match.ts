@@ -9,6 +9,14 @@ import { logActivity } from "./activity-log";
 import { invalidateCache } from "@/lib/redis";
 import { randomUUID } from "crypto";
 import { fromKarachiInputValue } from "@/lib/utils";
+import {
+  rankTable,
+  resolvePoints,
+  type StatRow,
+  type MiniMatch,
+  type TiebreakKey,
+  type PointsRules,
+} from "@/lib/standings/ranking";
 
 // Role hierarchy levels
 const ROLE_LEVELS: Record<string, number> = {
@@ -1005,15 +1013,25 @@ export async function recomputeTournamentStandings(tournamentId: string) {
   // Get tournament info
   const tournament = await prisma.tournament.findUnique({
     where: { id: tournamentId },
-    select: { participantType: true, name: true, gameCategory: true },
+    select: {
+      participantType: true,
+      name: true,
+      gameCategory: true,
+      pointsWin: true,
+      pointsDraw: true,
+      pointsLoss: true,
+      tiebreakers: true,
+    },
   });
 
   if (!tournament) return { success: false, error: "Tournament not found" };
 
+  const config = resolveStandingsConfig(tournament);
+
   if (tournament.participantType === "INDIVIDUAL") {
-    await recomputeIndividualStandings(tournamentId, tournament.gameCategory);
+    await recomputeIndividualStandings(tournamentId, config);
   } else {
-    await recomputeTeamStandings(tournamentId, tournament.gameCategory);
+    await recomputeTeamStandings(tournamentId, config);
   }
 
   await logActivity({
@@ -1028,26 +1046,66 @@ export async function recomputeTournamentStandings(tournamentId: string) {
   return { success: true, data: undefined };
 }
 
+/** Table config resolved once and threaded through the recompute helpers. */
+interface StandingsConfig {
+  gameCategory: string;
+  points: PointsRules;
+  tiebreakers: TiebreakKey[] | undefined;
+}
+
+function resolveStandingsConfig(t: {
+  gameCategory: string;
+  pointsWin: number | null;
+  pointsDraw: number | null;
+  pointsLoss: number | null;
+  tiebreakers: unknown;
+}): StandingsConfig {
+  const fallback = SCORING_RULES[t.gameCategory] ?? SCORING_RULES.FOOTBALL;
+  return {
+    gameCategory: t.gameCategory,
+    points: resolvePoints(t, fallback),
+    tiebreakers: Array.isArray(t.tiebreakers) ? (t.tiebreakers as TiebreakKey[]) : undefined,
+  };
+}
+
 export async function recomputeStandings(tournamentId: string) {
   // Get tournament info
   const tournament = await prisma.tournament.findUnique({
     where: { id: tournamentId },
-    select: { participantType: true, gameCategory: true },
+    select: {
+      participantType: true,
+      gameCategory: true,
+      pointsWin: true,
+      pointsDraw: true,
+      pointsLoss: true,
+      tiebreakers: true,
+    },
   });
 
   if (!tournament) return;
 
+  const config = resolveStandingsConfig(tournament);
+
   if (tournament.participantType === "INDIVIDUAL") {
-    await recomputeIndividualStandings(tournamentId, tournament.gameCategory);
+    await recomputeIndividualStandings(tournamentId, config);
   } else {
-    await recomputeTeamStandings(tournamentId, tournament.gameCategory);
+    await recomputeTeamStandings(tournamentId, config);
   }
 }
 
-async function recomputeTeamStandings(tournamentId: string, gameCategory: string) {
-  // Get scoring rules for this game
-  const rules = SCORING_RULES[gameCategory] ?? SCORING_RULES.FOOTBALL;
-  const isPUBG = gameCategory === "PUBG";
+/** Convert an id→stats map into StatRow[] for ranking (fills goalDiff). */
+function toStatRows(map: Record<string, PlayerStats>): StatRow[] {
+  return Object.entries(map)
+    .filter(([id]) => id && id !== "null" && id !== "undefined")
+    .map(([id, s]) => ({ id, ...s, goalDiff: s.goalsFor - s.goalsAgainst }));
+}
+
+async function recomputeTeamStandings(tournamentId: string, config: StandingsConfig) {
+  const rules = config.points;
+  const isPUBG = config.gameCategory === "PUBG";
+  // Head-to-head match pools (scoped to each table).
+  const overallMatches: MiniMatch[] = [];
+  const groupMatchPool: Record<string, MiniMatch[]> = {};
 
   // Fetch only GROUP STAGE matches for standings (exclude knockout)
   const matches = await prisma.match.findMany({
@@ -1128,6 +1186,7 @@ async function recomputeTeamStandings(tournamentId: string, gameCategory: string
     } else {
       // Add to overall stats with game-specific scoring
       addMatchToStats(overallStats, homeId, awayId, hg, ag, rules);
+      overallMatches.push({ homeId, awayId, homeGoals: hg, awayGoals: ag });
 
       // Add to group stats if match belongs to a group
       if (match.groupId) {
@@ -1135,32 +1194,79 @@ async function recomputeTeamStandings(tournamentId: string, gameCategory: string
         if (!groupStats[match.groupId][homeId]) groupStats[match.groupId][homeId] = createEmptyStats();
         if (!groupStats[match.groupId][awayId]) groupStats[match.groupId][awayId] = createEmptyStats();
         addMatchToStats(groupStats[match.groupId], homeId, awayId, hg, ag, rules);
+        (groupMatchPool[match.groupId] ??= []).push({ homeId, awayId, homeGoals: hg, awayGoals: ag });
       }
     }
   }
 
-  // Delete existing standings for this tournament, then recreate
+  // Resolve team names for tiebreak notes.
+  const nameOf = await buildNameResolver("team", Object.keys(overallStats));
+
+  // Delete existing standings for this tournament, then recreate (ranked).
   await prisma.standing.deleteMany({ where: { tournamentId } });
 
-  // Create overall standings (no groupId)
-  for (const [teamId, s] of Object.entries(overallStats)) {
-    if (!teamId) continue; // Skip invalid entries
-    s.goalDiff = s.goalsFor - s.goalsAgainst;
-    await prisma.standing.create({
-      data: { tournamentId, teamId, ...s },
+  // Overall table (no groupId)
+  await persistRankedTable(toStatRows(overallStats), overallMatches, config, nameOf, {
+    tournamentId,
+    kind: "team",
+  });
+
+  // Per-group tables
+  for (const [groupId, teams] of Object.entries(groupStats)) {
+    await persistRankedTable(toStatRows(teams), groupMatchPool[groupId] ?? [], config, nameOf, {
+      tournamentId,
+      groupId,
+      kind: "team",
     });
   }
+}
 
-  // Create per-group standings
-  for (const [groupId, teams] of Object.entries(groupStats)) {
-    for (const [teamId, s] of Object.entries(teams)) {
-      if (!teamId) continue; // Skip invalid entries
-      s.goalDiff = s.goalsFor - s.goalsAgainst;
-      await prisma.standing.create({
-        data: { tournamentId, groupId, teamId, ...s },
-      });
+/** Rank a table and persist each row with its `rank` + `tiebreakNote`. */
+async function persistRankedTable(
+  rows: StatRow[],
+  matches: MiniMatch[],
+  config: StandingsConfig,
+  nameOf: (id: string) => string,
+  base: { tournamentId: string; groupId?: string; kind: "team" | "player" }
+) {
+  const ranked = rankTable(rows, {
+    tiebreakers: config.tiebreakers,
+    matches,
+    points: config.points,
+    nameOf,
+  });
+  for (const r of ranked) {
+    const { id, rank, tiebreakNote, ...stats } = r;
+    await prisma.standing.create({
+      data: {
+        tournamentId: base.tournamentId,
+        ...(base.groupId ? { groupId: base.groupId } : {}),
+        ...(base.kind === "team" ? { teamId: id } : { playerId: id }),
+        ...stats,
+        rank,
+        tiebreakNote,
+      },
+    });
+  }
+}
+
+/** Load display names for a set of participant ids (for tiebreak notes). */
+async function buildNameResolver(
+  kind: "team" | "player",
+  ids: string[]
+): Promise<(id: string) => string> {
+  const clean = ids.filter((id) => id && id !== "null" && id !== "undefined");
+  const names = new Map<string, string>();
+  if (clean.length > 0) {
+    if (kind === "team") {
+      const rows = await prisma.team.findMany({ where: { id: { in: clean } }, select: { id: true, name: true } });
+      for (const r of rows) names.set(r.id, r.name);
+    } else {
+      const rows = await prisma.player.findMany({ where: { id: { in: clean } }, select: { id: true, name: true } });
+      for (const r of rows) names.set(r.id, r.name);
     }
   }
+  return (id: string) => names.get(id) ?? "The row above";
 }
 
 interface PlayerStats {
@@ -1212,10 +1318,12 @@ function addMatchToStats(
   }
 }
 
-async function recomputeIndividualStandings(tournamentId: string, gameCategory: string) {
-  // Get scoring rules for this game
-  const rules = SCORING_RULES[gameCategory] ?? SCORING_RULES.FOOTBALL;
-  const isPUBG = gameCategory === "PUBG";
+async function recomputeIndividualStandings(tournamentId: string, config: StandingsConfig) {
+  const rules = config.points;
+  const isPUBG = config.gameCategory === "PUBG";
+  // Head-to-head match pools (scoped to each table).
+  const overallMatches: MiniMatch[] = [];
+  const groupMatchPool: Record<string, MiniMatch[]> = {};
 
   // Fetch only GROUP STAGE matches for standings (exclude knockout)
   // Knockout matches (no groupId + round like "Round of 16") don't count in standings
@@ -1312,6 +1420,7 @@ async function recomputeIndividualStandings(tournamentId: string, gameCategory: 
     } else {
       // Add to overall stats with game-specific scoring
       addMatchToStats(overallStats, homeId, awayId, hg, ag, rules);
+      overallMatches.push({ homeId, awayId, homeGoals: hg, awayGoals: ag });
 
       // Add to group stats if match belongs to a group
       if (match.groupId) {
@@ -1319,31 +1428,30 @@ async function recomputeIndividualStandings(tournamentId: string, gameCategory: 
         if (!groupStats[match.groupId][homeId]) groupStats[match.groupId][homeId] = createEmptyStats();
         if (!groupStats[match.groupId][awayId]) groupStats[match.groupId][awayId] = createEmptyStats();
         addMatchToStats(groupStats[match.groupId], homeId, awayId, hg, ag, rules);
+        (groupMatchPool[match.groupId] ??= []).push({ homeId, awayId, homeGoals: hg, awayGoals: ag });
       }
     }
   }
 
-  // Delete existing standings for this tournament, then recreate
+  // Resolve player names for tiebreak notes.
+  const nameOf = await buildNameResolver("player", Object.keys(overallStats));
+
+  // Delete existing standings for this tournament, then recreate (ranked).
   await prisma.standing.deleteMany({ where: { tournamentId } });
 
-  // Create overall standings (no groupId)
-  for (const [playerId, s] of Object.entries(overallStats)) {
-    if (!playerId || playerId === "null" || playerId === "undefined") continue;
-    s.goalDiff = s.goalsFor - s.goalsAgainst;
-    await prisma.standing.create({
-      data: { tournamentId, playerId, ...s },
-    });
-  }
+  // Overall table (no groupId)
+  await persistRankedTable(toStatRows(overallStats), overallMatches, config, nameOf, {
+    tournamentId,
+    kind: "player",
+  });
 
-  // Create per-group standings
+  // Per-group tables
   for (const [groupId, players] of Object.entries(groupStats)) {
-    for (const [playerId, s] of Object.entries(players)) {
-      if (!playerId || playerId === "null" || playerId === "undefined") continue;
-      s.goalDiff = s.goalsFor - s.goalsAgainst;
-      await prisma.standing.create({
-        data: { tournamentId, groupId, playerId, ...s },
-      });
-    }
+    await persistRankedTable(toStatRows(players), groupMatchPool[groupId] ?? [], config, nameOf, {
+      tournamentId,
+      groupId,
+      kind: "player",
+    });
   }
 }
 

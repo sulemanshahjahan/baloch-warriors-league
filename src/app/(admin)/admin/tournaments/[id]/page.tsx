@@ -27,7 +27,6 @@ import {
   statusColor,
   statusLabel,
   formatLabel,
-  tiebreakExplanation,
 } from "@/lib/utils";
 import { TeamEnrollment } from "./team-enrollment";
 import { PlayerEnrollment } from "./player-enrollment";
@@ -306,8 +305,7 @@ export default async function TournamentDetailPage({ params }: TournamentDetailP
               <TableBody>
                 {tournament.standings.map((s, i) => {
                   const nameOf = (row: typeof s) => (tournament.participantType === "INDIVIDUAL" ? row.player?.name : row.team?.name) ?? "—";
-                  const above = i > 0 ? tournament.standings[i - 1] : null;
-                  const tiebreak = above ? tiebreakExplanation(above, s, nameOf(above)) : null;
+                  const tiebreak = s.tiebreakNote;
                   return (
                   <TableRow key={s.id}>
                     <TableCell className="text-muted-foreground text-xs align-top">{i + 1}</TableCell>

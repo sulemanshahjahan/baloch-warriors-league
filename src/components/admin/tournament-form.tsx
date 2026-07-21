@@ -14,10 +14,26 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Save, Info, Upload, X } from "lucide-react";
+import { Loader2, Save, Info, Upload, X, ArrowUp, ArrowDown } from "lucide-react";
 import { createTournament, updateTournament } from "@/lib/actions/tournament";
 import { uploadTournamentImage } from "@/lib/actions/upload";
+import { DEFAULT_TIEBREAKERS, type TiebreakKey } from "@/lib/standings/ranking";
 import type { Tournament } from "@prisma/client";
+
+const TIEBREAK_LABELS: Record<TiebreakKey, string> = {
+  POINTS: "Points",
+  GOAL_DIFF: "Goal difference",
+  GOALS_FOR: "Goals scored",
+  GOALS_AGAINST: "Goals conceded",
+  HEAD_TO_HEAD: "Head-to-head",
+  WINS: "Wins",
+  CLEAN_SHEETS: "Clean sheets",
+};
+
+// Default league points per game — used only as input placeholders.
+const POINT_DEFAULTS: Record<string, [number, number, number]> = {
+  FOOTBALL: [3, 1, 0], EFOOTBALL: [3, 1, 0], PUBG: [0, 0, 0], SNOOKER: [1, 0, 0], CHECKERS: [1, 0, 0],
+};
 
 interface TournamentFormProps {
   tournament?: Tournament;
@@ -134,6 +150,26 @@ export function TournamentForm({ tournament }: TournamentFormProps) {
   const [eFootballMode, setEFootballMode] = useState(tournament?.eFootballMode ?? "1v1");
   const [eFootballType, setEFootballType] = useState(tournament?.eFootballType ?? "DREAM");
 
+  // ── League & table settings (Phase 0) ──
+  const [doubleRoundRobin, setDoubleRoundRobin] = useState(tournament?.doubleRoundRobin ?? false);
+  const [pointsWin, setPointsWin] = useState(tournament?.pointsWin?.toString() ?? "");
+  const [pointsDraw, setPointsDraw] = useState(tournament?.pointsDraw?.toString() ?? "");
+  const [pointsLoss, setPointsLoss] = useState(tournament?.pointsLoss?.toString() ?? "");
+  const [tiebreakers, setTiebreakers] = useState<TiebreakKey[] | null>(
+    Array.isArray(tournament?.tiebreakers) ? (tournament!.tiebreakers as TiebreakKey[]) : null
+  );
+
+  const moveTiebreak = (i: number, dir: -1 | 1) => {
+    setTiebreakers((prev) => {
+      if (!prev) return prev;
+      const j = i + dir;
+      if (j < 0 || j >= prev.length) return prev;
+      const next = [...prev];
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
+  };
+
   // Get current game config
   const gameConfig = GAME_CONFIGS[gameCategory];
 
@@ -166,6 +202,13 @@ export function TournamentForm({ tournament }: TournamentFormProps) {
       formData.set("eFootballMode", eFootballMode);
       formData.set("eFootballType", eFootballType);
     }
+    // League & table settings
+    formData.set("doubleRoundRobin", doubleRoundRobin ? "on" : "");
+    formData.set("pointsWin", pointsWin);
+    formData.set("pointsDraw", pointsDraw);
+    formData.set("pointsLoss", pointsLoss);
+    if (tiebreakers) formData.set("tiebreakers", JSON.stringify(tiebreakers));
+    else formData.delete("tiebreakers");
 
     startTransition(async () => {
       const result = tournament
@@ -298,6 +341,86 @@ export function TournamentForm({ tournament }: TournamentFormProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* League & Table Settings — only for formats that produce a points table */}
+      {(format === "LEAGUE" || format === "GROUP_KNOCKOUT") && gameCategory !== "PUBG" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">League &amp; Table Settings</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {/* Double round-robin */}
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={doubleRoundRobin}
+                onChange={(e) => setDoubleRoundRobin(e.target.checked)}
+                className="mt-0.5 h-4 w-4"
+              />
+              <span>
+                <span className="text-sm font-medium">Double round-robin</span>
+                <span className="block text-xs text-muted-foreground">
+                  Each pair plays twice (home &amp; away). Off = single round-robin.
+                </span>
+              </span>
+            </label>
+
+            {/* Points per result */}
+            <div className="space-y-2">
+              <Label>Points (Win / Draw / Loss)</Label>
+              <div className="grid grid-cols-3 gap-3">
+                <Input type="number" min={0} inputMode="numeric" value={pointsWin}
+                  onChange={(e) => setPointsWin(e.target.value)}
+                  placeholder={`${POINT_DEFAULTS[gameCategory]?.[0] ?? 3} (default)`} aria-label="Points for a win" />
+                <Input type="number" min={0} inputMode="numeric" value={pointsDraw}
+                  onChange={(e) => setPointsDraw(e.target.value)}
+                  placeholder={`${POINT_DEFAULTS[gameCategory]?.[1] ?? 1} (default)`} aria-label="Points for a draw" />
+                <Input type="number" min={0} inputMode="numeric" value={pointsLoss}
+                  onChange={(e) => setPointsLoss(e.target.value)}
+                  placeholder={`${POINT_DEFAULTS[gameCategory]?.[2] ?? 0} (default)`} aria-label="Points for a loss" />
+              </div>
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <Info className="w-3 h-3" /> Leave blank to use the game default.
+              </p>
+            </div>
+
+            {/* Tiebreaker order */}
+            <div className="space-y-2">
+              <Label>Tiebreaker order</Label>
+              {!tiebreakers ? (
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs text-muted-foreground">
+                    Using default: {DEFAULT_TIEBREAKERS.map((k) => TIEBREAK_LABELS[k]).join(" → ")}
+                  </p>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setTiebreakers([...DEFAULT_TIEBREAKERS])}>
+                    Customize
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <ul className="space-y-1.5">
+                    {tiebreakers.map((k, i) => (
+                      <li key={k} className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-1.5 text-sm">
+                        <span className="w-5 text-xs text-muted-foreground">{i + 1}.</span>
+                        <span className="flex-1">{TIEBREAK_LABELS[k]}</span>
+                        <Button type="button" variant="ghost" size="icon" className="h-6 w-6" disabled={i === 0} onClick={() => moveTiebreak(i, -1)} aria-label="Move up">
+                          <ArrowUp className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button type="button" variant="ghost" size="icon" className="h-6 w-6" disabled={i === tiebreakers.length - 1} onClick={() => moveTiebreak(i, 1)} aria-label="Move down">
+                          <ArrowDown className="h-3.5 w-3.5" />
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setTiebreakers(null)}>
+                    Reset to default
+                  </Button>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* eFootball Options */}
       {gameCategory === "EFOOTBALL" && (

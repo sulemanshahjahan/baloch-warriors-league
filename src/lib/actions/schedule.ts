@@ -55,6 +55,12 @@ function generateRoundRobinPairs<T>(teams: T[]): [T, T][] {
   return pairs;
 }
 
+/** Append reversed (return-leg) fixtures for a double round-robin. */
+function withReturnLegs<T>(pairs: [T, T][], double: boolean): [T, T][] {
+  if (!double) return pairs;
+  return [...pairs, ...pairs.map(([home, away]) => [away, home] as [T, T])];
+}
+
 function generateKnockoutBracket<T>(teams: T[]): [T | null, T | null][] {
   // For knockout, we need power of 2
   const count = teams.length;
@@ -144,8 +150,8 @@ export async function generateSchedule(options: GenerateScheduleOptions) {
   let createdMatches = 0;
 
   if (format === "ROUND_ROBIN") {
-    // Round Robin - everyone plays everyone
-    const pairs = generateRoundRobinPairs(participants);
+    // Round Robin - everyone plays everyone (twice when doubleRoundRobin)
+    const pairs = withReturnLegs(generateRoundRobinPairs(participants), tournament.doubleRoundRobin);
     for (let i = 0; i < pairs.length; i++) {
       const [home, away] = pairs[i];
       const roundNum = Math.floor(i / (participants.length / 2)) + 1;
@@ -279,8 +285,8 @@ export async function generateSchedule(options: GenerateScheduleOptions) {
         continue; // Skip groups with less than 2 participants
       }
 
-      // Generate round-robin matches within group
-      const pairs = generateRoundRobinPairs(groupParticipants);
+      // Generate round-robin matches within group (twice when doubleRoundRobin)
+      const pairs = withReturnLegs(generateRoundRobinPairs(groupParticipants), tournament.doubleRoundRobin);
       for (let j = 0; j < pairs.length; j++) {
         const [home, away] = pairs[j];
         const groupRoundNum = Math.floor(j / (groupParticipants.length / 2)) + 1;
@@ -578,7 +584,9 @@ export async function generateKnockoutFromGroups(
         orderBy: { orderIndex: "asc" },
         include: {
           standings: {
-            orderBy: [{ points: "desc" }, { goalDiff: "desc" }, { goalsFor: "desc" }, { won: "desc" }, { id: "asc" }],
+            // Qualifiers by the persisted rank (honours points config + tiebreakers
+            // incl. head-to-head). nulls-last keeps un-recomputed rows out of the top.
+            orderBy: [{ rank: "asc" }, { id: "asc" }],
             take: advanceCount,
             include: {
               team: true,

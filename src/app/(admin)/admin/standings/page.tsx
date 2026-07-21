@@ -29,7 +29,7 @@ async function getAllStandings() {
     orderBy: [{ status: "asc" }, { updatedAt: "desc" }],
     include: {
       standings: {
-        orderBy: [{ points: "desc" }, { goalDiff: "desc" }, { goalsFor: "desc" }, { won: "desc" }, { id: "asc" }],
+        orderBy: [{ rank: "asc" }, { id: "asc" }],
         include: {
           team: { select: { id: true, name: true, logoUrl: true, slug: true } },
           player: { select: { id: true, name: true, photoUrl: true, slug: true } },

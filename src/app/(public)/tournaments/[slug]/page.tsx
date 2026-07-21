@@ -47,7 +47,6 @@ import {
   formatLabel,
   getInitials,
   getRoundDisplayName,
-  tiebreakExplanation,
 } from "@/lib/utils";
 import { SmartAvatar } from "@/components/public/smart-avatar";
 import { TiebreakInfo } from "@/components/public/tiebreak-info";
@@ -163,7 +162,7 @@ async function getTournamentBySlug(slug: string) {
       id: true,
       name: true,
       standings: {
-        orderBy: [{ points: "desc" }, { goalDiff: "desc" }, { goalsFor: "desc" }, { won: "desc" }, { id: "asc" }],
+        orderBy: [{ rank: "asc" }, { id: "asc" }],
         select: {
           id: true,
           played: true,
@@ -174,6 +173,7 @@ async function getTournamentBySlug(slug: string) {
           goalsAgainst: true,
           goalDiff: true,
           points: true,
+          tiebreakNote: true,
           teamId: true,
           playerId: true,
           team: { select: { id: true, slug: true, name: true, isDuo: true, players: { where: { isActive: true }, select: { player: { select: { id: true, name: true, photoUrl: true } } } } } },
@@ -272,7 +272,7 @@ async function getTournamentBySlug(slug: string) {
     // Overall standings
     prisma.standing.findMany({
     where: { tournamentId: tid, groupId: null },
-    orderBy: [{ points: "desc" }, { goalDiff: "desc" }, { goalsFor: "desc" }, { won: "desc" }, { id: "asc" }],
+    orderBy: [{ rank: "asc" }, { id: "asc" }],
     select: {
       id: true,
       played: true,
@@ -283,6 +283,7 @@ async function getTournamentBySlug(slug: string) {
       goalsAgainst: true,
       goalDiff: true,
       points: true,
+      tiebreakNote: true,
       teamId: true,
       playerId: true,
       team: { select: { id: true, slug: true, name: true, isDuo: true, players: { where: { isActive: true }, select: { player: { select: { id: true, name: true, photoUrl: true } } } } } },
@@ -1155,6 +1156,7 @@ function StandingsTable({
     goalsAgainst: number;
     goalDiff: number;
     points: number;
+    tiebreakNote: string | null;
     team: { id: string; slug: string; name: string; isDuo?: boolean; players?: { player: { id: string; name: string; photoUrl: string | null } }[] } | null;
     player: { id: string; slug: string; name: string } | null;
   }>;
@@ -1213,10 +1215,8 @@ function StandingsTable({
           const participantId = isIndividual ? s.playerId : s.teamId;
           const form = participantId ? computeForm(participantId, formMatches, isIndividual) : [];
 
-          // Tiebreak explanation (only for the non-obvious cases — see util).
-          const prev = !isPUBG && i > 0 ? standings[i - 1] : null;
-          const prevName = prev ? (isIndividual ? prev.player?.name : prev.team?.name) ?? "the team above" : "";
-          const tiebreakMsg = prev ? tiebreakExplanation(prev, s, prevName) : null;
+          // Tiebreak explanation — persisted note (null for the obvious cases / PUBG).
+          const tiebreakMsg = isPUBG ? null : s.tiebreakNote;
 
           return (
             <TableRow key={s.id}>

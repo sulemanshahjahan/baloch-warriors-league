@@ -18,6 +18,14 @@ export const tournamentSchema = z.object({
   seasonId: z.string().optional(),
   eFootballMode: z.enum(["1v1", "2v2"]).optional(),
   eFootballType: z.enum(["AUTHENTIC", "DREAM"]).optional(),
+  // ── League/table config (Phase 0) ──
+  doubleRoundRobin: z.coerce.boolean().optional(),
+  pointsWin: z.coerce.number().int().min(0).optional().or(z.literal("")),
+  pointsDraw: z.coerce.number().int().min(0).optional().or(z.literal("")),
+  pointsLoss: z.coerce.number().int().min(0).optional().or(z.literal("")),
+  tiebreakers: z
+    .array(z.enum(["POINTS", "GOAL_DIFF", "GOALS_FOR", "GOALS_AGAINST", "HEAD_TO_HEAD", "WINS", "CLEAN_SHEETS"]))
+    .optional(),
 });
 
 export type TournamentInput = z.infer<typeof tournamentSchema>;

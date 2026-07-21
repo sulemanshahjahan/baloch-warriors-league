@@ -10,7 +10,7 @@ import { SmartAvatar } from "@/components/public/smart-avatar";
 import { DuoTeamAvatar } from "@/components/public/duo-team-avatar";
 import { TiebreakInfo } from "@/components/public/tiebreak-info";
 import { Trophy, ArrowLeft, Crown, Target, ShieldCheck, BarChart3, XCircle } from "lucide-react";
-import { gameLabel, tiebreakExplanation } from "@/lib/utils";
+import { gameLabel } from "@/lib/utils";
 
 interface RecapPageProps {
   params: Promise<{ slug: string }>;
@@ -79,7 +79,7 @@ export default async function RecapPage({ params }: RecapPageProps) {
       team: TEAM_INCLUDE,
       group: { select: { id: true, name: true } },
     },
-    orderBy: [{ points: "desc" }, { goalDiff: "desc" }, { goalsFor: "desc" }, { won: "desc" }, { id: "asc" }],
+    orderBy: [{ rank: "asc" }, { id: "asc" }],
   });
 
   type StandingRow = (typeof standings)[number];
@@ -231,9 +231,7 @@ export default async function RecapPage({ params }: RecapPageProps) {
                   const e = entrantOf(s);
                   if (!e) return null;
                   const qualified = isQualified(e, i);
-                  const above = i > 0 ? group.rows[i - 1] : null;
-                  const aboveE = above ? entrantOf(above) : null;
-                  const tiebreak = above && aboveE ? tiebreakExplanation(above, s, aboveE.name) : null;
+                  const tiebreak = s.tiebreakNote;
                   return (
                     <Link key={s.id} href={e.href} className={`flex items-center justify-between p-3 rounded-lg transition-colors ${qualified ? "bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/10" : "bg-muted/30 hover:bg-muted/50 opacity-70"}`}>
                       <div className="flex items-center gap-3 min-w-0">

@@ -6,8 +6,28 @@ import { prisma } from "@/lib/db";
 import { slugify } from "@/lib/utils";
 import { tournamentSchema } from "@/lib/validations/tournament";
 import type { ActionResult } from "@/lib/utils";
-import type { TournamentStatus, GameCategory } from "@prisma/client";
+import { Prisma, type TournamentStatus, type GameCategory } from "@prisma/client";
 import { logActivity } from "./activity-log";
+
+const TIEBREAK_KEYS = ["POINTS", "GOAL_DIFF", "GOALS_FOR", "GOALS_AGAINST", "HEAD_TO_HEAD", "WINS", "CLEAN_SHEETS"];
+
+/** Parse the JSON-encoded tiebreaker order from the form; returns undefined if absent/invalid. */
+function parseTiebreakers(value: FormDataEntryValue | null): string[] | undefined {
+  if (typeof value !== "string" || !value) return undefined;
+  try {
+    const arr = JSON.parse(value);
+    if (Array.isArray(arr) && arr.every((k) => typeof k === "string" && TIEBREAK_KEYS.includes(k))) {
+      return arr;
+    }
+  } catch { /* ignore */ }
+  return undefined;
+}
+
+/** "" / undefined → null; otherwise the integer. */
+function toIntOrNull(v: number | string | undefined): number | null {
+  if (v === "" || v == null) return null;
+  return Number(v);
+}
 
 /** Revalidate all public + admin paths for a tournament */
 async function revalidateTournament(tournamentId: string) {
@@ -80,6 +100,8 @@ export async function createTournament(
   const parsed = tournamentSchema.safeParse({
     ...raw,
     isFeatured: raw.isFeatured === "on" || raw.isFeatured === "true",
+    doubleRoundRobin: raw.doubleRoundRobin === "on" || raw.doubleRoundRobin === "true",
+    tiebreakers: parseTiebreakers(formData.get("tiebreakers")),
     maxParticipants: raw.maxParticipants || undefined,
   });
 
@@ -127,6 +149,11 @@ export async function createTournament(
       isFeatured: data.isFeatured ?? false,
       eFootballMode: data.eFootballMode || null,
       eFootballType: data.eFootballType || null,
+      doubleRoundRobin: data.doubleRoundRobin ?? false,
+      pointsWin: toIntOrNull(data.pointsWin),
+      pointsDraw: toIntOrNull(data.pointsDraw),
+      pointsLoss: toIntOrNull(data.pointsLoss),
+      ...(data.tiebreakers && data.tiebreakers.length ? { tiebreakers: data.tiebreakers } : {}),
       ...(seasonId ? { season: { connect: { id: seasonId } } } : {}),
     },
   });
@@ -165,6 +192,8 @@ export async function updateTournament(
   const parsed = tournamentSchema.safeParse({
     ...raw,
     isFeatured: raw.isFeatured === "on" || raw.isFeatured === "true",
+    doubleRoundRobin: raw.doubleRoundRobin === "on" || raw.doubleRoundRobin === "true",
+    tiebreakers: parseTiebreakers(formData.get("tiebreakers")),
     maxParticipants: raw.maxParticipants || undefined,
   });
 
@@ -202,6 +231,11 @@ export async function updateTournament(
       isFeatured: data.isFeatured ?? false,
       eFootballMode: data.eFootballMode || null,
       eFootballType: data.eFootballType || null,
+      doubleRoundRobin: data.doubleRoundRobin ?? false,
+      pointsWin: toIntOrNull(data.pointsWin),
+      pointsDraw: toIntOrNull(data.pointsDraw),
+      pointsLoss: toIntOrNull(data.pointsLoss),
+      tiebreakers: data.tiebreakers && data.tiebreakers.length ? data.tiebreakers : Prisma.DbNull,
       seasonId: data.seasonId || null,
     },
   });
@@ -350,7 +384,7 @@ export async function getTournamentById(id: string) {
       },
       standings: {
         where: { groupId: null },
-        orderBy: [{ points: "desc" }, { goalDiff: "desc" }, { goalsFor: "desc" }, { won: "desc" }, { id: "asc" }],
+        orderBy: [{ rank: "asc" }, { id: "asc" }],
         include: {
           team: { select: { id: true, name: true, logoUrl: true } },
           player: { select: { id: true, name: true, photoUrl: true } },

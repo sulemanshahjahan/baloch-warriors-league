@@ -159,6 +159,17 @@ model Tournament {
   // eFootball-specific
   eFootballMode   String? // "1v1" or "2v2" (only for EFOOTBALL)
   eFootballType   String? // "AUTHENTIC" or "DREAM" (only for EFOOTBALL)
+  // ── League/table config (Phase 0) ──
+  // Each round-robin pair plays twice (home & away) when true.
+  doubleRoundRobin Boolean         @default(false)
+  // Per-tournament points override. When any is null, the per-game SCORING_RULES
+  // default is used (3/1/0 for football/eFootball). Ships null.
+  pointsWin       Int?
+  pointsDraw      Int?
+  pointsLoss      Int?
+  // Ordered tiebreaker keys (TiebreakKey[] from src/lib/standings/ranking.ts).
+  // Null → DEFAULT_TIEBREAKERS (POINTS, GOAL_DIFF, GOALS_FOR, HEAD_TO_HEAD, WINS).
+  tiebreakers     Json?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -955,6 +966,11 @@ model Standing {
 
   // Generic (PUBG score, snooker frames, etc.)
   totalScore Float @default(0)
+
+  // Persisted ranking (computed once in recomputeStandings — see ranking.ts).
+  // Read sites order by `rank`; they encode no tiebreaker order themselves.
+  rank         Int?
+  tiebreakNote String? // why this row sits below the one above (non-obvious ties only)
 
   updatedAt DateTime @updatedAt
 

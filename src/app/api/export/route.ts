@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
     if (type === "standings" && tournamentId) {
       const standings = await prisma.standing.findMany({
         where: { tournamentId, groupId: null },
-        orderBy: [{ points: "desc" }, { goalDiff: "desc" }],
+        orderBy: [{ rank: "asc" }, { id: "asc" }],
         include: {
           player: { select: { name: true } },
           team: { select: { name: true } },
