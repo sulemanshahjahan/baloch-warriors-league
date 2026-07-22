@@ -80,15 +80,52 @@ export function getTeamById(id: string | null | undefined): RandomTeam | null {
   return RANDOM_TEAMS.find((t) => t.id === id) ?? null;
 }
 
+// ─────────────────────────────────────────────────────────────
+// Per-player draw restrictions.
+// Some players draw from a limited pool of clubs in the ready check. Keyed by
+// player slug (stable, human-readable). A match's pool is restricted if EITHER
+// player has a restriction (the assigned team is shared by both sides).
+// ─────────────────────────────────────────────────────────────
+export const PLAYER_TEAM_POOL: Record<string, readonly string[]> = {
+  suleman: [
+    "eng-manutd", "eng-arsenal", "eng-liverpool", "eng-mancity",
+    "esp-barcelona", "esp-realmadrid", "esp-atletico",
+    "tur-galatasaray", "por-benfica", "fra-psg", "ita-inter",
+  ],
+};
+
+/**
+ * The allowed team ids for a match given its two players' slugs, or null for
+ * the full pool. If both players are restricted, their pools are intersected.
+ */
+export function poolForPlayers(...slugs: (string | null | undefined)[]): readonly string[] | null {
+  const pools = slugs
+    .map((s) => (s ? PLAYER_TEAM_POOL[s] : undefined))
+    .filter((p): p is readonly string[] => !!p);
+  if (pools.length === 0) return null;
+  if (pools.length === 1) return pools[0];
+  return pools.reduce((acc, p) => acc.filter((id) => p.includes(id)));
+}
+
 /**
  * Pick a uniformly-random team from the pool. When `excludeId` is provided
  * (the previously assigned team) it is excluded so a re-roll never repeats the
  * immediately previous team. If excluding would empty the pool (shouldn't
  * happen) it falls back to the full pool.
  */
-export function pickRandomTeam(excludeId?: string | null): RandomTeam {
-  const pool = excludeId ? RANDOM_TEAMS.filter((t) => t.id !== excludeId) : RANDOM_TEAMS;
-  const source = pool.length > 0 ? pool : RANDOM_TEAMS;
+export function pickRandomTeam(
+  excludeId?: string | null,
+  allowedIds?: readonly string[] | null,
+): RandomTeam {
+  // Restrict to the allowed pool (per-player draw limits) when given.
+  let pool: readonly RandomTeam[] =
+    allowedIds && allowedIds.length
+      ? RANDOM_TEAMS.filter((t) => allowedIds.includes(t.id))
+      : RANDOM_TEAMS;
+  if (pool.length === 0) pool = RANDOM_TEAMS; // safety: never empty
+  // Avoid repeating the immediately previous team (only if the pool allows it).
+  const deduped = excludeId ? pool.filter((t) => t.id !== excludeId) : pool;
+  const source = deduped.length > 0 ? deduped : pool;
   const index = Math.floor(Math.random() * source.length);
   return source[index];
 }

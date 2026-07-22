@@ -6,6 +6,7 @@ import {
   LOCK_DURATION_MS,
   getTeamById,
   pickRandomTeam,
+  poolForPlayers,
   type RandomTeam,
 } from "@/lib/randomTeams";
 
@@ -56,8 +57,8 @@ const MATCH_SELECT = {
   status: true,
   homePlayerId: true,
   awayPlayerId: true,
-  homePlayer: { select: { name: true } },
-  awayPlayer: { select: { name: true } },
+  homePlayer: { select: { name: true, slug: true } },
+  awayPlayer: { select: { name: true, slug: true } },
 } as const;
 
 type MatchRow = {
@@ -65,8 +66,8 @@ type MatchRow = {
   status: MatchStatus;
   homePlayerId: string | null;
   awayPlayerId: string | null;
-  homePlayer: { name: string } | null;
-  awayPlayer: { name: string } | null;
+  homePlayer: { name: string; slug: string } | null;
+  awayPlayer: { name: string; slug: string } | null;
 };
 
 type ReadyRow = {
@@ -198,7 +199,9 @@ export async function readyUp(
     // (assignedAt == null). This is why re-clicking Ready, or the lock simply
     // expiring, never silently re-rolls the team.
     if (current.homeReady && current.awayReady && current.assignedAt === null) {
-      const team = pickRandomTeam(current.assignedTeamId); // never repeat the previous team
+      // Restrict the pool when either player has a per-player draw limit.
+      const allowed = poolForPlayers(match.homePlayer?.slug, match.awayPlayer?.slug);
+      const team = pickRandomTeam(current.assignedTeamId, allowed); // never repeat the previous team
       await tx.matchReadyState.updateMany({
         where: { matchId, homeReady: true, awayReady: true, assignedAt: null },
         data: {
