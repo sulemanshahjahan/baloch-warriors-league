@@ -80,7 +80,7 @@ function TournamentCard({
     <Link href={`/tournaments/${tournament.slug}`}>
       <Card className="hover:border-primary/50 transition-all hover:-translate-y-0.5 cursor-pointer h-full group overflow-hidden">
         {tournament.bannerUrl && (
-          <div className="relative w-full aspect-[16/9] overflow-hidden bg-muted">
+          <div className="relative w-full aspect-square overflow-hidden bg-muted">
             {/* Blurred copy fills the frame so the full banner shows with no hard crop */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
