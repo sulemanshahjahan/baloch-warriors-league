@@ -66,6 +66,7 @@ function TournamentCard({
     isFeatured: boolean;
     eFootballMode: string | null;
     eFootballType: string | null;
+    bannerUrl: string | null;
     _count: { teams: number; players: number; matches: number };
   };
 }) {
@@ -77,7 +78,18 @@ function TournamentCard({
 
   return (
     <Link href={`/tournaments/${tournament.slug}`}>
-      <Card className="hover:border-primary/50 transition-all hover:-translate-y-0.5 cursor-pointer h-full group">
+      <Card className="hover:border-primary/50 transition-all hover:-translate-y-0.5 cursor-pointer h-full group overflow-hidden">
+        {tournament.bannerUrl && (
+          <div className="relative w-full aspect-[16/6] overflow-hidden bg-muted">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={tournament.bannerUrl}
+              alt={`${tournament.name} banner`}
+              loading="lazy"
+              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+            />
+          </div>
+        )}
         <CardContent className="p-5">
           <div className="flex items-start justify-between mb-3">
             <div className="flex items-center gap-2">
