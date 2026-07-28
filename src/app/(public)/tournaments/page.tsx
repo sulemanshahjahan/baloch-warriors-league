@@ -80,13 +80,21 @@ function TournamentCard({
     <Link href={`/tournaments/${tournament.slug}`}>
       <Card className="hover:border-primary/50 transition-all hover:-translate-y-0.5 cursor-pointer h-full group overflow-hidden">
         {tournament.bannerUrl && (
-          <div className="relative w-full aspect-[16/6] overflow-hidden bg-muted">
+          <div className="relative w-full aspect-[16/9] overflow-hidden bg-muted">
+            {/* Blurred copy fills the frame so the full banner shows with no hard crop */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={tournament.bannerUrl}
+              alt=""
+              aria-hidden="true"
+              className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl opacity-50"
+            />
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={tournament.bannerUrl}
               alt={`${tournament.name} banner`}
               loading="lazy"
-              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+              className="relative z-10 w-full h-full object-contain transition-transform duration-300 group-hover:scale-[1.03]"
             />
           </div>
         )}
