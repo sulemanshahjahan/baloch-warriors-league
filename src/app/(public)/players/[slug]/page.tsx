@@ -843,11 +843,12 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {/* Current basis — computed live from all completed matches */}
+                {/* Live basis from all completed matches. Read-only preview —
+                    the stored card only changes when an admin recomputes. */}
                 <div className="mb-4 p-3 rounded-lg border border-amber-500/20 bg-amber-500/5">
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-xs font-semibold text-amber-400 uppercase tracking-wide">
-                      Current — {player.cardRank}
+                      Live basis{cardBasis.finalRank !== player.cardRank ? ` — would be ${cardBasis.finalRank}` : ` — ${player.cardRank}`}
                     </span>
                     {cardBasis.provisional && (
                       <span className="text-[10px] text-muted-foreground">Provisional</span>
@@ -856,6 +857,12 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
                   <pre className="text-[11px] text-muted-foreground whitespace-pre-wrap leading-relaxed font-sans">
                     {cardBasis.reason}
                   </pre>
+                  {cardBasis.finalRank !== player.cardRank && (
+                    <p className="text-[11px] text-amber-400/90 mt-2">
+                      Card currently shows <strong>{player.cardRank}</strong> — updates to{" "}
+                      <strong>{cardBasis.finalRank}</strong> at the next recompute.
+                    </p>
+                  )}
                 </div>
 
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
