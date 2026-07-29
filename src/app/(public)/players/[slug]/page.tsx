@@ -40,6 +40,7 @@ import {
   getInitials,
   formatDate,
 } from "@/lib/utils";
+import { buildStatsSnapshot, computeCardRank } from "@/lib/card-rank";
 
 interface PlayerPageProps {
   params: Promise<{ slug: string }>;
@@ -297,6 +298,11 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
   const player = await getPlayerBySlug(slug);
 
   if (!player) notFound();
+
+  // Live card-rank basis from ALL current matches, so the breakdown always
+  // reflects the player's latest record (the history log only captures the
+  // moments the rank number actually changed).
+  const cardBasis = computeCardRank(await buildStatsSnapshot(player.id));
 
   // The player's team ids (incl. 2v2 duos) so team-based matches count everywhere.
   const teamRows = await prisma.teamPlayer.findMany({
@@ -828,15 +834,33 @@ export default async function PlayerPage({ params }: PlayerPageProps) {
               </CardContent>
             </Card>
 
-            {/* Card Rank History */}
+            {/* Card Rank */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-amber-400" />
-                  Card Rank History
+                  Card Rank
                 </CardTitle>
               </CardHeader>
               <CardContent>
+                {/* Current basis — computed live from all completed matches */}
+                <div className="mb-4 p-3 rounded-lg border border-amber-500/20 bg-amber-500/5">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-semibold text-amber-400 uppercase tracking-wide">
+                      Current — {player.cardRank}
+                    </span>
+                    {cardBasis.provisional && (
+                      <span className="text-[10px] text-muted-foreground">Provisional</span>
+                    )}
+                  </div>
+                  <pre className="text-[11px] text-muted-foreground whitespace-pre-wrap leading-relaxed font-sans">
+                    {cardBasis.reason}
+                  </pre>
+                </div>
+
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                  Rank change history
+                </p>
                 {player.rankChanges.length === 0 ? (
                   <p className="text-muted-foreground text-sm text-center py-4">
                     No rank changes yet — card stays at <strong>{player.cardRank}</strong>.
