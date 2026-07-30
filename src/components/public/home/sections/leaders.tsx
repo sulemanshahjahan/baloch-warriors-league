@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { avatarSrc, type LeaderCard } from "../data";
 import { EmptyState, SectionHeading } from "../section-heading";
-import { BallIcon, ChartIcon, RatioIcon, ShieldCheckIcon } from "../icons";
+import { AssistIcon, BallIcon, ChartIcon, RatioIcon, ShieldCheckIcon } from "../icons";
 
 /** Per-metric styling: icon, accent and the sparkline that sits under the value. */
 function CardArt({ card }: { card: LeaderCard }) {
@@ -31,6 +31,42 @@ function CardArt({ card }: { card: LeaderCard }) {
               }
             />
           ))}
+        </svg>
+      );
+    }
+    case "assists": {
+      // Lollipop stems — a created chance per stem, distinct from the goal bars.
+      const stems = [12, 20, 15, 24, 18, 27, 22];
+      return (
+        <svg viewBox="0 0 120 30" fill="none" style={{ display: "block", width: "100%", height: 30 }}>
+          {stems.map((h, i) => {
+            const x = 6 + i * 18;
+            const last = i === stems.length - 1;
+            return (
+              <g key={i}>
+                <path
+                  d={`M${x} 30V${30 - h}`}
+                  stroke={
+                    last
+                      ? "var(--flame)"
+                      : `color-mix(in srgb, var(--flame) ${30 + h}%, transparent)`
+                  }
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+                <circle
+                  cx={x}
+                  cy={30 - h}
+                  r="3"
+                  fill={
+                    last
+                      ? "var(--flame)"
+                      : `color-mix(in srgb, var(--flame) ${34 + h}%, transparent)`
+                  }
+                />
+              </g>
+            );
+          })}
         </svg>
       );
     }
@@ -138,6 +174,16 @@ const CARD_META: Record<
       WebkitMask: "radial-gradient(110% 80% at 100% 0%, black, transparent 72%)",
     },
   },
+  assists: {
+    icon: <AssistIcon size={15} strokeWidth={17} />,
+    accent: "var(--flame)",
+    pattern: {
+      backgroundImage:
+        "repeating-linear-gradient(-46deg, color-mix(in srgb, var(--flame) 12%, transparent) 0 1px, transparent 1px 11px)",
+      mask: "radial-gradient(110% 80% at 100% 0%, black, transparent 72%)",
+      WebkitMask: "radial-gradient(110% 80% at 100% 0%, black, transparent 72%)",
+    },
+  },
   winRate: {
     icon: <RatioIcon size={15} strokeWidth={17} />,
     accent: "var(--flame)",
@@ -215,6 +261,7 @@ export function SeasonLeaders({ leaders }: { leaders: LeaderCard[] }) {
                   data-delay={i === 0 ? undefined : String(i * 70)}
                   data-lift="1"
                   data-spotlight="1"
+                  data-leader-card={card.key}
                   style={{
                     position: "relative",
                     overflow: "hidden",

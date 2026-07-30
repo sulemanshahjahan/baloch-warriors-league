@@ -487,6 +487,16 @@
   }
 }
 
+/* ── Season leaders ──────────────────────────────────────────
+   Assists is a tablet/mobile-only card: at desktop widths the rail settles at
+   four tracks, so a fifth would drop to a row of its own. Below that the grid
+   is already wrapping, so it costs nothing. */
+@media (min-width: 1025px) {
+  .bwl2 [data-leader-card="assists"] {
+    display: none !important;
+  }
+}
+
 /* ── Champion stat strip ─────────────────────────────────────
    Five tracks on desktop, reflowing to three then two. Cell rules live here
    rather than inline because which cell starts a row changes per breakpoint. */

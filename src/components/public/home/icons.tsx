@@ -78,6 +78,15 @@ export const BootIcon = (p: IconProps) => (
   </Icon>
 );
 
+/** A pass: the passer, the ball's arc, and where it lands. */
+export const AssistIcon = (p: IconProps) => (
+  <Icon {...p}>
+    <circle cx="58" cy="186" r="26" />
+    <path d="M84 166c56-24 90-62 106-108" />
+    <path d="M154 40h38v38" />
+  </Icon>
+);
+
 export const ArrowRightIcon = (p: IconProps) => (
   <Icon {...p}>
     <path d="M40 128h176M144 56l72 72-72 72" />

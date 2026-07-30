@@ -88,7 +88,7 @@ export interface FixtureRow {
 }
 
 export interface LeaderCard {
-  key: "goals" | "winRate" | "elo" | "cleanSheets";
+  key: "goals" | "assists" | "winRate" | "elo" | "cleanSheets";
   label: string;
   tag: string;
   value: number;
@@ -519,6 +519,33 @@ async function loadLeaders(): Promise<LeaderCard[]> {
       href: `/players/${scorer.player.slug}`,
     });
   }
+  // Assists only exist in 2v2 — a 1v1 scoreline has nobody to assist. So the
+  // denominator here is the player's duo appearances, not their overall match
+  // count, which would otherwise read as a far worse assist rate than it is.
+  const assister = overall.topAssists?.[0];
+  if (assister?.player) {
+    const duoMatches = await prisma.match.count({
+      where: {
+        status: "COMPLETED",
+        homeTeam: { isDuo: true },
+        OR: [
+          { homeTeam: { players: { some: { playerId: assister.player.id, isActive: true } } } },
+          { awayTeam: { players: { some: { playerId: assister.player.id, isActive: true } } } },
+        ],
+      },
+    });
+    cards.push({
+      key: "assists",
+      label: "Assists",
+      tag: `${duoMatches} duo ${duoMatches === 1 ? "match" : "matches"}`,
+      value: assister.count,
+      suffix: "",
+      playerName: assister.player.name,
+      playerId: assister.player.id,
+      href: `/players/${assister.player.slug}`,
+    });
+  }
+
   const winRate = overall.bestWinRate?.[0];
   if (winRate?.player) {
     cards.push({
