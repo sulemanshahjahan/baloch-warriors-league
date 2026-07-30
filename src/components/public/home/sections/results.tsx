@@ -1,31 +1,38 @@
 import Link from "next/link";
 import { formatDate, formatDateTime, getInitials } from "@/lib/utils";
-import type { ChampionData, FixtureRow, ResultRow } from "../data";
+import { avatarSrc, type ChampionData, type FixtureRow, type ResultRow, type SideRef } from "../data";
 import { EmptyState, SectionHeading } from "../section-heading";
 import { ArrowRightIcon, CalendarIcon, TrophySimpleIcon } from "../icons";
 
-const badge = (accent: "gold" | "accent" | "muted"): React.CSSProperties => ({
+type BadgeAccent = "gold" | "accent" | "muted";
+
+const badge = (accent: BadgeAccent): React.CSSProperties => ({
   display: "grid",
   placeItems: "center",
   width: 38,
   height: 38,
   flex: "none",
   borderRadius: "50%",
+  overflow: "hidden",
   fontFamily: "var(--font-display)",
   fontWeight: 600,
   fontSize: 14,
   letterSpacing: ".06em",
+  // The photo covers the tinted fill the comp used, so the winner reads through
+  // the ring instead: a brighter border plus a soft halo.
   ...(accent === "gold"
     ? {
-        border: "1px solid color-mix(in srgb, var(--gold) 52%, transparent)",
+        border: "1px solid color-mix(in srgb, var(--gold) 70%, transparent)",
         color: "var(--gold)",
         background: "color-mix(in srgb, var(--gold) 9%, transparent)",
+        boxShadow: "0 0 0 3px color-mix(in srgb, var(--gold) 16%, transparent)",
       }
     : accent === "accent"
       ? {
-          border: "1px solid var(--color-accent-600)",
+          border: "1px solid var(--color-accent)",
           color: "var(--color-accent-300)",
           background: "color-mix(in srgb, var(--color-accent-900) 58%, transparent)",
+          boxShadow: "0 0 0 3px color-mix(in srgb, var(--color-accent) 15%, transparent)",
         }
       : {
           border: "1px solid var(--color-neutral-800)",
@@ -59,6 +66,40 @@ function shortCode(name: string): string {
   if (initials.length >= 2) return initials;
   const letters = name.replace(/[^\p{L}\p{N}]/gu, "");
   return letters.slice(0, 2).toUpperCase() || initials;
+}
+
+/**
+ * Round badge for one side of a fixture: the player/team photo inside the
+ * result's accent ring. `/api/image` renders initials itself when there is no
+ * photo on file, so the ring is never empty; the text code is only used for a
+ * side that has no record at all yet (an undecided bracket slot).
+ */
+function SideBadge({ side, accent }: { side: SideRef; accent: BadgeAccent }) {
+  return (
+    <span aria-hidden="true" style={badge(accent)}>
+      {side.id ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={avatarSrc(side.type, side.id, 64)}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          width={38}
+          height={38}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            borderRadius: "50%",
+            // Losing side recedes, matching how its name is dimmed.
+            ...(accent === "muted" ? { filter: "grayscale(.45)", opacity: 0.72 } : {}),
+          }}
+        />
+      ) : (
+        shortCode(side.name)
+      )}
+    </span>
+  );
 }
 
 function isFinalRound(label: string | null): boolean {
@@ -192,9 +233,7 @@ function ResultRowCard({ r, index }: { r: ResultRow; index: number }) {
         >
           {r.home.name}
         </span>
-        <span aria-hidden="true" style={badge(homeWon ? (gold ? "gold" : "accent") : "muted")}>
-          {shortCode(r.home.name)}
-        </span>
+        <SideBadge side={r.home} accent={homeWon ? (gold ? "gold" : "accent") : "muted"} />
       </span>
 
       <span
@@ -267,9 +306,7 @@ function ResultRowCard({ r, index }: { r: ResultRow; index: number }) {
           minWidth: 0,
         }}
       >
-        <span aria-hidden="true" style={badge(awayWon ? (gold ? "gold" : "accent") : "muted")}>
-          {shortCode(r.away.name)}
-        </span>
+        <SideBadge side={r.away} accent={awayWon ? (gold ? "gold" : "accent") : "muted"} />
         <span data-side-name="1" style={awayWon ? nameWon : nameLost}>
           {r.away.name}
         </span>
