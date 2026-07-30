@@ -1,0 +1,473 @@
+/* ─────────────────────────────────────────────────────────────
+   BWL Landing v2 — design-system tokens, fonts and behaviour classes.
+
+   Everything visual is scoped to `.bwl2` (the landing root) so the rest of
+   the app keeps the Tailwind tokens in globals.css untouched. Only the
+   @font-face declarations are global — they merely *declare* the families;
+   nothing outside `.bwl2` references them.
+   ───────────────────────────────────────────────────────────── */
+
+/* ── Inter (body). One variable file per unicode-range; each weight pins the
+      wght axis, mirroring the Google Fonts v1 output the design shipped. ── */
+@font-face {
+  font-family: "BWL Inter";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/inter-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "BWL Inter";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/inter-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "BWL Inter";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/inter-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "BWL Inter";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/inter-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "BWL Inter";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/inter-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "BWL Inter";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/inter-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* ── Saira Condensed (display) ── */
+@font-face {
+  font-family: "BWL Saira Condensed";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/saira-condensed-500-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "BWL Saira Condensed";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/saira-condensed-500-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "BWL Saira Condensed";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/saira-condensed-600-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "BWL Saira Condensed";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/saira-condensed-600-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "BWL Saira Condensed";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/saira-condensed-700-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "BWL Saira Condensed";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/saira-condensed-700-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "BWL Saira Condensed";
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("/fonts/saira-condensed-800-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "BWL Saira Condensed";
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("/fonts/saira-condensed-800-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Tokens — Nocturne base re-tuned to the BWL midnight-navy ground with a
+   crimson → ember → flame accent ramp. Scoped to the landing root.
+   ───────────────────────────────────────────────────────────── */
+.bwl2 {
+  --color-bg: oklch(0.145 0.028 265);
+  --color-surface: oklch(0.206 0.026 264);
+  --color-divider: oklch(0.298 0.022 264);
+  --color-text: oklch(0.945 0.006 270);
+  --color-neutral-800: oklch(0.3 0.016 264);
+  --color-neutral-900: oklch(0.222 0.02 264);
+  --color-accent: oklch(0.66 0.19 30);
+  --color-accent-100: oklch(0.966 0.02 42);
+  --color-accent-200: oklch(0.922 0.048 40);
+  --color-accent-300: oklch(0.858 0.09 36);
+  --color-accent-400: oklch(0.768 0.15 33);
+  --color-accent-500: oklch(0.66 0.19 30);
+  --color-accent-600: oklch(0.548 0.18 27);
+  --color-accent-700: oklch(0.44 0.15 25);
+  --color-accent-800: oklch(0.342 0.115 24);
+  --color-accent-900: oklch(0.248 0.08 23);
+  --color-accent-2: oklch(0.775 0.16 55);
+  --color-accent-2-100: oklch(0.966 0.02 52);
+  --color-accent-2-800: oklch(0.352 0.11 48);
+  --crimson: oklch(0.475 0.175 23);
+  --crimson-deep: oklch(0.318 0.118 22);
+  --flame: oklch(0.775 0.16 55);
+  --gold: oklch(0.822 0.125 86);
+  --gold-deep: oklch(0.605 0.105 82);
+  --color-section: oklch(0.262 0.098 24);
+  --color-section-glow: oklch(0.368 0.132 28);
+
+  --font-heading: "BWL Inter", system-ui, sans-serif;
+  --font-heading-weight: 500;
+  --font-body: "BWL Inter", system-ui, sans-serif;
+  --font-display: "BWL Saira Condensed", "Archivo Narrow", var(--font-heading), system-ui, sans-serif;
+
+  --radius-md: 8px;
+}
+
+.bwl2 *,
+.bwl2 *::before,
+.bwl2 *::after {
+  box-sizing: border-box;
+}
+.bwl2 h1,
+.bwl2 h2,
+.bwl2 h3,
+.bwl2 h4 {
+  font-family: var(--font-heading);
+  font-weight: var(--font-heading-weight);
+  line-height: 1.12;
+  letter-spacing: -0.015em;
+  margin: 0;
+}
+.bwl2 p {
+  margin: 0;
+}
+.bwl2 img {
+  display: block;
+  max-width: 100%;
+}
+.bwl2 figure {
+  margin: 0;
+}
+.bwl2 a {
+  color: var(--color-accent);
+  text-decoration: none;
+  text-underline-offset: 3px;
+}
+.bwl2 a:hover {
+  color: var(--color-accent-400);
+}
+.bwl2 :focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+.bwl2 ::selection {
+  background: color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+
+/* — Nocturne button/tag primitives used by the design markup — */
+.bwl2 .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  text-decoration: none;
+  font-family: var(--font-heading);
+  font-weight: var(--font-heading-weight);
+  font-size: 14px;
+  line-height: 1.2;
+  color: var(--color-text);
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 5.6px 10.08px;
+  border-radius: var(--radius-md);
+}
+.bwl2 .btn svg {
+  display: block;
+}
+.bwl2 .btn-primary {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+.bwl2 .btn-secondary {
+  border-color: var(--color-divider);
+}
+.bwl2 .btn-ghost {
+  color: var(--color-accent);
+  padding-inline: 2.8px;
+}
+.bwl2 .btn-ghost:hover {
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+.bwl2 .tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  padding: 3px 10px;
+  border-radius: 6px;
+}
+.bwl2 .tag-outline {
+  border: 1px solid var(--color-accent);
+  color: var(--color-accent);
+}
+
+/* ── Motion keyframes ── */
+@keyframes bwl-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-13px); }
+}
+@keyframes bwl-bloom {
+  0%, 100% { opacity: 0.42; transform: scale(1); }
+  50% { opacity: 0.82; transform: scale(1.07); }
+}
+@keyframes bwl-ember {
+  0%, 100% { opacity: 0.28; }
+  50% { opacity: 0.66; }
+}
+@keyframes bwl-sheen {
+  0% { background-position: 210% 50%; }
+  100% { background-position: -110% 50%; }
+}
+@keyframes bwl-orbit {
+  to { transform: rotate(360deg); }
+}
+@keyframes bwl-orbit-rev {
+  to { transform: rotate(-360deg); }
+}
+@keyframes bwl-drift {
+  0% { transform: translate3d(0, 0, 0); opacity: 0; }
+  14% { opacity: 0.85; }
+  84% { opacity: 0.55; }
+  100% { transform: translate3d(16px, -132px, 0); opacity: 0; }
+}
+@keyframes bwl-ray {
+  0%, 100% { opacity: 0.09; transform: translateX(0) skewX(-17deg); }
+  50% { opacity: 0.2; transform: translateX(30px) skewX(-17deg); }
+}
+@keyframes bwl-smoke {
+  0%, 100% { opacity: 0.2; transform: translateX(-2%) scale(1); }
+  50% { opacity: 0.42; transform: translateX(4%) scale(1.09); }
+}
+@keyframes bwl-live {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent) 62%, transparent); }
+  70% { box-shadow: 0 0 0 8px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@keyframes bwl-shine {
+  0% { transform: translateX(-170%) skewX(-18deg); }
+  100% { transform: translateX(380%) skewX(-18deg); }
+}
+@keyframes bwl-rise {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes bwl-drawer-glow {
+  0%, 100% { opacity: 0.5; transform: translateY(0) scale(1); }
+  50% { opacity: 0.9; transform: translateY(-3%) scale(1.06); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bwl2 *,
+  .bwl2 *::before,
+  .bwl2 *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Hover states. The exported design carried these as `style-hover`
+   attributes, which no browser understands — they are re-expressed here as
+   real CSS keyed off the same data attributes the markup already uses.
+   ───────────────────────────────────────────────────────────── */
+.bwl2 [data-hv="icon-btn"]:hover {
+  border-color: var(--color-accent-600);
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent-900) 62%, transparent);
+}
+.bwl2 [data-hv="profile-chip"]:hover {
+  border-color: var(--color-divider);
+  background: color-mix(in srgb, var(--color-surface) 55%, transparent);
+}
+.bwl2 [data-hv="cta"]:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--color-accent) 22%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+.bwl2 [data-hv="menu"]:hover {
+  transform: translateY(-2px);
+  border-color: var(--color-accent);
+  box-shadow:
+    0 14px 32px color-mix(in srgb, var(--color-accent) 26%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--flame) 26%, transparent);
+}
+.bwl2 [data-hv="drawer-close"]:hover {
+  border-color: var(--color-accent);
+  color: var(--color-text);
+  transform: translateY(-2px);
+}
+.bwl2 [data-hv="drawer-cta"]:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 32px color-mix(in srgb, var(--color-accent) 24%, transparent);
+}
+.bwl2 [data-hv="hero-primary"]:hover {
+  transform: translateY(-2px);
+  border-color: var(--color-accent);
+  box-shadow:
+    0 18px 40px color-mix(in srgb, var(--color-accent) 26%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--flame) 34%, transparent);
+}
+.bwl2 [data-hv="hero-secondary"]:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--color-text) 40%, transparent);
+  background: color-mix(in srgb, var(--color-surface) 70%, transparent);
+}
+.bwl2 [data-hv="gold-cta"]:hover {
+  transform: translateY(-2px);
+  border-color: var(--gold);
+  box-shadow: 0 16px 38px color-mix(in srgb, var(--gold) 18%, transparent);
+}
+.bwl2 [data-hv="app-cta"]:hover {
+  transform: translateY(-2px);
+  border-color: var(--color-text);
+  background: color-mix(in srgb, var(--color-text) 9%, transparent);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+}
+.bwl2 [data-hv="social"]:hover {
+  border-color: var(--color-accent-600);
+  color: var(--color-accent);
+  transform: translateY(-2px);
+}
+.bwl2 [data-hv="foot-link"]:hover {
+  color: var(--color-accent);
+}
+
+/* Shared 38×38 icon control (search / notifications) in the landing header. */
+.bwl2 .bwl2-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  cursor: pointer;
+  border: 1px solid var(--color-divider);
+  background: color-mix(in srgb, var(--color-surface) 50%, transparent);
+  color: color-mix(in srgb, var(--color-text) 76%, transparent);
+  transition: border-color 0.3s ease, color 0.3s ease, background 0.3s ease;
+}
+.bwl2 .bwl2-icon-btn:hover {
+  border-color: var(--color-accent-600);
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent-900) 62%, transparent);
+}
+
+/* Drawer rows — edge bar, sweep, number, arrow and label all react to the row. */
+.bwl2 [data-drawer-link]:hover [data-link-sweep],
+.bwl2 [data-drawer-link]:focus-visible [data-link-sweep] {
+  opacity: 1;
+  transform: none;
+}
+.bwl2 [data-drawer-link]:hover [data-link-edge],
+.bwl2 [data-drawer-link]:focus-visible [data-link-edge] {
+  transform: scaleY(1);
+}
+.bwl2 [data-drawer-link]:hover [data-link-num],
+.bwl2 [data-drawer-link]:focus-visible [data-link-num] {
+  color: var(--color-accent);
+}
+.bwl2 [data-drawer-link]:hover [data-link-text],
+.bwl2 [data-drawer-link]:focus-visible [data-link-text] {
+  transform: translateX(12px);
+  color: var(--color-text);
+}
+.bwl2 [data-drawer-link]:hover [data-link-arrow],
+.bwl2 [data-drawer-link]:focus-visible [data-link-arrow] {
+  opacity: 1;
+  transform: none;
+}
+
+/* Header collapse ladder — the one thing inline styles cannot express. */
+@media (max-width: 1080px) {
+  .bwl2 [data-brand-sub] { display: none !important; }
+}
+/* Account chips (points, profile, sign-in) fold away in the header — they stay
+   reachable in the drawer, which renders the same component untagged. */
+@media (max-width: 900px) {
+  .bwl2 [data-header-collapse] { display: none !important; }
+}
+@media (max-width: 620px) {
+  .bwl2 [data-cta-label] { display: none !important; }
+}
+@media (max-width: 480px) {
+  .bwl2 [data-menu-label] { display: none !important; }
+}
+
+/* The results board drops its bracket rail before the row grid gets cramped,
+   and the rows themselves stack their two sides on narrow screens. */
+@media (max-width: 900px) {
+  .bwl2 [data-results-grid] { grid-template-columns: minmax(0, 1fr) !important; }
+  .bwl2 [data-bracket] {
+    border-left: 0 !important;
+    padding-left: 0 !important;
+    border-top: 1px solid var(--color-divider);
+    padding-top: 24px !important;
+  }
+}
+@media (max-width: 620px) {
+  .bwl2 [data-result-row] {
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) !important;
+    gap: 10px !important;
+  }
+  .bwl2 [data-result-meta] {
+    grid-column: 1 / -1;
+  }
+  .bwl2 [data-score] {
+    font-size: 26px !important;
+  }
+  .bwl2 [data-side-name] {
+    font-size: 15px !important;
+  }
+}

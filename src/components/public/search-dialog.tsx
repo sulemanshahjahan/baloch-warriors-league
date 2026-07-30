@@ -17,7 +17,16 @@ interface SearchResults {
   tournaments: Array<{ id: string; name: string; slug: string; gameCategory: string; status: string }>;
 }
 
-export function SearchDialog() {
+interface SearchDialogProps {
+  /**
+   * Optional custom trigger. Lets a host with its own design language (e.g. the
+   * v2 landing header) supply the button while reusing all the search
+   * behaviour. Omit for the standard navbar trigger.
+   */
+  renderTrigger?: (open: () => void) => React.ReactNode;
+}
+
+export function SearchDialog({ renderTrigger }: SearchDialogProps = {}) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResults | null>(null);
@@ -93,6 +102,9 @@ export function SearchDialog() {
   return (
     <>
       {/* Trigger button */}
+      {renderTrigger ? (
+        renderTrigger(() => setOpen(true))
+      ) : (
       <button
         onClick={() => setOpen(true)}
         aria-label="Search"
@@ -102,6 +114,7 @@ export function SearchDialog() {
         <span className="hidden sm:inline">Search...</span>
         <kbd className="hidden sm:inline text-[10px] px-1.5 py-0.5 rounded bg-muted border border-border/50 font-mono">⌘K</kbd>
       </button>
+      )}
 
       <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) { setQuery(""); setResults(null); } }}>
         <DialogContent className="sm:max-w-lg p-0 gap-0 overflow-hidden">

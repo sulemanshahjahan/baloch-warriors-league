@@ -5,7 +5,11 @@ import { Download, ChevronRight } from "lucide-react";
 
 const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.bwl.league";
 
-export function DownloadAppButton({ variant }: { variant: "navbar-desktop" | "navbar-mobile" | "hero" }) {
+export function DownloadAppButton({
+  variant,
+}: {
+  variant: "navbar-desktop" | "navbar-mobile" | "hero" | "landing";
+}) {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
@@ -15,6 +19,50 @@ export function DownloadAppButton({ variant }: { variant: "navbar-desktop" | "na
   }, []);
 
   if (!show) return null;
+
+  // v2 landing "Get app" band — styled by the landing design system, so it only
+  // carries layout here and inherits colour from the surrounding `.bwl2` scope.
+  if (variant === "landing") {
+    return (
+      <a
+        data-shine="1"
+        data-hv="app-cta"
+        className="btn btn-primary"
+        href={PLAY_STORE_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          position: "relative",
+          overflow: "hidden",
+          marginTop: 30,
+          padding: "16px 26px",
+          fontFamily: "var(--font-display)",
+          fontWeight: 600,
+          fontSize: 15,
+          letterSpacing: ".11em",
+          textTransform: "uppercase",
+          color: "var(--color-text)",
+          borderColor: "color-mix(in srgb, var(--color-text) 52%, transparent)",
+          transition:
+            "transform .34s cubic-bezier(.2,.7,.2,1), border-color .34s ease, box-shadow .34s ease, background .34s ease",
+        }}
+      >
+        <svg
+          viewBox="0 0 256 256"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={20}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+          style={{ width: 17, height: 17 }}
+        >
+          <path d="M128 32v120M84 108l44 44 44-44M40 200h176" />
+        </svg>
+        Get on Google Play
+      </a>
+    );
+  }
 
   if (variant === "navbar-desktop") {
     return (

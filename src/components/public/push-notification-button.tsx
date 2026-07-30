@@ -90,7 +90,15 @@ async function unsubscribeFromFCM(): Promise<void> {
 // Navbar bell icon button
 // ═══════════════════════════════════════
 
-export function PushNotificationButton() {
+export function PushNotificationButton({
+  className,
+  iconClassName,
+}: {
+  /** Override the button chrome so hosts with their own design language (e.g.
+   *  the v2 landing header) can style the control without forking it. */
+  className?: string;
+  iconClassName?: string;
+} = {}) {
   const [supported, setSupported] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -215,12 +223,20 @@ export function PushNotificationButton() {
     <button
       onClick={handleToggle}
       disabled={loading}
-      className={`p-2.5 rounded-lg transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center ${
-        subscribed ? "text-primary hover:bg-primary/10" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
-      }`}
+      className={
+        className ??
+        `p-2.5 rounded-lg transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center ${
+          subscribed ? "text-primary hover:bg-primary/10" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+        }`
+      }
       title={subscribed ? "Notifications on" : "Turn on notifications"}
+      aria-label={subscribed ? "Notifications on" : "Turn on notifications"}
     >
-      {subscribed ? <BellRing className="w-5 h-5" /> : <Bell className="w-5 h-5" />}
+      {subscribed ? (
+        <BellRing className={iconClassName ?? "w-5 h-5"} />
+      ) : (
+        <Bell className={iconClassName ?? "w-5 h-5"} />
+      )}
     </button>
   );
 }
