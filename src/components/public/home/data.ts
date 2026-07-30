@@ -119,6 +119,8 @@ export interface ChampionData {
   }[];
 }
 
+export type FormResult = "W" | "D" | "L";
+
 export interface PlayerOfWeekData {
   id: string;
   name: string;
@@ -129,8 +131,8 @@ export interface PlayerOfWeekData {
   eloGained: number;
   goalsPerMatch: string;
   eloRank: number | null;
-  /** most recent last, true = win */
-  form: boolean[];
+  /** last ten results, oldest first */
+  form: FormResult[];
   formLabel: string;
 }
 
@@ -444,16 +446,31 @@ async function loadPlayerOfWeek(): Promise<PlayerOfWeekData | null> {
         leg2AwayScore: true,
         leg3HomeScore: true,
         leg3AwayScore: true,
+        homeScorePens: true,
+        awayScorePens: true,
       },
     }),
   ]);
 
-  // Oldest first so the bar chart reads left → right through time.
-  const form = [...recent].reverse().map((m) => {
+  // Oldest first so the bar chart reads left → right through time. A level
+  // scoreline is a draw, not a loss — unless a shootout settled it.
+  const form: FormResult[] = [...recent].reverse().map((m) => {
     const t = legTotals(m);
-    return m.homePlayerId === potw.playerId ? t.home > t.away : t.away > t.home;
+    const atHome = m.homePlayerId === potw.playerId;
+    const own = atHome ? t.home : t.away;
+    const opp = atHome ? t.away : t.home;
+    if (own > opp) return "W";
+    if (own < opp) return "L";
+    if (m.homeScorePens != null && m.awayScorePens != null) {
+      const ownP = atHome ? m.homeScorePens : m.awayScorePens;
+      const oppP = atHome ? m.awayScorePens : m.homeScorePens;
+      if (ownP > oppP) return "W";
+      if (ownP < oppP) return "L";
+    }
+    return "D";
   });
-  const wonInForm = form.filter(Boolean).length;
+  const tally = { W: 0, D: 0, L: 0 };
+  for (const r of form) tally[r]++;
 
   return {
     id: potw.player.id,
@@ -468,7 +485,10 @@ async function loadPlayerOfWeek(): Promise<PlayerOfWeekData | null> {
     eloRank: higherRated + 1,
     form,
     formLabel: form.length
-      ? `Form · ${wonInForm}W ${form.length - wonInForm}L`
+      ? `Form · ${(["W", "D", "L"] as const)
+          .filter((k) => tally[k] > 0)
+          .map((k) => `${tally[k]}${k}`)
+          .join(" ")}`
       : "Form · no matches yet",
   };
 }

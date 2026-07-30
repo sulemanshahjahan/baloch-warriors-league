@@ -547,6 +547,7 @@ export function Hero() {
 
 const divider = (
   <span
+    data-live-rule="1"
     aria-hidden="true"
     style={{ width: 1, height: 22, flex: "none", background: "var(--color-divider)" }}
   />
@@ -577,6 +578,7 @@ export function LiveStatus({
     >
       <div
         data-reveal="1"
+        data-live-strip="1"
         style={{
           display: "flex",
           alignItems: "center",
@@ -827,23 +829,15 @@ export function Numbers({
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))",
             gap: "32px 0",
           }}
+          data-numbers-grid="1"
         >
           {cells.map((cell, i) => (
             <div
               key={cell.label}
               data-reveal="1"
               data-delay={i === 0 ? undefined : String(i * 70)}
-              style={{
-                padding:
-                  i === 0 ? "2px clamp(16px,2.4vw,32px) 2px 0" : "2px clamp(16px,2.4vw,32px)",
-                borderLeft:
-                  i === 0
-                    ? undefined
-                    : "1px solid color-mix(in srgb, var(--color-text) 13%, transparent)",
-              }}
             >
               <span
                 aria-hidden="true"

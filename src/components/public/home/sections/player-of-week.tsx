@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { avatarSrc, type PlayerOfWeekData } from "../data";
+import { avatarSrc, type FormResult, type PlayerOfWeekData } from "../data";
 import { ArrowRightIcon } from "../icons";
 
 const metric: React.CSSProperties = { display: "flex", flexDirection: "column", gap: 5 };
@@ -18,11 +18,19 @@ const metricValue: React.CSSProperties = {
 function Rule() {
   return (
     <span
+      data-potw-rule="1"
       aria-hidden="true"
       style={{ width: 1, height: 34, background: "var(--color-divider)" }}
     />
   );
 }
+
+/** Win / draw / loss bar. Height and colour both carry the result. */
+const FORM_BAR: Record<FormResult, { height: string; background: string }> = {
+  W: { height: "100%", background: "var(--color-accent)" },
+  D: { height: "62%", background: "color-mix(in srgb, var(--color-text) 42%, transparent)" },
+  L: { height: "40%", background: "color-mix(in srgb, var(--color-text) 20%, transparent)" },
+};
 
 export function PlayerOfWeek({ potw }: { potw: PlayerOfWeekData | null }) {
   if (!potw) return null;
@@ -161,6 +169,7 @@ export function PlayerOfWeek({ potw }: { potw: PlayerOfWeekData | null }) {
         </span>
 
         <span
+          data-potw-metrics="1"
           style={{
             position: "relative",
             display: "flex",
@@ -252,27 +261,30 @@ export function PlayerOfWeek({ potw }: { potw: PlayerOfWeekData | null }) {
                   aria-hidden="true"
                   style={{ display: "flex", alignItems: "flex-end", gap: 3, height: 22 }}
                 >
-                  {potw.form.map((won, i) => (
-                    <span
-                      key={i}
-                      style={{
-                        width: 6,
-                        height: won ? "100%" : "46%",
-                        borderRadius: 2,
-                        background: won
-                          ? i === potw.form.length - 1
-                            ? "var(--flame)"
-                            : "var(--color-accent)"
-                          : "color-mix(in srgb, var(--color-text) 22%, transparent)",
-                      }}
-                    />
-                  ))}
+                  {potw.form.map((result, i) => {
+                    const bar = FORM_BAR[result];
+                    const latest = i === potw.form.length - 1;
+                    return (
+                      <span
+                        key={i}
+                        style={{
+                          width: 6,
+                          height: bar.height,
+                          borderRadius: 2,
+                          // The most recent result is picked out in flame.
+                          background:
+                            latest && result === "W" ? "var(--flame)" : bar.background,
+                        }}
+                      />
+                    );
+                  })}
                 </span>
               </span>
             </>
           )}
           <span
             data-arrow-host="1"
+            data-potw-cta="1"
             style={{
               display: "inline-flex",
               alignItems: "center",

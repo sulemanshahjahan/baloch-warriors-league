@@ -5,18 +5,20 @@ import type { ChampionData } from "../data";
 import { Kicker } from "../section-heading";
 import { ArrowRightIcon, BootIcon, TrophyIcon } from "../icons";
 
+// No `white-space: nowrap` here — at three columns on a narrow screen a label
+// like "MATCHES" is wider than its track, and nowrap makes it overrun the
+// neighbouring column instead of wrapping.
 const statLabel: React.CSSProperties = {
   fontSize: 11.5,
   letterSpacing: ".18em",
   textTransform: "uppercase",
-  whiteSpace: "nowrap",
   color: "color-mix(in srgb, var(--color-text) 58%, transparent)",
 };
 const statValue: React.CSSProperties = {
   fontFamily: "var(--font-display)",
   fontWeight: 600,
   fontSize: 20,
-  whiteSpace: "nowrap",
+  overflowWrap: "anywhere",
   fontFeatureSettings: "'tnum' 1",
 };
 
@@ -347,28 +349,27 @@ export function Champion({ champion }: { champion: ChampionData | null }) {
             </p>
           )}
 
+          {/* Column count and cell rules are driven from landing.css so the strip
+              can reflow to 3 (then 2) columns without the dividers landing in
+              the wrong places. */}
           <div
             data-reveal="1"
             data-delay="210"
+            data-champion-stats="1"
             style={{
               display: "grid",
-              gridTemplateColumns: `repeat(${cells.length},minmax(0,1fr))`,
               marginTop: 38,
               borderTop: "1px solid color-mix(in srgb, var(--gold) 26%, transparent)",
               borderBottom: "1px solid color-mix(in srgb, var(--color-divider) 90%, transparent)",
             }}
           >
-            {cells.map((c, i) => (
+            {cells.map((c) => (
               <span
                 key={c.label}
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 7,
-                  minWidth: 0,
-                  padding: i === 0 ? "18px 8px 18px 0" : "18px 8px",
-                  borderLeft: i === 0 ? undefined : "1px solid var(--color-divider)",
-                }}
+                // Padding lives in landing.css alongside the cell rules — an
+                // inline shorthand here would outrank the per-breakpoint
+                // padding-left reset on whichever cell opens a row.
+                style={{ display: "flex", flexDirection: "column", gap: 7, minWidth: 0 }}
               >
                 <span style={c.gold ? { ...statLabel, color: "var(--gold)" } : statLabel}>
                   {c.label}
